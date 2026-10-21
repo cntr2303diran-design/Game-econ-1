@@ -35,7 +35,10 @@ fun MarkasScreen(
     gameState: GameState,
     onOpenKoranPagi: () -> Unit,
     onOpenJurnalKeputusan: (Decision) -> Unit,
-    onOpenEventDialog: () -> Unit,
+    onOpenEventDialog: (String) -> Unit,
+    onRejectProposal: (String) -> Unit,
+    onEquityCure: () -> Unit,
+    onNewGame: () -> Unit,
     onInspectOrigin: (DataOriginInfo) -> Unit,
     onAdvanceTurn: () -> Unit,
     modifier: Modifier = Modifier
@@ -45,7 +48,6 @@ fun MarkasScreen(
         val scrollState = rememberScrollState()
 
         if (isLandscapeWide) {
-            // Mode Landscape / Tablet: 2 Kolom Terminal Eksekutif (Kiri: Peringatan, Koran Pagi, Indikator; Kanan: FanChart, Menunggu Keputusan, Kalibrasi, Akhiri Giliran)
             Row(
                 modifier = Modifier
                     .fillMaxSize()
@@ -57,9 +59,24 @@ fun MarkasScreen(
                     modifier = Modifier.weight(1.05f),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    if (gameState.gameOverReason != null) {
+                        GameOverBanner(
+                            reason = gameState.gameOverReason,
+                            isVictory = gameState.isVictory,
+                            evaluation = gameState.campaignEvaluation,
+                            onNewGame = onNewGame
+                        )
+                    }
+
+                    ScenarioDifficultyBanner(gameState = gameState)
+
                     CovenantWarningBanner(
                         title = gameState.covenantWarningTitle,
                         subtitle = gameState.covenantWarningSubtitle,
+                        tone = gameState.covenantTone,
+                        canEquityCure = gameState.canEquityCure,
+                        equityCureAmountText = gameState.equityCureAmountText,
+                        onEquityCure = onEquityCure,
                         originInfo = gameState.covenantOrigin,
                         onInspectOrigin = onInspectOrigin
                     )
@@ -76,6 +93,10 @@ fun MarkasScreen(
                         indicators = gameState.markasIndicators,
                         onInspectOrigin = onInspectOrigin
                     )
+
+                    if (gameState.memos.isNotEmpty()) {
+                        MemosSection(memos = gameState.memos)
+                    }
                 }
 
                 Column(
@@ -84,24 +105,30 @@ fun MarkasScreen(
                 ) {
                     PendingDecisionsSection(
                         decisions = gameState.pendingDecisions,
+                        scheduledChainCount = gameState.scheduledChainCount,
                         onDecisionClick = { decision ->
                             if (decision.opensEventDialog) {
-                                onOpenEventDialog()
+                                onOpenEventDialog(decision.id)
                             } else {
                                 onOpenJurnalKeputusan(decision)
                             }
-                        }
+                        },
+                        onReject = onRejectProposal
                     )
 
                     FanChart(
                         title = "Proyeksi Kas & Ketidakpastian (FanChart)",
-                        subtitle = "Pita keyakinan 50% & 90% dalam 6 giliran ke depan",
+                        subtitle = "Pita keyakinan 50% & 90% dalam 6 giliran ke depan (Kesulitan: ${gameState.difficultyLabel})",
                         historyPoints = gameState.cashHistoryPoints,
                         medianFuturePoints = gameState.cashFanMedianPoints,
                         spread50Points = gameState.cashFanBand50Points,
                         spread90Points = gameState.cashFanBand90Points,
                         unitLabel = "juta RS"
                     )
+
+                    if (gameState.campaignEvaluation != null) {
+                        CampaignScoreCard(evaluation = gameState.campaignEvaluation)
+                    }
 
                     CognitiveCalibrationCard(
                         brierScore = gameState.brierScore,
@@ -111,12 +138,12 @@ fun MarkasScreen(
 
                     EndTurnPrimaryButton(
                         turn = gameState.turn,
-                        onAdvanceTurn = onAdvanceTurn
+                        gameOver = gameState.gameOverReason != null,
+                        onAdvanceTurn = if (gameState.gameOverReason != null) onNewGame else onAdvanceTurn
                     )
                 }
             }
         } else {
-            // Mode Portrait Satu Tangan
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -124,9 +151,24 @@ fun MarkasScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                if (gameState.gameOverReason != null) {
+                    GameOverBanner(
+                        reason = gameState.gameOverReason,
+                        isVictory = gameState.isVictory,
+                        evaluation = gameState.campaignEvaluation,
+                        onNewGame = onNewGame
+                    )
+                }
+
+                ScenarioDifficultyBanner(gameState = gameState)
+
                 CovenantWarningBanner(
                     title = gameState.covenantWarningTitle,
                     subtitle = gameState.covenantWarningSubtitle,
+                    tone = gameState.covenantTone,
+                    canEquityCure = gameState.canEquityCure,
+                    equityCureAmountText = gameState.equityCureAmountText,
+                    onEquityCure = onEquityCure,
                     originInfo = gameState.covenantOrigin,
                     onInspectOrigin = onInspectOrigin
                 )
@@ -144,26 +186,36 @@ fun MarkasScreen(
                     onInspectOrigin = onInspectOrigin
                 )
 
+                if (gameState.memos.isNotEmpty()) {
+                    MemosSection(memos = gameState.memos)
+                }
+
                 PendingDecisionsSection(
                     decisions = gameState.pendingDecisions,
+                    scheduledChainCount = gameState.scheduledChainCount,
                     onDecisionClick = { decision ->
                         if (decision.opensEventDialog) {
-                            onOpenEventDialog()
+                            onOpenEventDialog(decision.id)
                         } else {
                             onOpenJurnalKeputusan(decision)
                         }
-                    }
+                    },
+                    onReject = onRejectProposal
                 )
 
                 FanChart(
                     title = "Proyeksi Kas & Ketidakpastian (FanChart)",
-                    subtitle = "Pita keyakinan 50% & 90% dalam 6 giliran ke depan",
+                    subtitle = "Pita keyakinan 50% & 90% dalam 6 giliran ke depan (Kesulitan: ${gameState.difficultyLabel})",
                     historyPoints = gameState.cashHistoryPoints,
                     medianFuturePoints = gameState.cashFanMedianPoints,
                     spread50Points = gameState.cashFanBand50Points,
                     spread90Points = gameState.cashFanBand90Points,
                     unitLabel = "juta RS"
                 )
+
+                if (gameState.campaignEvaluation != null) {
+                    CampaignScoreCard(evaluation = gameState.campaignEvaluation)
+                }
 
                 CognitiveCalibrationCard(
                     brierScore = gameState.brierScore,
@@ -173,7 +225,54 @@ fun MarkasScreen(
 
                 EndTurnPrimaryButton(
                     turn = gameState.turn,
-                    onAdvanceTurn = onAdvanceTurn
+                    gameOver = gameState.gameOverReason != null,
+                    onAdvanceTurn = if (gameState.gameOverReason != null) onNewGame else onAdvanceTurn
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScenarioDifficultyBanner(gameState: GameState) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(6.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Skenario: ${gameState.scenarioTitle.ifEmpty { "Warisan Bangkrut" }} · Seed #${gameState.seed}",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "${gameState.eraName} · PPh Efektif ${gameState.effectiveTaxRateText}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Surface(
+                color = if (gameState.isIronman) KapitalSemanticColors.redContainer else KapitalSemanticColors.blueContainer,
+                shape = RoundedCornerShape(4.dp)
+            ) {
+                Text(
+                    text = "Mode: ${gameState.difficultyLabel}${if (gameState.isIronman) " (Ironman)" else ""}",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontFamily = MonoFontFamily,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = if (gameState.isIronman) KapitalSemanticColors.red else KapitalSemanticColors.blue,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                 )
             }
         }
@@ -185,54 +284,240 @@ fun MarkasScreen(
 private fun CovenantWarningBanner(
     title: String,
     subtitle: String,
+    tone: SemanticTone,
+    canEquityCure: Boolean,
+    equityCureAmountText: String,
+    onEquityCure: () -> Unit,
     originInfo: DataOriginInfo,
     onInspectOrigin: (DataOriginInfo) -> Unit
 ) {
+    val fg = semanticToneColor(tone)
+    val bg = semanticToneContainerColor(tone)
     Surface(
-        color = KapitalSemanticColors.yellowContainer,
+        color = bg,
         shape = RoundedCornerShape(6.dp),
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(6.dp))
-            .border(1.dp, KapitalSemanticColors.yellow.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
+            .border(1.dp, fg.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
             .combinedClickable(
                 onClick = { onInspectOrigin(originInfo) },
                 onLongClick = { onInspectOrigin(originInfo) }
             )
-            .defaultMinSize(minHeight = 56.dp)
             .testTag("covenant_warning_card")
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.WarningAmber,
-                contentDescription = "Peringatan Covenant",
-                tint = KapitalSemanticColors.yellow,
-                modifier = Modifier.size(22.dp)
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = KapitalSemanticColors.yellow
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.WarningAmber,
+                        contentDescription = "Peringatan Covenant",
+                        tint = fg,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Column {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = fg
+                        )
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+                Icon(
+                    imageVector = Icons.Outlined.Info,
+                    contentDescription = "Lihat Asal Data Covenant",
+                    tint = fg,
+                    modifier = Modifier.size(18.dp)
                 )
             }
-            Icon(
-                imageVector = Icons.Outlined.Info,
-                contentDescription = "Asal data covenant",
-                tint = KapitalSemanticColors.yellow,
-                modifier = Modifier.size(18.dp)
+            if (canEquityCure) {
+                OutlinedButton(
+                    onClick = onEquityCure,
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                ) {
+                    Text("Suntikan Ekuitas Pemegang Saham / Equity Cure (+$equityCureAmountText · 2 AP)")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GameOverBanner(
+    reason: String,
+    isVictory: Boolean,
+    evaluation: CampaignEvaluationUi?,
+    onNewGame: () -> Unit
+) {
+    val fg = if (isVictory) KapitalSemanticColors.green else KapitalSemanticColors.red
+    val bg = if (isVictory) KapitalSemanticColors.greenContainer else KapitalSemanticColors.redContainer
+    Surface(
+        color = bg,
+        shape = RoundedCornerShape(6.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.5.dp, fg, RoundedCornerShape(6.dp))
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = if (isVictory) "KAMPANYE 40 TAHUN BERHASIL DISELESAIKAN" else "PERMAINAN BERAKHIR",
+                style = MaterialTheme.typography.labelMedium.copy(fontFamily = MonoFontFamily, fontWeight = FontWeight.Bold),
+                color = fg
             )
+            Text(reason, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+            if (evaluation != null) {
+                Text(
+                    text = "Evaluasi Akhir: Kelas ${evaluation.grade} (${evaluation.totalScore}/100) · ${evaluation.archetypeTitle}",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = fg
+                )
+            }
+            Button(
+                onClick = onNewGame,
+                colors = ButtonDefaults.buttonColors(containerColor = fg, contentColor = Color.White),
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+            ) {
+                Text("Mulai Permainan Baru")
+            }
+        }
+    }
+}
+
+@Composable
+private fun CampaignScoreCard(evaluation: CampaignEvaluationUi) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(6.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Evaluasi Kepemimpinan 5 Komponen",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = evaluation.archetypeTitle,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = KapitalSemanticColors.blue
+                    )
+                }
+                Surface(
+                    color = KapitalSemanticColors.blueContainer,
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text(
+                        text = "Kelas ${evaluation.grade} · ${evaluation.totalScore}/100",
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontFamily = MonoFontFamily,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = KapitalSemanticColors.blue,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                ScoreMetricPill("Nilai Riil (30%)", "${evaluation.nilaiPerusahaanScore}")
+                ScoreMetricPill("Ketahanan (20%)", "${evaluation.ketahananScore}")
+                ScoreMetricPill("Kalibrasi (20%)", "${evaluation.kualitasKeputusanScore}")
+                ScoreMetricPill("Etika (15%)", "${evaluation.etikaReputasiScore}")
+                ScoreMetricPill("Sosial (15%)", "${evaluation.dampakSosialScore}")
+            }
+
+            Text(
+                text = "Kepercayaan Dewan: ${evaluation.boardTrust}/100 · Jejak Etika: ${evaluation.ethicsRiskLabel}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun ScoreMetricPill(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontFamily = MonoFontFamily,
+                fontWeight = FontWeight.Bold
+            ),
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun MemosSection(memos: List<MemoItem>) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(6.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "Memo Meja Direksi Bulan Ini (masing-masing punya kepentingan)",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            memos.forEach { m ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(4.dp))
+                        .padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = "${m.from} · ${m.role}",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = KapitalSemanticColors.blue
+                    )
+                    Text(
+                        text = "“${m.text}”",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
         }
     }
 }
@@ -253,7 +538,6 @@ private fun MorningPaperPreviewCard(
             .clip(RoundedCornerShape(6.dp))
             .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
             .clickable(onClick = onClick)
-            .defaultMinSize(minHeight = 48.dp)
             .testTag("morning_paper_card")
     ) {
         Column(
@@ -276,8 +560,11 @@ private fun MorningPaperPreviewCard(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = source,
-                        style = MaterialTheme.typography.labelLarge,
+                        text = source.uppercase(),
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontFamily = MonoFontFamily,
+                            fontWeight = FontWeight.Bold
+                        ),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -286,7 +573,7 @@ private fun MorningPaperPreviewCard(
 
             Text(
                 text = headline,
-                style = MaterialTheme.typography.displayMedium.copy(
+                style = MaterialTheme.typography.headlineMedium.copy(
                     fontFamily = NotoSerifFontFamily,
                     fontWeight = FontWeight.Bold
                 ),
@@ -329,31 +616,14 @@ private fun MarkasIndicatorsGrid(
     indicators: List<Indicator>,
     onInspectOrigin: (DataOriginInfo) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Indikator Utama",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = "Ketuk / tahan angka untuk Asal data",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        val chunked = indicators.chunked(2)
-        chunked.forEach { rowItems ->
+    val rows = indicators.chunked(2)
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        rows.forEach { pair ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                rowItems.forEach { ind ->
+                pair.forEach { ind ->
                     UncertainValue(
                         label = ind.label,
                         valueText = ind.valueText,
@@ -367,7 +637,7 @@ private fun MarkasIndicatorsGrid(
                         modifier = Modifier.weight(1f)
                     )
                 }
-                if (rowItems.size == 1) {
+                if (pair.size == 1) {
                     Spacer(modifier = Modifier.weight(1f))
                 }
             }
@@ -378,97 +648,137 @@ private fun MarkasIndicatorsGrid(
 @Composable
 private fun PendingDecisionsSection(
     decisions: List<Decision>,
-    onDecisionClick: (Decision) -> Unit
+    scheduledChainCount: Int,
+    onDecisionClick: (Decision) -> Unit,
+    onReject: (String) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(6.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(
-                text = "Menunggu keputusan",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = "Wajib Jurnal Keputusan / Respons Krisis",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        decisions.forEach { dec ->
-            val badgeFg = semanticToneColor(dec.tone)
-            val badgeBg = semanticToneContainerColor(dec.tone)
-
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(6.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(6.dp))
-                    .border(
-                        width = 1.dp,
-                        color = if (dec.tone == SemanticTone.DANGER_RED) badgeFg.copy(alpha = 0.55f) else KapitalSemanticColors.border,
-                        shape = RoundedCornerShape(6.dp)
-                    )
-                    .clickable { onDecisionClick(dec) }
-                    .defaultMinSize(minHeight = 56.dp)
-                    .testTag("decision_item_${dec.id}")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
+                Text(
+                    text = "Menunggu keputusan",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = if (scheduledChainCount > 0) "${decisions.size} aktif · $scheduledChainCount rantai mengintai"
+                    else "${decisions.count { !it.isCompleted }} aktif",
+                    style = MaterialTheme.typography.labelMedium.copy(fontFamily = MonoFontFamily),
+                    color = if (scheduledChainCount > 0) KapitalSemanticColors.yellow else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (decisions.isEmpty()) {
+                Text(
+                    text = "Semua agenda keputusan bulan ini sudah diselesaikan. Anda dapat meninjau laporan atau mengakhiri giliran.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            decisions.forEach { decision ->
+                val toneColor = semanticToneColor(decision.tone)
+                val containerBg = if (decision.isCompleted) {
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                } else {
+                    MaterialTheme.colorScheme.surface
+                }
+
+                Surface(
+                    color = containerBg,
+                    shape = RoundedCornerShape(6.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .clip(RoundedCornerShape(6.dp))
+                        .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
+                        .clickable { onDecisionClick(decision) }
+                        .defaultMinSize(minHeight = 56.dp)
+                        .testTag("decision_card_${decision.id}")
                 ) {
                     Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (dec.isCompleted) {
-                                Icon(
-                                    imageVector = Icons.Outlined.CheckCircle,
-                                    contentDescription = "Selesai",
-                                    tint = KapitalSemanticColors.green,
-                                    modifier = Modifier.size(16.dp)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    if (decision.isCompleted) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.CheckCircle,
+                                            contentDescription = "Selesai",
+                                            tint = KapitalSemanticColors.green,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = decision.title,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = decision.subtitle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Text(
-                                text = dec.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            Surface(
+                                color = semanticToneContainerColor(decision.tone),
+                                shape = RoundedCornerShape(4.dp),
+                                modifier = Modifier.border(
+                                    width = 1.dp,
+                                    color = toneColor.copy(alpha = 0.45f),
+                                    shape = RoundedCornerShape(4.dp)
+                                )
+                            ) {
+                                Text(
+                                    text = decision.badgeText,
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontFamily = MonoFontFamily,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = toneColor,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
                         }
-                        Text(
-                            text = dec.subtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
 
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Surface(
-                        color = badgeBg,
-                        shape = RoundedCornerShape(4.dp),
-                        modifier = Modifier.border(1.dp, badgeFg.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
-                    ) {
-                        Text(
-                            text = dec.badgeText,
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontFamily = MonoFontFamily,
-                                fontWeight = FontWeight.SemiBold
-                            ),
-                            color = badgeFg,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
+                        if (decision.canReject) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                TextButton(onClick = { onReject(decision.id) }) {
+                                    Text("Tolak proposal (0 AP)", style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -490,8 +800,8 @@ private fun CognitiveCalibrationCard(
             .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -499,40 +809,34 @@ private fun CognitiveCalibrationCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Kalibrasi Kognitif & Jurnal Hipotesis",
+                    text = "Kalibrasi Kognitif & Jurnal Keputusan",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Surface(
-                    color = KapitalSemanticColors.greenContainer,
-                    shape = RoundedCornerShape(4.dp)
-                ) {
-                    Text(
-                        text = "Brier Score: ${String.format("%.2f", brierScore)}",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontFamily = MonoFontFamily,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = KapitalSemanticColors.green,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                    )
-                }
+                Text(
+                    text = "Skor Brier: ${String.format("%.2f", brierScore)}",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontFamily = MonoFontFamily,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = KapitalSemanticColors.green
+                )
             }
 
-            biases.forEach { note ->
+            biases.forEach { bias ->
                 Text(
-                    text = "• $note",
+                    text = "• $bias",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
             if (completedJournals.isNotEmpty()) {
-                HorizontalDivider(color = KapitalSemanticColors.border, modifier = Modifier.padding(vertical = 2.dp))
-                val latest = completedJournals.first()
+                HorizontalDivider(color = KapitalSemanticColors.border)
+                val latest = completedJournals.last()
                 Text(
-                    text = "Jurnal Terakhir: ${latest.decisionTitle} (Keyakinan ${latest.confidencePct}% · Evaluasi Giliran ${latest.evaluateAtTurn})",
-                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = MonoFontFamily),
+                    text = "Jurnal Terakhir (Giliran ${latest.turnSubmitted}): ${latest.decisionTitle} — Keyakinan ${latest.confidencePct}% (Evaluasi pada Giliran ${latest.evaluateAtTurn})",
+                    style = MaterialTheme.typography.labelSmall,
                     color = KapitalSemanticColors.blue
                 )
             }
@@ -543,6 +847,7 @@ private fun CognitiveCalibrationCard(
 @Composable
 private fun EndTurnPrimaryButton(
     turn: Int,
+    gameOver: Boolean,
     onAdvanceTurn: () -> Unit
 ) {
     Button(
@@ -558,8 +863,8 @@ private fun EndTurnPrimaryButton(
             .testTag("end_turn_button")
     ) {
         Text(
-            text = "Akhiri giliran",
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+            text = if (gameOver) "Mulai Permainan Baru" else "Akhiri giliran (Lanjut ke Giliran ${turn + 1})",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
         )
     }
 }
