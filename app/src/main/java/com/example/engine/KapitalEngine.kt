@@ -123,6 +123,7 @@ class KapitalEngine(val seed: Long) {
 
     // ---------- Makro ----------
     val world = World()
+    val commodities = Commodities()
 
     /** Ekonomi asing: tiap negara punya rumah tangga, pesaing, dan bank sentral sendiri (skala kecil). */
     class ForeignProfile(val id: String, val infl: Double, val policy: Double, val target: Double, val rStar: Double)
@@ -139,6 +140,17 @@ class KapitalEngine(val seed: Long) {
         p.id to World(2_000, p.target, p.rStar).also { it.initScenario(p.infl, p.policy) }
     }
     private var fxPassState = 1.0
+    private var aurPrice = 1.0
+    /** Kurs riil: kurs nominal dibagi kurs paritas daya beli. Hanya penyimpangan dari PPP yang mengubah daya saing. */
+    fun fxReal(): Double = kurs / (15450.0 * priceIndex / aurPrice)
+    var creditAdj = 0.0; private set
+    var hedgeUntilTurn = -1; private set
+    var cureUsed = false; private set
+    private var hedgeCottonIdx = 1.0
+    val hedgeActive: Boolean get() = turn <= hedgeUntilTurn
+    /** Indeks biaya bahan efektif: kapas dikunci kontrak berjangka bila ada lindung nilai. */
+    fun materialIndexEff(): Double =
+        0.78 * (if (hedgeActive) hedgeCottonIdx else commodities.cotton.index) + 0.22 * commodities.oil.index
     /** Rugi fiskal yang boleh dikompensasi 5 tahun ke depan (aturan PPh badan Indonesia). */
     private val lossPool = mutableListOf<Pair<Int, Double>>()
     fun taxLossCarryforward(): Double = lossPool.sumOf { it.second }
@@ -325,7 +337,8 @@ class KapitalEngine(val seed: Long) {
     private fun volumeRevenue(revenue: Double): Double = revenue / ((1.0 + priceAdjPct / 100.0) * fxPassLevel())
 
     fun cogsRatio(): Double {
-        var r = COGS_BASE * (0.8 + 0.2 * kurs / 15450.0)
+        // 65% HPP adalah bahan (kapas + energi); sisanya upah langsung dan overhead
+        var r = COGS_BASE * (0.8 + 0.2 * fxReal()) * (0.35 + 0.65 * materialIndexEff())
         if (kickbackActive) r += 0.01
         if (dualSourcing) r += 0.012
         r -= spinningBenefit()
@@ -372,12 +385,13 @@ class KapitalEngine(val seed: Long) {
     private fun trendGrowth(): Double = Math.pow(1.025, trendMonths / 12.0)
 
     /** Beban usaha: tumbuh dengan inflasi dan 80% dari pertumbuhan volume (biaya semi-tetap). */
-    private fun opexBase(): Double = 2300.0 * costIndex * Math.pow(trendGrowth(), 0.8)
+    private fun opexBase(): Double = 2300.0 * costIndex * Math.pow(trendGrowth(), 0.95)
 
     private fun maintenanceSpend(): Double {
-        val needed = 610.0 * costIndex
-        return if (deferralActive) 420.0 * costIndex
-        else needed + if (deferredMonths > 0) 120.0 * costIndex else 0.0
+        val scale = costIndex * Math.pow(trendGrowth(), 0.95)
+        val needed = 610.0 * scale
+        return if (deferralActive) 420.0 * scale
+        else needed + if (deferredMonths > 0) 120.0 * scale else 0.0
     }
 
     /** ICR tiga bulan terakhir termasuk perkiraan bulan berjalan. */
@@ -480,6 +494,25 @@ class KapitalEngine(val seed: Long) {
                 if (action.contractId !in reviewedContracts && spend(1)) {
                     reviewedContracts += action.contractId
                     oneOffOpex += 50.0
+                    true
+                } else false
+            }
+            Action.EquityCure -> {
+                if (!cureUsed && covenantBreaches >= 1 && gameOverReason == null && spend(2)) {
+                    cureUsed = true
+                    cash += EQUITY_CURE; equity += EQUITY_CURE
+                    covenantBreaches -= 1
+                    chronicle += ChronicleItem(turn, "Suntikan ekuitas pemegang saham",
+                        "Pemegang saham menyuntik ${fmt(EQUITY_CURE)} jt RS sebagai equity cure atas pelanggaran covenant.",
+                        "Covenant dilanggar → hak equity cure → kas bertambah → pelanggaran dianggap pulih satu tingkat.")
+                    true
+                } else false
+            }
+            Action.HedgeCotton -> {
+                if (!hedgeActive && spend(1)) {
+                    hedgeCottonIdx = commodities.cotton.index * 1.02   // premi kontrak berjangka 2%
+                    hedgeUntilTurn = turn + 6
+                    oneOffOpex += 60.0
                     true
                 } else false
             }
@@ -643,6 +676,7 @@ class KapitalEngine(val seed: Long) {
         foreignProfiles.forEachIndexed { i, p ->
             foreign.getValue(p.id).step(rng(20 + i), 1.0, 1.0, 1.0, 0.0, 1.0)
         }
+        aurPrice *= 1.0 + foreign.getValue("aurelia").inflation / 1200.0
         val infDiff = inflationAnnual - foreign.getValue("aurelia").inflation
         val driftMonthly = infDiff / 1200.0 + 0.0012
         kurs *= 1.0 + driftMonthly + gaussian(rMacro) * 0.008
@@ -665,9 +699,15 @@ class KapitalEngine(val seed: Long) {
             }
         }
         // Harga impor menyesuaikan bertahap (puncak di kuartal kedua); 60% dari depresiasi menular ke harga jual
-        val fxTarget = 1.0 + 0.6 * ((0.8 + 0.2 * kurs / 15450.0) - 1.0)
+        commodities.step(rng(30), world.gap)
+        commodities.lastEvents.forEach { lines += ReportLine(it, Tone.WARN) }
+        if (hedgeUntilTurn == turn) lines += ReportLine("Kontrak berjangka kapas berakhir; HPP kembali mengikuti harga pasar.", Tone.INFO)
+        // Harga jual dan biaya pesaing mengikuti harga PASAR; hanya HPP Anda yang bisa dikunci kontrak berjangka
+        val marketMat = commodities.materialIndex()
+        val matCost = 0.35 + 0.65 * marketMat
+        val fxTarget = (1.0 + 0.6 * ((0.8 + 0.2 * fxReal()) - 1.0)) * (1.0 + 0.65 * 0.7 * (marketMat - 1.0))
         fxPassState += 0.35 * (fxTarget - fxPassState)
-        val costPressure = (0.8 + 0.2 * kurs / 15450.0) * (costIndex / priceIndex)
+        val costPressure = (0.8 + 0.2 * fxReal()) * (costIndex / priceIndex) * matCost
         val rpPlayer = (1.0 + priceAdjPct / 100.0) * fxPassLevel()
         volOverride = world.volumeFactor(rpPlayer)          // pembeli melihat harga pesaing bulan lalu
         val prevPolicy = policyRate
@@ -685,7 +725,9 @@ class KapitalEngine(val seed: Long) {
                 if (policyRate > prevPolicy) Tone.WARN else Tone.INFO)
         }
         out.events.forEach { lines += ReportLine(it, Tone.WARN) }
-        loans.forEach { l -> l.floatingSpreadPct?.let { l.annualRatePct = policyRate + it } }
+        // Kondisi kredit: saat pengangguran naik, kredit macet bank naik dan spread melebar
+        creditAdj = (0.4 * (out.unemployment - 5.0)).coerceIn(-0.5, 2.0)
+        loans.forEach { l -> l.floatingSpreadPct?.let { l.annualRatePct = policyRate + it + creditAdj } }
 
         // ---- 2. Kejadian operasional ----
         val rOps = rng(2)
@@ -848,7 +890,7 @@ class KapitalEngine(val seed: Long) {
             if (covenantBreaches == 0) {
                 b.maturityTurn += 12
                 b.floatingSpreadPct = (b.floatingSpreadPct ?: 4.0) + 2.0
-                b.annualRatePct = policyRate + (b.floatingSpreadPct ?: 0.0)
+                b.annualRatePct = policyRate + (b.floatingSpreadPct ?: 0.0) + creditAdj
                 oneOffOpex += b.balance * 0.01
                 lines += ReportLine("Bank B memperpanjang pinjaman 12 bulan dengan bunga +2% dan biaya 1%.", Tone.WARN)
             } else {
@@ -1136,13 +1178,14 @@ class KapitalEngine(val seed: Long) {
 
     companion object {
         /** Rasio HPP bahan+energi (dikalibrasi agar margin EBIT ±5%, setara pabrikan tekstil Indonesia). */
-        const val COGS_BASE = 0.645
+        const val COGS_BASE = 0.638
         /** Bagian nilai piutang yang diterima saat factoring (potongan ±4% untuk tenor ±60 hari). */
         const val FACTOR_KEEP = 0.96
         /** Bagian piutang obral kredit yang akhirnya macet. */
         const val STUFFED_LOSS = 0.45
         /** Belanja modal penggantian mesin sebagai bagian dari penyusutan. */
         const val RCF_LIMIT = 4000.0
+        const val EQUITY_CURE = 4000.0
         const val REPLACEMENT_CAPEX = 0.70
 
         private val idLocale: Locale = Locale.forLanguageTag("id-ID")

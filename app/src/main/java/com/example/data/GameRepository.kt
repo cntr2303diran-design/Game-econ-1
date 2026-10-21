@@ -119,6 +119,8 @@ class GameRepository(
         when (actionId) {
             "review" -> perform(Action.ReviewContract(contractId))
             "dual" -> perform(Action.DualSourcing)
+            "hedge" -> perform(Action.HedgeCotton)
+            "cure" -> perform(Action.EquityCure)
         }
     }
 
@@ -350,7 +352,30 @@ class GameRepository(
                     fanProjectionSpread = (1..4).map { (e.kurs * 0.02 * sqrt(it.toDouble()) * if (monthsToElection in 0..4) 3 else 1).toFloat() },
                     originInfo = m.originInfo.copy(displayedValue = "${fmt(e.kurs)} RS per 1 A$", dataDate = dateText(turn))
                 )
-            } else m
+            } else {
+                val ser = when (m.id) {
+                    "mkt_kapas" -> e.commodities.cotton
+                    "mkt_minyak" -> e.commodities.oil
+                    "mkt_baja" -> e.commodities.steel
+                    else -> null
+                }
+                if (ser == null) m else {
+                    val h = ser.history.toList()
+                    val ch = (h.last() / h[h.size - 2] - 1.0) * 100.0
+                    val unit = when (m.id) { "mkt_kapas" -> "A$/ton"; "mkt_minyak" -> "A$/bbl"; else -> "A$/ton" }
+                    val vol = ser.sigmaMonthly
+                    m.copy(
+                        priceText = "${fmt1(ser.price)} $unit",
+                        changeText = (if (ch >= 0) "+" else "") + "${fmt1(ch)}% bulan ini",
+                        tone = if (abs(ch) > 4.0) SemanticTone.DANGER_RED else if (abs(ch) > 2.0) SemanticTone.WARNING_YELLOW else SemanticTone.GOOD_GREEN,
+                        sparklineHistory = h.map { it.toFloat() },
+                        fanProjectionMedian = (1..4).map { (ser.base * Math.exp(ser.logDev * Math.pow(ser.rho, it.toDouble()))).toFloat() },
+                        fanProjectionSpread = (1..4).map { (ser.price * vol * 1.65 * sqrt(it.toDouble())).toFloat() },
+                        originInfo = m.originInfo.copy(displayedValue = "${fmt1(ser.price)} $unit (${if (ch >= 0) "+" else ""}${fmt1(ch)}%)", dataDate = dateText(turn),
+                            calculationMethod = "Proses mean-reverting (kecepatan ${fmt2(ser.rho)}/bulan) dengan guncangan pasokan dan permintaan global. Pita = 1,65 simpangan baku.")
+                    )
+                }
+            }
         }
 
         // ---- Laporan keuangan ----
@@ -518,6 +543,21 @@ class GameRepository(
             if (e.dualSourcing) SemanticTone.GOOD_GREEN else SemanticTone.WARNING_YELLOW, originInfo = covOrigin,
             actions = reviewAction("cnt_sup_kestrel") +
                 if (e.dualSourcing) emptyList() else listOf(ContractActionItem("dual", "Aktifkan dual sourcing (1 AP, HPP +1,2%)", e.ap >= 1)))
+
+        if (e.covenantBreaches >= 1 && !e.cureUsed) contracts += ContractItem("cnt_cure", "Hak equity cure", "Pemegang saham", "Sundara",
+            "Suntikan ekuitas ${fmt(KapitalEngine.EQUITY_CURE)} jt RS (sekali seumur permainan)",
+            "Berlaku selama ada pelanggaran covenant aktif",
+            "Menambah kas dan menurunkan hitungan pelanggaran satu tingkat. Tidak memperbaiki ICR.",
+            "Menunda masalah, bukan menyelesaikannya: jika laba operasi tidak pulih, pelanggaran terulang.",
+            SemanticTone.WARNING_YELLOW, originInfo = covOrigin,
+            actions = listOf(ContractActionItem("cure", "Suntik ekuitas (2 AP, sekali)", e.ap >= 2)))
+        contracts += ContractItem("cnt_hedge_kapas", "Kontrak berjangka kapas", "Bursa Komoditas Tarsis–Sundara", "Tarsis",
+            "Kunci harga kapas ${fmt1(e.commodities.cotton.price)} A$/ton (+2% premi) selama 6 bulan",
+            if (e.hedgeActive) "Aktif sampai ${dateText(e.hedgeUntilTurn)}" else "Belum ada lindung nilai · HPP mengikuti harga pasar",
+            "Biaya 60 jt RS. Melindungi dari kenaikan harga, tetapi Anda tidak menikmati penurunan harga selama kontrak.",
+            "Kapas ±45% dari biaya produksi. Harga kapas bisa bergerak ±25% per tahun dan melonjak saat El Niño.",
+            if (e.hedgeActive) SemanticTone.GOOD_GREEN else SemanticTone.WARNING_YELLOW, originInfo = covOrigin,
+            actions = if (e.hedgeActive) emptyList() else listOf(ContractActionItem("hedge", "Lindung nilai kapas 6 bulan (1 AP, 60 jt RS)", e.ap >= 1)))
 
         // ---- Proyek ----
         val gantt = mutableListOf<GanttTask>()

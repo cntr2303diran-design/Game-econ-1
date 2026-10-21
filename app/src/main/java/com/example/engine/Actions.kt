@@ -22,6 +22,8 @@ sealed class Action {
     data class CrossCheck(val newsId: String) : Action()
     data class ReviewContract(val contractId: String) : Action()
     object DualSourcing : Action()
+    object HedgeCotton : Action()
+    object EquityCure : Action()
     data class Audit(val execId: String) : Action()
     data class Confront(val execId: String) : Action()
     data class Fire(val execId: String) : Action()
@@ -40,6 +42,8 @@ sealed class Action {
         is CrossCheck -> "CHK|${esc(newsId)}"
         is ReviewContract -> "REV|${esc(contractId)}"
         DualSourcing -> "DUAL"
+        HedgeCotton -> "HEDGE"
+        EquityCure -> "CURE"
         is Audit -> "AUD|${esc(execId)}"
         is Confront -> "CON|${esc(execId)}"
         is Fire -> "FIR|${esc(execId)}"
@@ -66,6 +70,8 @@ sealed class Action {
                     "CHK" -> CrossCheck(p[1])
                     "REV" -> ReviewContract(p[1])
                     "DUAL" -> DualSourcing
+                    "HEDGE" -> HedgeCotton
+                    "CURE" -> EquityCure
                     "AUD" -> Audit(p[1])
                     "CON" -> Confront(p[1])
                     "FIR" -> Fire(p[1])

@@ -194,7 +194,7 @@ class World(
             if (rv.id == "riv_importir" && dumpingMonthsLeft > 0) target *= 0.85
             // Menyamai bila pemain lebih murah (sesuai agresivitas); tidak mengikuti kenaikan harga pemain
             val undercut = playerRelPrice - rv.price
-            var move = 0.10 * (target - rv.price)
+            var move = 0.30 * (target - rv.price)
             if (undercut < 0.0) move += rv.aggression * 0.75 * undercut
             rv.price = (rv.price + move + gauss(r) * 0.002).coerceIn(0.6, 1.8)
             val margin = rv.price / max(0.3, ownCost) - 1.0

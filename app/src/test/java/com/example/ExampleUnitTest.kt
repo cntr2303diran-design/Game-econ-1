@@ -139,6 +139,33 @@ class ExampleUnitTest {
     }
 
     @Test
+    fun commodities_areMeanReverting_andFeedCosts() {
+        val c = com.example.engine.Commodities()
+        val r = kotlin.random.Random(5)
+        val idx = ArrayList<Double>()
+        repeat(480) { c.step(r, 0.0); idx += c.cotton.index }
+        assertTrue("kapas tidak meledak: ${idx.max()}", idx.max() < 3.5 && idx.min() > 0.35)
+        assertTrue("rata-rata dekat 1: ${idx.average()}", idx.average() in 0.7..1.5)
+        val e = KapitalEngine(1L)
+        val base = e.cogsRatio()
+        repeat(3) { e.apply(Action.EndTurn) }
+        assertTrue(e.commodities.materialIndex() > 0.0 && e.cogsRatio() > 0.0 && base > 0.0)
+    }
+
+    @Test
+    fun hedgeAndEquityCure_workAndRoundTrip() {
+        assertEquals(Action.HedgeCotton, Action.decode(Action.HedgeCotton.encode()))
+        assertEquals(Action.EquityCure, Action.decode(Action.EquityCure.encode()))
+        val e = KapitalEngine(3L)
+        assertFalse("equity cure butuh pelanggaran covenant", e.apply(Action.EquityCure))
+        assertTrue(e.apply(Action.HedgeCotton))
+        assertTrue(e.hedgeActive)
+        assertFalse("tidak boleh ganda", e.apply(Action.HedgeCotton))
+        repeat(7) { e.apply(Action.EndTurn); if (e.gameOverReason != null) return }
+        assertFalse("lindung nilai berakhir setelah 6 bulan", e.hedgeActive)
+    }
+
+    @Test
     fun actionEncoding_roundTrips() {
         val a = Action.Journal("dec_termsheet", "cnt_ts_1", 70, 1234.5, "alasan | dengan pipa", "prediksi\nbaris", "gagal 100%")
         val decoded = Action.decode(a.encode())
