@@ -1,0 +1,315 @@
+package com.example.model
+
+enum class SemanticTone {
+    DANGER_RED,     // Merah = bahaya
+    WARNING_YELLOW, // Kuning = peringatan
+    GOOD_GREEN,     // Hijau = membaik
+    PRIMARY_BLUE,   // Biru = aksi utama
+    NEUTRAL_GRAY    // Abu-abu = netral / data tertunda
+}
+
+enum class ConfidenceTier(val label: String, val tone: SemanticTone) {
+    LOW("Keyakinan rendah", SemanticTone.DANGER_RED),
+    MEDIUM("Keyakinan sedang", SemanticTone.WARNING_YELLOW),
+    HIGH("Keyakinan tinggi", SemanticTone.GOOD_GREEN)
+}
+
+/**
+ * Metadata yang ditampilkan saat pengguna melakukan ketuk lama (long-press) pada angka mana pun
+ * untuk membuka Bottom Sheet "Asal data" (sumber, tanggal, cara hitung, bias).
+ */
+data class DataOriginInfo(
+    val title: String,
+    val displayedValue: String,
+    val sourceName: String,
+    val dataDate: String,
+    val calculationMethod: String,
+    val uncertaintyAndBiasNote: String,
+    val confidence: ConfidenceTier
+)
+
+/**
+ * Model untuk kartu indikator di Markas dan di seluruh layar.
+ */
+data class Indicator(
+    val id: String,
+    val label: String,
+    val valueText: String,
+    val deltaOrSubText: String,
+    val tone: SemanticTone,
+    val dataDate: String,
+    val source: String,
+    val confidence: ConfidenceTier,
+    val originInfo: DataOriginInfo
+)
+
+enum class MediaSlant(
+    val outletName: String,
+    val slantLabel: String,
+    val editorialProfile: String
+) {
+    BISNIS("Harian Bisnis", "Bisnis", "Fokus likuiditas, suku bunga, rantai pasok, dan covenant bank"),
+    PRO_PEMERINTAH("Suara Sundara", "Pro-Pemerintah", "Menonjolkan stabilitas makro dan memperhalus angka inflasi jelang pemilu"),
+    OPOSISI("Mimbar Rakyat", "Oposisi", "Menyorot tajam pemadaman listrik, biaya hidup, dan tuntutan serikat pekerja"),
+    SENSASIONAL("Kilat Sore", "Sensasional", "Judul bombastis; rawan ditunggangi rumor spekulan atau short-seller"),
+    INDEPENDEN("Lensa Independen", "Independen", "Jurnalisme investigatif rantai pasok dan akuntansi forensik")
+}
+
+data class NewsItem(
+    val id: String,
+    val mediaSlant: MediaSlant,
+    val headline: String,
+    val summary: String,
+    val dateLabel: String,
+    val confidence: ConfidenceTier,
+    val isRumor: Boolean = false,
+    val isMacroRelease: Boolean = false,
+    val crossChecked: Boolean = false,
+    val eventTopicId: String = "KESTREL_RARE_EARTH",
+    val originInfo: DataOriginInfo
+)
+
+data class Decision(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val apCost: Int,
+    val badgeText: String,
+    val tone: SemanticTone,
+    val assetSharePct: Int,
+    val defaultContextNote: String,
+    val isCompleted: Boolean = false,
+    val opensEventDialog: Boolean = false
+)
+
+data class CompletedJournalEntry(
+    val id: String,
+    val decisionTitle: String,
+    val turnSubmitted: Int,
+    val evaluateAtTurn: Int,
+    val strategicReason: String,
+    val numericPrediction: String,
+    val confidencePct: Int,
+    val failureScenario: String,
+    val evaluated: Boolean = false,
+    val brierScoreContribution: Double? = null
+)
+
+data class Executive(
+    val id: String,
+    val initials: String,
+    val name: String,
+    val roleTitle: String,
+    val loyaltyEstimate: String,   // Ditampilkan sebagai perkiraan ("Tinggi?", "Sedang?", "Rendah?")
+    val ambitionEstimate: String,  // Ditampilkan sebagai perkiraan ("Tinggi?", "Sedang?")
+    val skillEstimate: String,
+    val horizonNote: String,
+    val incentiveScheme: String,
+    val suspectedBehaviorNote: String,
+    val loyaltyTone: SemanticTone,
+    val originInfo: DataOriginInfo
+)
+
+enum class MapTokenType(val label: String) {
+    PABRIK("Pabrik"),
+    GUDANG("Gudang"),
+    TOKO("Toko"),
+    KAPAL("Kapal")
+}
+
+enum class MapLayerFilter(val label: String) {
+    PELAYARAN("Pelayaran"),
+    ZONA_KONFLIK("Zona konflik"),
+    RISIKO_IKLIM("Risiko iklim"),
+    RANTAI_PASOK("Rantai pasok")
+}
+
+data class MapPiece(
+    val id: String,
+    val type: MapTokenType,
+    val label: String,
+    val countryId: String,
+    val normX: Float,
+    val normY: Float,
+    val statusNote: String
+)
+
+data class Country(
+    val id: String,
+    val name: String,
+    val currencyCode: String,
+    val archetype: String,
+    val opportunity: String,
+    val mainRisk: String,
+    val centralBankStyle: String,
+    val inflationRange: String,
+    val policyRate: String,
+    val gdpGrowth: String,
+    val tensionScore: Int, // 0..100
+    val electionCountdown: String,
+    val electricityReliability: String,
+    val climateRiskLabel: String,
+    val supplyChainRole: String,
+    val polygonPoints: List<Pair<Float, Float>>, // Normalized 0f..1f coordinates for Canvas polygon
+    val pieces: List<MapPiece>,
+    val originInfo: DataOriginInfo
+)
+
+data class GanttTask(
+    val id: String,
+    val projectName: String,
+    val phaseName: String,
+    val startMonth: Int, // 1..12
+    val durationMonths: Int,
+    val progressMonth: Int,
+    val budgetRsMillion: Int,
+    val realizedRsMillion: Int,
+    val statusLabel: String,
+    val tone: SemanticTone,
+    val noteFromStaff: String
+)
+
+data class ContractItem(
+    val id: String,
+    val category: String, // "Kredit Bank", "Term Sheet", "Pemasok Tier-1..3", " Pelanggan Ritel"
+    val counterparty: String,
+    val countryName: String,
+    val valueText: String,
+    val maturityOrTenor: String,
+    val covenantOrClause: String,
+    val hiddenRiskNote: String,
+    val tone: SemanticTone,
+    val apCostToAct: Int = 2,
+    val actionLabel: String = "Negosiasi / Tinjau",
+    val originInfo: DataOriginInfo
+)
+
+data class MarketInstrument(
+    val id: String,
+    val category: String, // "Komoditas", "Kurs Valas", "Saham & Korporasi"
+    val name: String,
+    val ticker: String,
+    val priceText: String,
+    val changeText: String,
+    val tone: SemanticTone,
+    val sparklineHistory: List<Float>,
+    val fanProjectionMedian: List<Float>,
+    val fanProjectionSpread: List<Float>,
+    val forensicMScoreNote: String? = null,
+    val originInfo: DataOriginInfo
+)
+
+data class EventOptionItem(
+    val id: String,
+    val title: String,
+    val apCost: Int,
+    val impactEstimate: String,
+    val advisorAttribution: String = "menurut Direktur Operasi",
+    val tone: SemanticTone
+)
+
+data class EventDialogModel(
+    val id: String,
+    val title: String,
+    val contextDescription: String,
+    val earlyWarningNote: String,
+    val options: List<EventOptionItem>
+)
+
+data class FinancialRowItem(
+    val label: String,
+    val currentVal: String,
+    val priorVal: String,
+    val note: String,
+    val isHeaderOrTotal: Boolean = false,
+    val tone: SemanticTone = SemanticTone.NEUTRAL_GRAY,
+    val originInfo: DataOriginInfo
+)
+
+data class PairwiseTension(
+    val pairLabel: String,
+    val straitOrBorder: String,
+    val score: Int, // 0..100
+    val escalationStage: String,
+    val businessEffect: String,
+    val tone: SemanticTone
+)
+
+data class ChronicleEntry(
+    val turn: Int,
+    val dateLabel: String,
+    val eraLabel: String,
+    val title: String,
+    val description: String,
+    val causalChain: String,
+    val canReplayCounterfactual: Boolean = true
+)
+
+data class GameState(
+    val dateText: String = "Maret 2033",
+    val turn: Int = 39,
+    val totalTurns: Int = 480,
+    val eraNumber: Int = 1,
+    val eraName: String = "Era 1: Bertahan Hidup",
+    val apCurrent: Int = 4,
+    val apMax: Int = 7,
+    val runwayMonths: Int = 5,
+    val activeRole: String = "CEO PT Benang Sundara",
+    val isDarkTheme: Boolean = false,
+
+    // Peringatan Covenant di Markas
+    val covenantWarningTitle: String = "Jarak ke covenant 6%",
+    val covenantWarningSubtitle: String = "Uji kuartalan Bank B dalam 1 giliran",
+    val covenantOrigin: DataOriginInfo,
+
+    // Kartu Koran Pagi Ringkas di Markas
+    val featuredNewsSource: String = "Harian Bisnis",
+    val featuredNewsConfidence: ConfidenceTier = ConfidenceTier.MEDIUM,
+    val featuredNewsHeadline: String = "Kestrel dikabarkan batasi ekspor logam langka",
+    val featuredNewsFooter: String = "+4 berita lain · 2 rumor · 1 rilis data",
+
+    // 4 Indikator Utama di Markas (Grid 2 Kolom)
+    val markasIndicators: List<Indicator>,
+
+    // FanChart Proyeksi Kas 6 Bulan ke Depan
+    val cashHistoryPoints: List<Float>,
+    val cashFanMedianPoints: List<Float>,
+    val cashFanBand50Points: List<Float>,
+    val cashFanBand90Points: List<Float>,
+
+    // Daftar Menunggu Keputusan di Markas
+    val pendingDecisions: List<Decision>,
+    val completedJournals: List<CompletedJournalEntry>,
+
+    // Layar Koran Pagi (5 Media)
+    val morningPaperEdition: List<NewsItem>,
+
+    // Layar Peta & Dunia (8 Negara Inti)
+    val countries: List<Country>,
+    val mapPieces: List<MapPiece>,
+    val activeMapLayer: MapLayerFilter = MapLayerFilter.PELAYARAN,
+    val pairwiseTensions: List<PairwiseTension>,
+
+    // Layar Perusahaan (Laporan Keuangan, Organisasi, Proyek Gantt, Kontrak)
+    val incomeStatementRows: List<FinancialRowItem>,
+    val balanceSheetRows: List<FinancialRowItem>,
+    val cashFlowRows: List<FinancialRowItem>,
+    val executives: List<Executive>,
+    val activeIncentiveScheme: String = "Bonus berbasis omzet (Rawan obral kredit)",
+    val ganttTasks: List<GanttTask>,
+    val contracts: List<ContractItem>,
+
+    // Layar Pasar (Komoditas, Kurs RS/A$, Saham & Forensik)
+    val marketInstruments: List<MarketInstrument>,
+
+    // Fitur PDF: Skor Kalibrasi Brier, Bias Kognitif, & Kronik Dunia
+    val brierScore: Double = 0.16,
+    val detectedBiases: List<String>,
+    val worldChronicles: List<ChronicleEntry>,
+
+    // Kartu Event Dialog & Bottom Sheet Asal Data
+    val activeEventDialog: EventDialogModel,
+    val showEventDialog: Boolean = false,
+    val inspectedDataOrigin: DataOriginInfo? = null,
+    val selectedCountryForSheet: Country? = null
+)

@@ -1,0 +1,6 @@
+{
+  "name": "KAPITAL",
+  "description": "Simulasi ekonomi makro-mikro dan strategi korporasi berbasis giliran (2030-2070) dengan 207.000 agen otonom, akuntansi forensik, birokrasi perbankan, dan kalibrasi kognitif.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

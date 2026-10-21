@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">KAPITAL</string>
+    <string name="app_subtitle">Simulasi Ekonomi Makro-Mikro &amp; Strategi Korporasi (2030–2070)</string>
+    <string name="tab_paper">Koran Pagi</string>
+    <string name="tab_map">Peta Dunia</string>
+    <string name="tab_ops">Operasi &amp; SDM</string>
+    <string name="tab_terminal">Terminal Data</string>
+    <string name="tab_cognitive">Kognitif &amp; Rapat</string>
+    <string name="btn_end_turn">Akhiri Giliran (Bulan Berikutnya)</string>
+    <string name="premortem_required_title">Jurnal Hipotesis &amp; Pre-Mortem Wajib (&gt;10% Aset)</string>
+    <string name="board_meeting_title">Rapat Dewan Direksi Kuartalan</string>
+    <string name="event_crisis_title">Kartu Event &amp; Krisis Berantai</string>
+    <string name="save_manager_title">Manajemen Save, Skenario &amp; Seed</string>
+</resources>
