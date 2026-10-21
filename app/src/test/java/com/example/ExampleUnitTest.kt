@@ -172,4 +172,23 @@ class ExampleUnitTest {
         assertNotNull(decoded)
         assertEquals(a, decoded)
     }
+
+    @Test
+    fun bourse_buySell_balanceAndRoundTrip() {
+        assertEquals(Action.BuyStock("sx_mitra", 3), Action.decode(Action.BuyStock("sx_mitra", 3).encode()))
+        assertEquals(Action.SellStock("sx_mitra", 2), Action.decode(Action.SellStock("sx_mitra", 2).encode()))
+        val e = KapitalEngine(4L)
+        assertFalse("emiten tak dikenal", e.apply(Action.BuyStock("xxx", 1)))
+        assertFalse("tidak boleh jual sebelum punya", e.apply(Action.SellStock("sx_mitra", 1)))
+        assertTrue(e.apply(Action.BuyStock("sx_mitra", 2)))
+        assertEquals(2, e.holdings["sx_mitra"])
+        repeat(14) {
+            e.apply(Action.EndTurn)
+            assertTrue("neraca seimbang", abs(e.totalAssets() - e.totalLiabilities() - e.equity) < 1e-6)
+            if (e.gameOverReason != null) return
+        }
+        assertTrue(e.bourse.companies.all { it.quarters.isNotEmpty() })
+        assertTrue(e.apply(Action.SellStock("sx_mitra", 2)))
+        assertTrue(e.holdings.isEmpty())
+    }
 }

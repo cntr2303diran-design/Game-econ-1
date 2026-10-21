@@ -11,7 +11,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Apartment
+import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.filled.HomeWork
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Menu
@@ -56,6 +58,7 @@ const val ROUTE_MARKAS = "markas"
 const val ROUTE_PETA = "peta"
 const val ROUTE_PERUSAHAAN = "perusahaan"
 const val ROUTE_PASAR = "pasar"
+const val ROUTE_BURSA = "bursa"
 const val ROUTE_DUNIA = "dunia"
 const val ROUTE_KORAN_PAGI = "koran_pagi"
 const val ROUTE_JURNAL_KEPUTUSAN = "jurnal_keputusan/{decisionId}?option={option}"
@@ -103,6 +106,7 @@ fun KapitalAppScaffold(
             BottomNavTab(ROUTE_PETA, "Peta", Icons.Filled.Map, Icons.Outlined.Map),
             BottomNavTab(ROUTE_PERUSAHAAN, "Perusahaan", Icons.Filled.Apartment, Icons.Outlined.Apartment),
             BottomNavTab(ROUTE_PASAR, "Pasar", Icons.AutoMirrored.Filled.ShowChart, Icons.AutoMirrored.Outlined.ShowChart),
+            BottomNavTab(ROUTE_BURSA, "Bursa", Icons.Filled.AccountBalance, Icons.Outlined.AccountBalance),
             BottomNavTab(ROUTE_DUNIA, "Dunia", Icons.Filled.Public, Icons.Outlined.Public)
         )
     }
@@ -243,6 +247,15 @@ fun KapitalAppScaffold(
             composable(ROUTE_PASAR) {
                 PasarScreen(
                     gameState = gameState,
+                    onInspectOrigin = { viewModel.inspectDataOrigin(it) }
+                )
+            }
+
+            composable(ROUTE_BURSA) {
+                BursaScreen(
+                    gameState = gameState,
+                    onBuy = { id, lots -> viewModel.buyStock(id, lots) },
+                    onSell = { id, lots -> viewModel.sellStock(id, lots) },
                     onInspectOrigin = { viewModel.inspectDataOrigin(it) }
                 )
             }

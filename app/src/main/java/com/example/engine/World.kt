@@ -118,6 +118,14 @@ class World(
      */
     fun volumeFactor(relPrice: Double): Double = playerShare(relPrice) / playerShare0
 
+    /** Pangsa pesaing [id] pada harga pemain tertentu (0 bila sudah keluar pasar). */
+    fun rivalShareOf(id: String, playerRelPrice: Double): Double {
+        val rv = rivals.firstOrNull { it.id == id && it.active } ?: return 0.0
+        val wp = weight(playerShare0, playerRelPrice)
+        val wr = rivals.filter { it.active }.sumOf { weight(it.share0, it.price) }
+        return weight(rv.share0, rv.price) / (wp + wr)
+    }
+
     /** Harga pesaing rata-rata tertimbang relatif terhadap harga pasar awal. */
     fun rivalAveragePrice(): Double {
         val a = rivals.filter { it.active }

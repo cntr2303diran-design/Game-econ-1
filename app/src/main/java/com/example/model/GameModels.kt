@@ -304,6 +304,8 @@ data class GameState(
     val hasSavedGame: Boolean = false,
     val companyEquityText: String = "",
     val rivals: List<RivalItem> = emptyList(),
+    val bourse: BourseState = BourseState(),
+    val actionPoints: Int = 0,
     val playerShareText: String = "",
     val unemploymentText: String = "",
     val marketNote: String = "",
@@ -363,4 +365,45 @@ data class GameState(
     val showEventDialog: Boolean = false,
     val inspectedDataOrigin: DataOriginInfo? = null,
     val selectedCountryForSheet: Country? = null
+)
+
+/** Bursa saham: satu emiten beserta laporan keuangan resminya. */
+data class StockItem(
+    val id: String,
+    val ticker: String,
+    val name: String,
+    val sector: String,
+    val blurb: String,
+    val riskNote: String,
+    val listed: Boolean,
+    val priceText: String,
+    val changeText: String,
+    val changeTone: SemanticTone,
+    val holdingLots: Int,
+    val holdingText: String,
+    val lotCostText: String,
+    val unrealizedText: String,
+    val unrealizedTone: SemanticTone,
+    val spark: List<Float>,
+    val ratios: List<Pair<String, String>>,
+    val reportLabel: String,
+    val reportNote: String,
+    val income: List<FinancialRowItem>,
+    val balance: List<FinancialRowItem>,
+    val cashFlow: List<FinancialRowItem>,
+    val canBuy: Boolean,
+    val buyBlockReason: String
+)
+
+data class BourseState(
+    val indexText: String = "",
+    val indexChangeText: String = "",
+    val indexTone: SemanticTone = SemanticTone.NEUTRAL_GRAY,
+    val indexSpark: List<Float> = emptyList(),
+    val cashText: String = "",
+    val portfolioText: String = "",
+    val unrealizedText: String = "",
+    val dividendText: String = "",
+    val stocks: List<StockItem> = emptyList(),
+    val headlines: List<String> = emptyList()
 )

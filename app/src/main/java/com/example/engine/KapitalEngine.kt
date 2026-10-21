@@ -123,6 +123,17 @@ class KapitalEngine(val seed: Long) {
 
     // ---------- Makro ----------
     val world = World()
+    val bourse = Bourse()
+    /** Kepemilikan saham dalam lot (1 lot = 100 ribu lembar), biaya perolehan total (jt RS). */
+    val holdings = LinkedHashMap<String, Int>()
+    val costBasis = HashMap<String, Double>()
+    var dividendsReceivedTotal = 0.0; private set
+    var realizedGainTotal = 0.0; private set
+    /** Kas bersih keluar untuk saham sejak giliran lalu (untuk laporan arus kas). */
+    var periodInvestOut = 0.0; private set
+    var periodInvestIn = 0.0; private set
+    private var periodStartCash = 6200.0
+    var lastDividendIncome = 0.0; private set
     val commodities = Commodities()
 
     /** Ekonomi asing: tiap negara punya rumah tangga, pesaing, dan bank sentral sendiri (skala kecil). */
@@ -306,7 +317,8 @@ class KapitalEngine(val seed: Long) {
     fun totalAR(): Double = normalAR + stuffedTotal()
     fun loanBalanceRs(l: Loan): Double = if (l.currencyAud) l.balance * kurs else l.balance
     fun totalDebt(): Double = loans.sumOf { loanBalanceRs(it) }
-    fun totalAssets(): Double = cash + totalAR() + inventory + fixedAssets
+    fun portfolioValue(): Double = holdings.entries.sumOf { (id, lots) -> lots * LOT * (bourse.company(id)?.price ?: 0.0) }
+    fun totalAssets(): Double = cash + totalAR() + inventory + fixedAssets + portfolioValue()
     fun totalLiabilities(): Double = payables + totalDebt()
 
     fun balanceSnapshot(): Map<String, Double> = mapOf(
@@ -529,6 +541,8 @@ class KapitalEngine(val seed: Long) {
             }
             is Action.Confront -> doConfront(action.execId)
             is Action.Fire -> doFire(action.execId)
+            is Action.BuyStock -> doBuy(action.companyId, action.lots)
+            is Action.SellStock -> doSell(action.companyId, action.lots)
             is Action.AdjustPrice -> {
                 val target = (priceAdjPct + action.deltaPct).coerceIn(-15, 15)
                 if (target != priceAdjPct && spend(1)) { priceAdjPct = target; true } else false
@@ -536,6 +550,41 @@ class KapitalEngine(val seed: Long) {
         }
         if (ok) actionCount++
         return ok
+    }
+
+    private fun doBuy(id: String, lots: Int): Boolean {
+        val c = bourse.company(id) ?: return false
+        if (lots <= 0 || !c.listed) return false
+        val gross = lots * LOT * c.price
+        val fee = gross * BROKER_FEE
+        // jaga kas minimum agar tidak langsung krisis kas
+        if (cash - gross - fee < 1500.0) return false
+        if (gross > 0.5 * totalAssets()) return false
+        if (!spend(1)) return false
+        cash -= gross + fee
+        equity -= fee
+        holdings[id] = (holdings[id] ?: 0) + lots
+        costBasis[id] = (costBasis[id] ?: 0.0) + gross
+        periodInvestOut += gross + fee
+        return true
+    }
+
+    private fun doSell(id: String, lots: Int): Boolean {
+        val c = bourse.company(id) ?: return false
+        val have = holdings[id] ?: 0
+        if (lots <= 0 || lots > have || !c.listed) return false
+        if (!spend(1)) return false
+        val gross = lots * LOT * c.price
+        val fee = gross * (BROKER_FEE + SELL_TAX)
+        val basis = (costBasis[id] ?: 0.0) * lots / have
+        cash += gross - fee
+        // selisih harga dengan nilai pasar akhir bulan sudah masuk ekuitas lewat mark-to-market; biaya jual dibebankan
+        equity -= fee
+        realizedGainTotal += gross - basis
+        periodInvestIn += gross - fee
+        if (lots == have) { holdings.remove(id); costBasis.remove(id) }
+        else { holdings[id] = have - lots; costBasis[id] = (costBasis[id] ?: 0.0) - basis }
+        return true
     }
 
     private fun spend(cost: Int): Boolean {
@@ -661,7 +710,7 @@ class KapitalEngine(val seed: Long) {
     // =====================================================================
     private fun endTurn() {
         val lines = mutableListOf<ReportLine>()
-        val startCash = cash
+        val startCash = periodStartCash
         val startAR = totalAR()
         val startInv = inventory
         val startPay = payables
@@ -713,6 +762,40 @@ class KapitalEngine(val seed: Long) {
         val prevPolicy = policyRate
         val out = world.step(rWorld, rpPlayer, costPressure, fxPassLevel(), kurs / kursBefore - 1.0, kurs, demandShock)
         econ = out.demand
+        run {
+            val pvBefore = portfolioValue()
+            val ev = bourse.step(rng(40), Bourse.Ctx(
+                turn, econ, trendGrowth(), priceIndex, costPressure,
+                commodities.cotton.index, commodities.oil.index, commodities.steel.index,
+                fxReal(), out.policyRate, world.gap, rpPlayer,
+                { id -> world.rivalShareOf(id, rpPlayer) },
+                { id -> world.rivals.first { it.id == id }.price },
+                { id -> world.rivals.first { it.id == id }.active },
+                { id -> world.rivals.first { it.id == id }.share0 }))
+            // dividen diterima & penilaian ulang portofolio
+            var divIn = 0.0
+            for ((id, lots) in holdings) {
+                val c = bourse.company(id) ?: continue
+                val m = c.monthly.lastOrNull() ?: continue
+                if (m.turn == turn && m.dividend > 0 && c.sharesM > 0) divIn += lots * LOT * (m.dividend / c.sharesM)
+            }
+            // saham emiten pailit tidak bernilai lagi
+            val delisted = holdings.keys.filter { bourse.company(it)?.listed == false }
+            for (id in delisted) {
+                lines += ReportLine("Saham $id dihentikan perdagangannya karena emiten pailit; nilai investasi Anda nyaris hilang.", Tone.BAD)
+            }
+            val pvAfter = portfolioValue()
+            equity += (pvAfter - pvBefore) + divIn
+            cash += divIn
+            dividendsReceivedTotal += divIn
+            lastDividendIncome = divIn
+            if (divIn > 0.0) lines += ReportLine("Dividen saham diterima ${fmt(divIn)} jt RS.", Tone.GOOD)
+            if (holdings.isNotEmpty() && Math.abs(pvAfter - pvBefore) > 0.0) {
+                val d = pvAfter - pvBefore
+                lines += ReportLine("Portofolio saham ${if (d >= 0) "naik" else "turun"} ${fmt(Math.abs(d))} jt RS bulan ini (nilai ${fmt(pvAfter)} jt RS, belum direalisasi).", if (d >= 0) Tone.GOOD else Tone.WARN)
+            }
+            ev.forEach { lines += ReportLine(it, Tone.INFO) }
+        }
         inflationAnnual = out.inflationAnnual
         policyRate = out.policyRate
         trendMonths++
@@ -1044,7 +1127,8 @@ class KapitalEngine(val seed: Long) {
             "baddebt" to writeOff, "ebit" to ebit, "interest" to interest, "intinc" to interestIncome, "tax" to tax, "ni" to ni)
         prevCashFlow = lastCashFlow
         lastCashFlow = mapOf("ni" to ni, "dep" to dep, "wc" to (-dAR - dInv + dPay), "cfo" to cfo,
-            "capex" to -capex, "fin" to newDebt - principal, "net" to cash - startCash)
+            "capex" to -capex, "fin" to newDebt - principal, "stock" to periodInvestIn - periodInvestOut, "div" to lastDividendIncome, "net" to cash - startCash)
+        periodInvestIn = 0.0; periodInvestOut = 0.0; periodStartCash = cash
         revenueHist += revenue
         cashHist += cash
         kursHist += kurs
@@ -1178,6 +1262,9 @@ class KapitalEngine(val seed: Long) {
 
     companion object {
         /** Rasio HPP bahan+energi (dikalibrasi agar margin EBIT ±5%, setara pabrikan tekstil Indonesia). */
+        const val LOT = 0.1
+        const val BROKER_FEE = 0.0015
+        const val SELL_TAX = 0.001
         const val COGS_BASE = 0.638
         /** Bagian nilai piutang yang diterima saat factoring (potongan ±4% untuk tenor ±60 hari). */
         const val FACTOR_KEEP = 0.96

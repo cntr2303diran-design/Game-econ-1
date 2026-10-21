@@ -28,6 +28,8 @@ sealed class Action {
     data class Confront(val execId: String) : Action()
     data class Fire(val execId: String) : Action()
     data class AdjustPrice(val deltaPct: Int) : Action()
+    data class BuyStock(val companyId: String, val lots: Int) : Action()
+    data class SellStock(val companyId: String, val lots: Int) : Action()
 
     fun encode(): String = when (this) {
         EndTurn -> "END"
@@ -48,6 +50,8 @@ sealed class Action {
         is Confront -> "CON|${esc(execId)}"
         is Fire -> "FIR|${esc(execId)}"
         is AdjustPrice -> "PRC|$deltaPct"
+        is BuyStock -> "BUY|${esc(companyId)}|$lots"
+        is SellStock -> "SEL|${esc(companyId)}|$lots"
     }
 
     companion object {
@@ -76,6 +80,8 @@ sealed class Action {
                     "CON" -> Confront(p[1])
                     "FIR" -> Fire(p[1])
                     "PRC" -> AdjustPrice(p[1].toInt())
+                    "BUY" -> BuyStock(p[1], p[2].toInt())
+                    "SEL" -> SellStock(p[1], p[2].toInt())
                     else -> null
                 }
             } catch (e: Exception) {

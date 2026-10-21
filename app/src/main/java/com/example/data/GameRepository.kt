@@ -110,6 +110,8 @@ class GameRepository(
     }
 
     fun adjustPrice(deltaPct: Int) = perform(Action.AdjustPrice(deltaPct))
+    fun buyStock(id: String, lots: Int) = perform(Action.BuyStock(id, lots))
+    fun sellStock(id: String, lots: Int) = perform(Action.SellStock(id, lots))
     fun crossCheckNewsItem(newsId: String) = perform(Action.CrossCheck(newsId))
     fun auditExecutive(id: String) = perform(Action.Audit(id))
     fun confrontExecutive(id: String) = perform(Action.Confront(id))
@@ -659,6 +661,8 @@ class GameRepository(
             hasSavedGame = log.isNotEmpty() || e.turn > 39,
             companyEquityText = "${fmt(e.equity)} jt RS",
             rivals = rivalItems,
+            actionPoints = e.ap,
+            bourse = BourseView.build(e, origin("Bursa Efek Sundara", "Harga penutupan", "Bursa Efek Sundara (BES)", "Bulan $closed", "Harga bergerak dari nilai wajar (laba 12 bulan x P/E yang bergantung suku bunga) ditambah sentimen pasar. Laporan dirilis resmi tiap akhir triwulan.", "Harga bisa menyimpang jauh dari nilai wajar dalam jangka pendek.", ConfidenceTier.HIGH)),
             playerShareText = shareText,
             unemploymentText = unempText,
             marketNote = marketNote,
