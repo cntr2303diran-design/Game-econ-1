@@ -285,7 +285,7 @@ class GameRepository(
                 tone = tone(d.tone), assetSharePct = d.assetSharePct, defaultContextNote = d.context,
                 opensEventDialog = d.isEvent,
                 options = if (d.id == "dec_termsheet") listOf(
-                    "cnt_ts_1" to "Bank Pembangunan Sundara · bunga tetap 14,5% · cicilan 48 bulan",
+                    "cnt_ts_1" to "Bank Pembangunan Sundara · bunga tetap 10,75% · cicilan 48 bulan",
                     "cnt_ts_2" to "Aurelia Global CitiTrust · 5,2% dalam A$ · bullet 36 bulan"
                 ) else emptyList(),
                 canReject = d.id == "dec_pemintalan"
@@ -482,14 +482,14 @@ class GameRepository(
             SemanticTone.WARNING_YELLOW, originInfo = covOrigin, actions = reviewAction("cnt_bank_b"))
         if (e.termSheetChosen == null && bankB != null) {
             contracts += ContractItem("cnt_ts_1", "Term sheet #1", "Bank Pembangunan Sundara", "Sundara",
-                "25.000 jt RS (bunga tetap 14,5%)", "Tenor 48 bulan · cicilan merata ±521 jt RS/bulan",
-                "ICR ≥ 1,8x · agunan pabrik dengan haircut 25%.",
+                "25.000 jt RS (bunga tetap 10,75%)", "Tenor 48 bulan · cicilan merata ±521 jt RS/bulan",
+                "ICR ≥ 1,5x · agunan pabrik dengan haircut 25%.",
                 if ("cnt_ts_1" in e.reviewedContracts) "Aman dari kurs dan kenaikan bunga, tetapi cicilan pokok menyedot sekitar 6.250 jt RS kas per tahun." else notReviewed,
                 SemanticTone.PRIMARY_BLUE, originInfo = covOrigin,
                 actions = reviewAction("cnt_ts_1") + ContractActionItem("choose", "Pilih lewat jurnal keputusan (2 AP)", e.ap >= 2))
             contracts += ContractItem("cnt_ts_2", "Term sheet #2", "Aurelia Global CitiTrust", "Aurelia",
                 "≈${fmt2(24000.0 / e.kurs)} juta A$ (≈24.000 jt RS, bunga 5,2%)", "Tenor 36 bulan · bullet (pokok di akhir)",
-                "ICR ≥ 2,4x · klausul Material Adverse Change (MAC).",
+                "ICR ≥ 1,75x · klausul Material Adverse Change (MAC).",
                 if ("cnt_ts_2" in e.reviewedContracts) "JEBAKAN: utang dalam A$. Jika Rial anjlok, klausul MAC mengizinkan bank menaikkan bunga ke 9,2% dan menagih 30% pokok dalam 3 bulan." else notReviewed,
                 SemanticTone.PRIMARY_BLUE, originInfo = covOrigin,
                 actions = reviewAction("cnt_ts_2") + ContractActionItem("choose", "Pilih lewat jurnal keputusan (2 AP)", e.ap >= 2))
@@ -574,7 +574,45 @@ class GameRepository(
                 canReplayCounterfactual = it.actionIndex != null && turn - it.turn >= 12, actionIndex = it.actionIndex)
         }
 
+        // ---- Pesaing dan pasar produk (estimasi intel ±1,5%, bukan angka pasti) ----
+        val intel = kotlin.random.Random(seed * 31L + turn * 17L)
+        val myRel = (1.0 + e.priceAdjPct / 100.0) * e.fxPassLevel()
+        val rivalItems = e.world.rivals.mapIndexed { idx, rv ->
+            val observed = rv.price * (1.0 + (intel.nextDouble() - 0.5) * 0.03)
+            val diff = (observed / myRel - 1.0) * 100.0
+            RivalItem(
+                id = rv.id, name = rv.name,
+                priceText = "${fmt2(observed * 100.0)} (indeks)",
+                vsYouText = when {
+                    !rv.active -> "—"
+                    diff < -1.0 -> "${fmt1(-diff)}% lebih murah dari Anda"
+                    diff > 1.0 -> "${fmt1(diff)}% lebih mahal dari Anda"
+                    else -> "sepadan dengan harga Anda"
+                },
+                statusText = when {
+                    !rv.active -> "Keluar pasar"
+                    rv.id == "riv_importir" && e.world.dumpingMonthsLeft > 0 -> "Membanting harga (dumping)"
+                    rv.weakMonths >= 4 -> "Tertekan: jual di bawah biaya ${rv.weakMonths} bulan"
+                    else -> "Bersaing normal"
+                },
+                tone = when {
+                    !rv.active -> SemanticTone.NEUTRAL_GRAY
+                    rv.id == "riv_importir" && e.world.dumpingMonthsLeft > 0 -> SemanticTone.DANGER_RED
+                    rv.weakMonths >= 4 -> SemanticTone.WARNING_YELLOW
+                    else -> SemanticTone.PRIMARY_BLUE
+                }
+            )
+        }
+        val shareText = "${fmt1(e.playerShare() * 100.0)}% (awal 20%)"
+        val unempText = "${fmt1(e.world.unemployment)}%"
+        val marketNote = "Ketika Anda memotong harga, pesaing menyamai dalam beberapa bulan dan perang harga menggerus margin semua pihak. " +
+            "Menaikkan harga membuat Anda kehilangan pangsa karena pesaing tidak ikut naik."
+
         return GameState(
+            rivals = rivalItems,
+            playerShareText = shareText,
+            unemploymentText = unempText,
+            marketNote = marketNote,
             dateText = dateText(turn),
             turn = turn,
             eraNumber = KapitalEngine.era(turn),

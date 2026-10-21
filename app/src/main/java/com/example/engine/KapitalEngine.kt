@@ -122,12 +122,15 @@ class KapitalEngine(val seed: Long) {
     val loans = mutableListOf<Loan>()
 
     // ---------- Makro ----------
-    var policyRate = 8.25; private set
+    val world = World()
+    var policyRate = 6.50; private set
     var kurs = 15450.0; private set
     var econ = 1.0; private set
     var priceIndex = 1.0; private set
     var costIndex = 1.0; private set
-    var inflationAnnual = 8.0; private set
+    var inflationAnnual = 4.0; private set
+    private var volOverride: Double? = null
+    private var trendMonths = 0
 
     // ---------- Rahasia dunia (ditentukan seed) ----------
     private val worldRng = Random(seed)
@@ -167,8 +170,8 @@ class KapitalEngine(val seed: Long) {
     private var oneOffOpex = 0.0
 
     // ---------- Riwayat ----------
-    val ebitHist = mutableListOf(1300.0, 1190.0)
-    val interestHist = mutableListOf(500.0, 510.0)
+    val ebitHist = mutableListOf(1330.0, 1390.0)
+    val interestHist = mutableListOf(395.0, 390.0)
     val cashHist = mutableListOf(9800.0, 8900.0, 8200.0, 7600.0, 7300.0, 6200.0)
     val revenueHist = mutableListOf<Double>()
     val journals = mutableListOf<JournalRecord>()
@@ -209,10 +212,12 @@ class KapitalEngine(val seed: Long) {
         }
 
     init {
-        loans += Loan("bank_b", "Bank Niaga Sundara (Bank B)", 24000.0, 16.25, false, 0.0, 999, 45, 8.0, 2.0)
-        loans += Loan("bank_lama", "Bank Pembangunan (pinjaman lama)", 18000.0, 15.0, false, 200.0, 0, 999, null, 0.0)
+        world.initScenario(4.0, 6.50)
+        loans += Loan("bank_b", "Bank Niaga Sundara (Bank B)", 24000.0, 10.50, false, 0.0, 999, 45, 4.0, 1.75)
+        loans += Loan("rcf", "Fasilitas Modal Kerja Bank B (revolving, plafon 4.000 jt RS)", 0.0, 6.5 + 3.5, false, 0.0, 999, 999, 3.5, 0.0)
+        loans += Loan("bank_lama", "Bank Pembangunan (pinjaman lama)", 18000.0, 11.75, false, 200.0, 0, 999, null, 0.0)
         // Piutang hasil "obral kredit" 5 bulan terakhir (sudah terjadi sebelum giliran 39)
-        for (t in 34..38) stuffedBuckets += t to 600.0
+        for (t in 34..38) stuffedBuckets += t to 400.0
         equity = totalAssets() - totalLiabilities()
         chronicle += ChronicleItem(1, "Awal warisan PT Benang Sundara",
             "Mewarisi pabrik tekstil 340 pekerja dengan mesin tua, kas tipis, dan utang jatuh tempo.",
@@ -232,10 +237,10 @@ class KapitalEngine(val seed: Long) {
         prevBalance = balanceSnapshot()
         val est = estimateMonth()
         lastIncome = est
-        prevIncome = mapOf("revenue" to 14100.0, "cogs" to 9400.0, "opex" to 2380.0, "maint" to 610.0,
-            "dep" to 520.0, "baddebt" to 0.0, "ebit" to 1190.0, "interest" to 510.0, "tax" to 150.0, "ni" to 530.0)
-        lastCashFlow = mapOf("ni" to 530.0, "dep" to 520.0, "wc" to -2010.0, "cfo" to -960.0, "capex" to -120.0,
-            "fin" to -20.0, "net" to -1100.0)
+        prevIncome = mapOf("revenue" to 14100.0, "cogs" to 9200.0, "opex" to 2380.0, "maint" to 610.0,
+            "dep" to 520.0, "baddebt" to 0.0, "ebit" to 1390.0, "interest" to 390.0, "tax" to 220.0, "ni" to 780.0)
+        lastCashFlow = mapOf("ni" to 780.0, "dep" to 520.0, "wc" to -2010.0, "cfo" to -710.0, "capex" to -364.0,
+            "fin" to -200.0, "net" to -1274.0)
         memos = generateMemos(Random(seed + 7))
         news = generateNews(Random(seed + 11))
     }
@@ -281,8 +286,14 @@ class KapitalEngine(val seed: Long) {
         return 0.05 * min(1.0, months / 6.0)
     }
 
+    /** Tingkat harga paritas impor: 60% dari depresiasi rial menular ke harga jual (kain impor bersaing dalam USD). */
+    fun fxPassLevel(): Double = 1.0 + 0.6 * ((0.8 + 0.2 * kurs / 15450.0) - 1.0)
+
+    /** Pendapatan tanpa efek harga diskresioner dan paritas impor (basis HPP). */
+    private fun volumeRevenue(revenue: Double): Double = revenue / ((1.0 + priceAdjPct / 100.0) * fxPassLevel())
+
     fun cogsRatio(): Double {
-        var r = 0.60 * (0.8 + 0.2 * kurs / 15450.0)
+        var r = COGS_BASE * (0.8 + 0.2 * kurs / 15450.0)
         if (kickbackActive) r += 0.01
         if (dualSourcing) r += 0.012
         r -= spinningBenefit()
@@ -298,11 +309,11 @@ class KapitalEngine(val seed: Long) {
         val normalRev = baseNormalRevenue(1.0)
         val stuff = if (stuffingActive) normalRev * 0.08 else 0.0
         val revenue = normalRev + stuff
-        val cogs = revenue / (1.0 + priceAdjPct / 100.0) * cogsRatio() * (costIndex / priceIndex).coerceIn(0.8, 1.6)
-        val opex = 2300.0 * costIndex + wageAddOn
+        val cogs = volumeRevenue(revenue) * cogsRatio() * (costIndex / priceIndex).coerceIn(0.8, 1.6)
+        val opex = opexBase() + wageAddOn
         val maint = maintenanceSpend()
         val dep = fixedAssets * 0.0081
-        val baddebt = stuffedBuckets.filter { turn - it.first >= 6 }.sumOf { it.second * 0.6 }
+        val baddebt = stuffedBuckets.filter { turn - it.first >= 6 }.sumOf { it.second * STUFFED_LOSS }
         val ebit = revenue - cogs - opex - maint - dep - baddebt
         val interest = monthlyInterest()
         val tax = max(0.0, ebit - interest) * 0.22
@@ -310,20 +321,26 @@ class KapitalEngine(val seed: Long) {
             "baddebt" to baddebt, "ebit" to ebit, "interest" to interest, "tax" to tax, "ni" to ebit - interest - tax)
     }
 
-    /** Faktor harga: pendapatan per unit naik, volume turun (semi-elastisitas 2,5). */
-    fun priceRevenueFactor(): Double {
-        val a = priceAdjPct / 100.0
-        return (1.0 + a) * kotlin.math.exp(-2.5 * a)
-    }
+    /** Faktor harga: pendapatan per unit naik, volume mengikuti pangsa pasar yang ditentukan harga pesaing. */
+    fun priceRevenueFactor(): Double = (1.0 + priceAdjPct / 100.0) * priceVolumeFactor()
 
-    fun priceVolumeFactor(): Double = kotlin.math.exp(-2.5 * priceAdjPct / 100.0)
+    /** Volume relatif akibat harga Anda vs harga pesaing saat ini (pesaing bereaksi, lihat World). */
+    fun priceVolumeFactor(): Double = volOverride ?: world.volumeFactor((1.0 + priceAdjPct / 100.0) * fxPassLevel())
+
+    fun playerShare(): Double = world.playerShare((1.0 + priceAdjPct / 100.0) * fxPassLevel())
 
     private fun baseNormalRevenue(prodFactor: Double): Double {
-        var r = 13704.0 * econ * priceIndex * prodFactor * (1.0 - lostCustomerShare) * priceRevenueFactor()
+        var r = 13704.0 * econ * trendGrowth() * priceIndex * fxPassLevel() * prodFactor * (1.0 - lostCustomerShare) * priceRevenueFactor()
         if (salesScheme == SalesScheme.KAS) r *= 0.97
         if (!exec("exec_sales").present) r *= 0.95
         return r
     }
+
+    /** Pertumbuhan riil tren industri (2,5%/tahun; tekstil Indonesia tumbuh 6,4% pada Q2 2026 tetapi dari basis yang lemah). */
+    private fun trendGrowth(): Double = Math.pow(1.025, trendMonths / 12.0)
+
+    /** Beban usaha: tumbuh dengan inflasi dan 80% dari pertumbuhan volume (biaya semi-tetap). */
+    private fun opexBase(): Double = 2300.0 * costIndex * Math.pow(trendGrowth(), 0.8)
 
     private fun maintenanceSpend(): Double {
         val needed = 610.0 * costIndex
@@ -586,22 +603,20 @@ class KapitalEngine(val seed: Long) {
         prevBalance = balanceSnapshot()
         prevIncome = lastIncome
 
-        // ---- 1. Makro ----
+        // ---- 1. Makro: dunia berbasis agen (rumah tangga, pesaing, bank sentral) ----
         val rMacro = rng(1)
-        econ = 1.0 + 0.85 * (econ - 1.0) + gaussian(rMacro) * 0.012
-        val monthlyInfl = (inflationAnnual / 12.0) / 100.0
-        priceIndex *= 1.0 + monthlyInfl
-        inflationAnnual += 0.08 * (7.5 - inflationAnnual)
-        costIndex *= 1.0 + monthlyInfl
-        kurs *= 1.0 + 0.003 + gaussian(rMacro) * 0.008
+        val rWorld = rng(8)
+        val kursBefore = kurs
+        kurs *= 1.0 + 0.002 + gaussian(rMacro) * 0.008
+        var demandShock = 0.0
         if (turn == electionTurn) {
             lines += ReportLine("Pemilu Sundara berlangsung bulan ini.", Tone.INFO)
             if (electionShock) {
-                kurs *= 1.18
-                inflationAnnual += 3.0
-                lines += ReportLine("Rial Sundara anjlok sekitar 18% setelah hasil pemilu; inflasi impor naik.", Tone.BAD)
+                kurs *= 1.12
+                demandShock = -0.03
+                lines += ReportLine("Rial Sundara anjlok sekitar 12% setelah hasil pemilu; inflasi impor naik dan bank sentral akan bereaksi.", Tone.BAD)
                 chronicle += ChronicleItem(turn, "Guncangan kurs pascapemilu",
-                    "Rial Sundara melemah tajam terhadap A$.", "Subsidi jelang pemilu → defisit → investor keluar → kurs anjlok.")
+                    "Rial Sundara melemah tajam terhadap A$.", "Subsidi jelang pemilu → defisit → investor keluar → kurs anjlok → bunga naik.")
                 if (loans.any { it.id == "aurelia" && it.balance > 0.0 }) {
                     macDemandTurn = turn + 3
                     loans.first { it.id == "aurelia" }.annualRatePct = 9.2
@@ -611,10 +626,24 @@ class KapitalEngine(val seed: Long) {
                 lines += ReportLine("Pasar tenang setelah pemilu; kurs relatif stabil.", Tone.GOOD)
             }
         }
-        if (turn in (electionTurn + 1)..(electionTurn + 3) && rateHikeAfterElection) {
-            policyRate += 0.5
-            lines += ReportLine("Bank sentral menaikkan suku bunga acuan ke ${fmt2(policyRate)}%.", Tone.WARN)
+        val costPressure = (0.8 + 0.2 * kurs / 15450.0) * (costIndex / priceIndex)
+        val rpPlayer = (1.0 + priceAdjPct / 100.0) * fxPassLevel()
+        volOverride = world.volumeFactor(rpPlayer)          // pembeli melihat harga pesaing bulan lalu
+        val prevPolicy = policyRate
+        val out = world.step(rWorld, rpPlayer, costPressure, fxPassLevel(), kurs / kursBefore - 1.0, kurs, demandShock)
+        econ = out.demand
+        inflationAnnual = out.inflationAnnual
+        policyRate = out.policyRate
+        trendMonths++
+        val monthlyInfl = (inflationAnnual / 12.0) / 100.0
+        priceIndex *= 1.0 + monthlyInfl
+        costIndex *= 1.0 + monthlyInfl
+        if (policyRate != prevPolicy) {
+            lines += ReportLine(
+                "Bank sentral ${if (policyRate > prevPolicy) "menaikkan" else "menurunkan"} suku bunga acuan ke ${fmt2(policyRate)}% (inflasi ${fmt2(inflationAnnual)}%, pengangguran ${fmt2(out.unemployment)}%).",
+                if (policyRate > prevPolicy) Tone.WARN else Tone.INFO)
         }
+        out.events.forEach { lines += ReportLine(it, Tone.WARN) }
         loans.forEach { l -> l.floatingSpreadPct?.let { l.annualRatePct = policyRate + it } }
 
         // ---- 2. Kejadian operasional ----
@@ -674,18 +703,18 @@ class KapitalEngine(val seed: Long) {
         val normalRev = baseNormalRevenue(prodFactor)
         val stuffRev = if (stuffingActive) normalRev * 0.08 else 0.0
         val revenue = normalRev + stuffRev
-        val cogs = revenue / (1.0 + priceAdjPct / 100.0) * cogsRatio() * (costIndex / priceIndex).coerceIn(0.8, 1.6)
-        val opex = 2300.0 * costIndex + wageAddOn + oneOffOpex + sanctionFine
+        val cogs = volumeRevenue(revenue) * cogsRatio() * (costIndex / priceIndex).coerceIn(0.8, 1.6)
+        val opex = opexBase() + wageAddOn + oneOffOpex + sanctionFine
         oneOffOpex = 0.0
         val maint = maintenanceSpend() + breakdownCost + if (holdupThisTurn) 200.0 else 0.0
         if (deferralActive) deferredMonths += 1 else if (deferredMonths > 0) deferredMonths -= 1
         val dep = fixedAssets * 0.0081
-        // Piutang obral kredit yang berumur 6 bulan: 60% macet, 40% tertagih
+        // Piutang obral kredit yang berumur 6 bulan: 45% macet, 55% tertagih
         var writeOff = 0.0
         var stuffedCollected = 0.0
         val keep = mutableListOf<Pair<Int, Double>>()
         for ((t, v) in stuffedBuckets) {
-            if (turn - t >= 6) { writeOff += v * 0.6; stuffedCollected += v * 0.4 } else keep += t to v
+            if (turn - t >= 6) { writeOff += v * STUFFED_LOSS; stuffedCollected += v * (1.0 - STUFFED_LOSS) } else keep += t to v
         }
         stuffedBuckets.clear(); stuffedBuckets += keep
         if (stuffRev > 0.0) stuffedBuckets += turn to stuffRev
@@ -698,6 +727,8 @@ class KapitalEngine(val seed: Long) {
         val tax = max(0.0, ebit - interest + interestIncome) * 0.22
         val ni = ebit - interest + interestIncome - tax
         equity += ni
+
+        volOverride = null
 
         // ---- 4. Modal kerja ----
         val dsoNormal = if (salesScheme == SalesScheme.OMZET) 62.0 else 50.0
@@ -732,6 +763,8 @@ class KapitalEngine(val seed: Long) {
             val inv = loans.firstOrNull { it.id == "kredit_investasi" }
             if (inv != null) { inv.balance += capex * 0.7; newDebt += capex * 0.7 }
         }
+        val replacement = dep * REPLACEMENT_CAPEX
+        capex += replacement
         fixedAssets += capex - dep
 
         // Pencairan refinancing
@@ -739,11 +772,11 @@ class KapitalEngine(val seed: Long) {
             val bankB = loans.firstOrNull { it.id == "bank_b" }
             val payoff = bankB?.balance ?: 0.0
             if (termSheetChosen == "cnt_ts_1") {
-                loans += Loan("bank_pembangunan", "Bank Pembangunan Sundara", 25000.0, 14.5, false, 25000.0 / 48.0, turn + 1, turn + 48, null, 1.8)
+                loans += Loan("bank_pembangunan", "Bank Pembangunan Sundara", 25000.0, 10.75, false, 25000.0 / 48.0, turn + 1, turn + 48, null, 1.5)
                 newDebt += 25000.0
                 lines += ReportLine("Kredit Bank Pembangunan 25.000 jt RS cair; Bank B dilunasi. Cicilan pokok ±521 jt RS per bulan mulai bulan depan.", Tone.GOOD)
             } else {
-                loans += Loan("aurelia", "Aurelia Global CitiTrust", 24000.0 / kurs, 5.2, true, 0.0, 999, turn + 36, null, 2.4)
+                loans += Loan("aurelia", "Aurelia Global CitiTrust", 24000.0 / kurs, 5.2, true, 0.0, 999, turn + 36, null, 1.75)
                 newDebt += 24000.0
                 lines += ReportLine("Pinjaman Aurelia ${fmt2(24000.0 / kurs * 1000)} ribu A$ cair; Bank B dilunasi. Utang kini dalam A$.", Tone.INFO)
                 if (turn >= electionTurn && electionShock && macDemandTurn < 0) { /* guncangan sudah lewat */ }
@@ -772,7 +805,7 @@ class KapitalEngine(val seed: Long) {
         loans.firstOrNull { it.id == "bank_b" && it.balance > 0.5 && it.maturityTurn == turn }?.let { b ->
             if (covenantBreaches == 0) {
                 b.maturityTurn += 12
-                b.floatingSpreadPct = (b.floatingSpreadPct ?: 8.0) + 2.0
+                b.floatingSpreadPct = (b.floatingSpreadPct ?: 4.0) + 2.0
                 b.annualRatePct = policyRate + (b.floatingSpreadPct ?: 0.0)
                 oneOffOpex += b.balance * 0.01
                 lines += ReportLine("Bank B memperpanjang pinjaman 12 bulan dengan bunga +2% dan biaya 1%.", Tone.WARN)
@@ -789,24 +822,45 @@ class KapitalEngine(val seed: Long) {
             if (fxLoss > 50.0) lines += ReportLine("Rugi selisih kurs utang A$: ${fmt(fxLoss)} jt RS (mengurangi ekuitas).", Tone.BAD)
         }
 
+        // ---- 5b. Dividen: pemegang saham menarik kas berlebih tiap Desember ----
+        var dividend = 0.0
+        val cashFloor = 36000.0 * costIndex
+        if ((turn + 1) % 12 == 0 && covenantBreaches == 0 && cash + (ni + dep) > cashFloor && gameOverReason == null) {
+            dividend = 0.5 * (cash + ni + dep - cashFloor)
+            equity -= dividend
+            lines += ReportLine("RUPS menetapkan dividen ${fmt(dividend)} jt RS (50% kas di atas cadangan ${fmt(cashFloor)} jt RS). Kas berlebih tidak boleh menganggur selamanya.", Tone.INFO)
+        }
+
         // ---- 6. Kas ----
         val dAR = totalAR() - startAR
         val dInv = inventory - startInv
         val dPay = payables - startPay
         val cfo = ni + dep - dAR - dInv + dPay
-        cash += cfo - capex + newDebt - principal
+        cash += cfo - capex + newDebt - principal - dividend
+
+        // Fasilitas modal kerja: tarik otomatis saat kas negatif, lunasi saat kas longgar
+        loans.firstOrNull { it.id == "rcf" }?.let { f ->
+            if (cash < 0.0 && f.balance < RCF_LIMIT) {
+                val draw = min(-cash, RCF_LIMIT - f.balance)
+                f.balance += draw; cash += draw
+                lines += ReportLine("Kas menipis: fasilitas modal kerja Bank B ditarik ${fmt(draw)} jt RS (bunga acuan + 3,5%).", Tone.WARN)
+            } else if (f.balance > 0.0 && cash > 2500.0) {
+                val pay = min(f.balance, cash - 2500.0)
+                f.balance -= pay; cash -= pay
+            }
+        }
 
         // Likuiditas darurat: factoring otomatis
         if (cash < 0.0) {
             val needed = -cash
             val maxFactor = normalAR * 0.7
-            val faceValue = min(maxFactor, needed / 0.94)
+            val faceValue = min(maxFactor, needed / FACTOR_KEEP)
             normalAR -= faceValue
-            val proceeds = faceValue * 0.94
+            val proceeds = faceValue * FACTOR_KEEP
             val discount = faceValue - proceeds
             cash += proceeds
             equity -= discount
-            lines += ReportLine("Kas negatif: piutang ${fmt(faceValue)} jt RS dijual ke perusahaan factoring dengan potongan 6%.", Tone.BAD)
+            lines += ReportLine("Kas negatif: piutang ${fmt(faceValue)} jt RS dijual ke perusahaan factoring dengan potongan 4%.", Tone.BAD)
             if (cash < 0.0) {
                 gameOverReason = "Kas habis dan tidak ada lagi piutang yang bisa dijual. Perusahaan bangkrut karena cash crunch, walaupun laporan laba rugi masih bisa terlihat untung."
             }
@@ -839,11 +893,11 @@ class KapitalEngine(val seed: Long) {
                     chronicle += ChronicleItem(turn, "Restrukturisasi paksa oleh bank", "Covenant gagal dua kuartal berturut-turut.",
                         "ICR rendah berulang → bank menarik sebagian pokok → kas tersedot.")
                     if (cash < 0.0) {
-                        val face = min(normalAR * 0.7, -cash / 0.94)
+                        val face = min(normalAR * 0.7, -cash / FACTOR_KEEP)
                         normalAR -= face
-                        cash += face * 0.94
-                        equity -= face * 0.06
-                        lines += ReportLine("Pelunasan paksa dibiayai dengan menjual piutang ${fmt(face)} jt RS (potongan 6%).", Tone.BAD)
+                        cash += face * FACTOR_KEEP
+                        equity -= face * (1.0 - FACTOR_KEEP)
+                        lines += ReportLine("Pelunasan paksa dibiayai dengan menjual piutang ${fmt(face)} jt RS (potongan 4%).", Tone.BAD)
                         if (cash < 0.0) gameOverReason = "Kas tidak cukup memenuhi tuntutan pelunasan bank. Perusahaan bangkrut."
                     }
                 } else {
@@ -997,14 +1051,14 @@ class KapitalEngine(val seed: Long) {
                     "Penelusuran neraca pembayaran dan jadwal jatuh tempo utang luar negeri.", 2)
             )
             "bunga" -> listOf(
-                piece("BISNIS", if (rateHikeAfterElection) "Ekonom perkirakan bunga naik setelah pemilu" else "Ekonom: bank sentral cenderung menahan bunga",
+                piece("BISNIS", if (world.taylorStar > policyRate + 0.2) "Ekonom perkirakan bunga acuan naik karena inflasi dan kurs" else "Ekonom: bank sentral cenderung menahan bunga",
                     "Survei 12 ekonom; proyeksi bunga acuan akhir tahun.", 1),
                 piece("PRO_PEMERINTAH", "Bank sentral: tidak ada rencana menaikkan bunga",
                     "Gubernur menegaskan dukungan pada pertumbuhan.", 0),
                 piece("OPOSISI", "Bunga ditahan demi pemilu, rakyat bayar belakangan",
                     "Oposisi menilai bank sentral tunduk pada istana.", 1),
                 piece("SENSASIONAL", "Bunga KPR bakal meroket 5%!", "Kabar dari grup percakapan bankir.", 0, true),
-                piece("INDEPENDEN", if (rateHikeAfterElection) "Notulen rapat bocor: mayoritas anggota dewan dukung kenaikan bunga pascapemilu" else "Notulen rapat: dewan gubernur terbelah, kenaikan bunga belum disepakati",
+                piece("INDEPENDEN", if (world.taylorStar > policyRate + 0.2) "Notulen rapat bocor: mayoritas anggota dewan condong menaikkan bunga" else "Notulen rapat: dewan gubernur terbelah, belum ada kenaikan bunga",
                     "Dokumen internal dan wawancara dua mantan pejabat bank sentral.", 2)
             )
             "kestrel" -> listOf(
@@ -1039,6 +1093,16 @@ class KapitalEngine(val seed: Long) {
     }
 
     companion object {
+        /** Rasio HPP bahan+energi (dikalibrasi agar margin EBIT ±5%, setara pabrikan tekstil Indonesia). */
+        const val COGS_BASE = 0.645
+        /** Bagian nilai piutang yang diterima saat factoring (potongan ±4% untuk tenor ±60 hari). */
+        const val FACTOR_KEEP = 0.96
+        /** Bagian piutang obral kredit yang akhirnya macet. */
+        const val STUFFED_LOSS = 0.45
+        /** Belanja modal penggantian mesin sebagai bagian dari penyusutan. */
+        const val RCF_LIMIT = 4000.0
+        const val REPLACEMENT_CAPEX = 0.70
+
         private val idLocale: Locale = Locale.forLanguageTag("id-ID")
         val MONTHS = listOf("Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli",
             "Agustus", "September", "Oktober", "November", "Desember")

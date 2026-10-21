@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
@@ -54,6 +55,7 @@ fun PasarScreen(
                     modifier = Modifier.weight(1.1f),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    RivalsCard(gameState)
                     Text(
                         text = "Komoditas, kurs, dan saham (ketuk untuk grafik, tahan untuk asal data)",
                         style = MaterialTheme.typography.titleMedium,
@@ -76,7 +78,7 @@ fun PasarScreen(
                 ) {
                     FanChart(
                         title = "FanChart Proyeksi: ${selectedInstrument.name}",
-                        subtitle = "Buku pesanan 207.000 agen · Pita ketidakpastian 50% & 90%",
+                        subtitle = "Pita ketidakpastian 50% & 90%",
                         historyPoints = selectedInstrument.sparklineHistory,
                         medianFuturePoints = selectedInstrument.fanProjectionMedian,
                         spread50Points = selectedInstrument.fanProjectionSpread.map { it * 0.5f },
@@ -98,6 +100,7 @@ fun PasarScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                RivalsCard(gameState)
                 Text(
                     text = "Daftar Komoditas, Kurs RS/A$, & Saham",
                     style = MaterialTheme.typography.titleMedium,
@@ -115,7 +118,7 @@ fun PasarScreen(
 
                 FanChart(
                     title = "FanChart Proyeksi: ${selectedInstrument.name}",
-                    subtitle = "Buku pesanan 207.000 agen · Pita ketidakpastian 50% & 90%",
+                    subtitle = "Pita ketidakpastian 50% & 90%",
                     historyPoints = selectedInstrument.sparklineHistory,
                     medianFuturePoints = selectedInstrument.fanProjectionMedian,
                     spread50Points = selectedInstrument.fanProjectionSpread.map { it * 0.5f },
@@ -128,6 +131,49 @@ fun PasarScreen(
                     onInspectOrigin = onInspectOrigin
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun RivalsCard(gameState: GameState) {
+    Card(
+        modifier = Modifier.fillMaxWidth().testTag("card_rivals"),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Pesaing dan pasar produk", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text("Pangsa Anda", style = MaterialTheme.typography.labelMedium)
+                    Text(gameState.playerShareText, style = MaterialTheme.typography.titleMedium, fontFamily = MonoFontFamily)
+                }
+                Column(Modifier.weight(1f)) {
+                    Text("Pengangguran Sundara", style = MaterialTheme.typography.labelMedium)
+                    Text(gameState.unemploymentText, style = MaterialTheme.typography.titleMedium, fontFamily = MonoFontFamily)
+                }
+            }
+            gameState.rivals.forEach { r ->
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                        .background(semanticToneContainerColor(r.tone)).padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(r.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                        Text(r.statusText, style = MaterialTheme.typography.bodySmall, color = semanticToneColor(r.tone))
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(r.priceText, style = MaterialTheme.typography.bodySmall, fontFamily = MonoFontFamily)
+                        Text(r.vsYouText, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+            Text(
+                "Harga adalah estimasi intel pasar (±1,5%), bukan data pasti. " + gameState.marketNote,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

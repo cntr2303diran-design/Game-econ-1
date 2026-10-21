@@ -82,6 +82,45 @@ class ExampleUnitTest {
     }
 
     @Test
+    fun competitors_matchPriceCuts_butNotRises() {
+        val cut = KapitalEngine(4L); cut.apply(Action.AdjustPrice(-8))
+        val hold = KapitalEngine(4L)
+        val rise = KapitalEngine(4L); rise.apply(Action.AdjustPrice(5))
+        repeat(6) { cut.apply(Action.EndTurn); hold.apply(Action.EndTurn); rise.apply(Action.EndTurn) }
+        assertTrue("potong harga harus menambah pangsa dulu", cut.playerShare() > hold.playerShare())
+        assertTrue("menaikkan harga harus menurunkan pangsa", rise.playerShare() < hold.playerShare())
+        assertTrue("pesaing menyamai potongan harga", cut.world.rivalAveragePrice() < hold.world.rivalAveragePrice() - 0.01)
+        assertTrue("pesaing tidak ikut naik", abs(rise.world.rivalAveragePrice() - hold.world.rivalAveragePrice()) < 0.02)
+    }
+
+    @Test
+    fun macro_isEndogenousAndStable() {
+        val w = com.example.engine.World()
+        w.initScenario(4.0, 6.5)
+        val r = kotlin.random.Random(9)
+        val infl = ArrayList<Double>(); val pol = ArrayList<Double>(); val un = ArrayList<Double>()
+        repeat(360) {
+            val o = w.step(r, 1.0, 1.0, 1.0, 0.0, 15450.0)
+            infl += o.inflationAnnual; pol += o.policyRate; un += o.unemployment
+        }
+        assertTrue("inflasi rata-rata mendekati target 3%: ${infl.average()}", infl.average() in 2.0..4.5)
+        assertTrue("bunga acuan tetap wajar", pol.all { it in 2.0..14.0 })
+        assertTrue("pengangguran tidak meledak: ${un.max()}", un.max() < 12.0)
+    }
+
+    @Test
+    fun taylorRule_raisesRatesWhenCurrencyCollapses() {
+        val w = com.example.engine.World(); w.initScenario(4.0, 6.5)
+        val r = kotlin.random.Random(1)
+        var kurs = 15450.0
+        repeat(6) { w.step(r, 1.0, 1.0, 1.0, 0.0, kurs) }
+        val before = w.policyRate
+        kurs *= 1.25
+        repeat(8) { w.step(r, 1.0, 1.0, 1.0, if (it == 0) 0.25 else 0.0, kurs) }
+        assertTrue("bank sentral harus menaikkan bunga: $before -> ${w.policyRate}", w.policyRate > before)
+    }
+
+    @Test
     fun actionEncoding_roundTrips() {
         val a = Action.Journal("dec_termsheet", "cnt_ts_1", 70, 1234.5, "alasan | dengan pipa", "prediksi\nbaris", "gagal 100%")
         val decoded = Action.decode(a.encode())

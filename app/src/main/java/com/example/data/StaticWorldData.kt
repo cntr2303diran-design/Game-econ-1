@@ -265,7 +265,7 @@ object StaticWorldData {
                     displayedValue = "1.850 A$/ton (+4,2%)",
                     sourceName = "Bursa Komoditas Tarsis–Sundara",
                     dataDate = "1 Maret 2033",
-                    calculationMethod = "Terbentuk dari buku pesanan 207.000 agen, cadangan air irigasi Tarsis, dan stok gudang global.",
+                    calculationMethod = "Terbentuk dari buku pesanan pelaku pasar, cadangan air irigasi Tarsis, dan stok gudang global.",
                     uncertaintyAndBiasNote = "Gejala El Niño di Tarsis melebarkan pita proyeksi FanChart ke atas dalam 6 bulan ke depan.",
                     confidence = ConfidenceTier.HIGH
                 )

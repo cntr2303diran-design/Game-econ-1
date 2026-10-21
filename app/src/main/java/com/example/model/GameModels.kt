@@ -262,6 +262,16 @@ data class ChronicleEntry(
     val actionIndex: Int? = null
 )
 
+/** Pesaing di pasar tekstil Sundara (harga hasil estimasi intel pasar, bukan data pasti). */
+data class RivalItem(
+    val id: String,
+    val name: String,
+    val priceText: String,
+    val vsYouText: String,
+    val statusText: String,
+    val tone: SemanticTone
+)
+
 data class GameState(
     val dateText: String = "Maret 2033",
     val turn: Int = 39,
@@ -291,6 +301,10 @@ data class GameState(
     val periodLabel: String = "",
     val prevPeriodLabel: String = "",
     val accrualWarning: String? = null,
+    val rivals: List<RivalItem> = emptyList(),
+    val playerShareText: String = "",
+    val unemploymentText: String = "",
+    val marketNote: String = "",
 
     // Peringatan Covenant di Markas
     val covenantWarningTitle: String = "Jarak ke covenant 6%",

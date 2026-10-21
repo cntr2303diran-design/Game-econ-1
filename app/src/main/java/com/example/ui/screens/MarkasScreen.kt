@@ -716,7 +716,7 @@ private fun PriceLeverCard(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Harga naik = margin naik, volume turun. 1 AP per perubahan.",
+                    text = "Harga naik = margin naik, pangsa turun. Pesaing menyamai potongan harga, tapi tidak ikut kenaikan. 1 AP per perubahan.",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
