@@ -138,3 +138,30 @@ Rata-rata hanya ±20 bulan aktif karena sekitar 40–48% permainan tanpa strateg
 
 ### Keseimbangan (tes massal Argon, 240 permainan × 24 giliran)
 Bangkrut: pasif 87%, nekat harga 98%, disiplin operasi 52%, multinasional+hedging 67%. Premis tersulit: ekspansi berutang (92%) dan warisan bangkrut (91%). Ini terlalu keras untuk permainan yang ingin mengajar; perlu penyeimbangan.
+
+---
+
+## Build-20: kalibrasi anak usaha dan koreksi diagnosis keseimbangan
+
+**Koreksi:** angka bangkrut 52–98% dari tes massal Argon sebagian besar artefak bot. Bot "pasif" selalu bangkrut karena tidak memperpanjang pinjaman Bank B (200/200 mati dalam 72 giliran, juga pada build lama); itu desain, bukan cacat. Bot disiplin yang menerima refinancing (`tools/sim/Bot.kt`, 200 seed): bangkrut 15% dalam 24 giliran dan 30% dalam 72 giliran; tersulit ekspansi berutang (59%) dan warisan bangkrut (46%).
+
+**Perubahan model anak usaha** (`KapitalEngine.kt`):
+1. Sinergi anak usaha ke induk (HPP, permintaan) dikali `SUB_SYNERGY = 0.5`. Sebelumnya pendapatan anak usaha sudah dikonsolidasi DAN permintaan induk naik penuh (hitung ganda); akibatnya membuka anak usaha menaikkan peluang bertahan induk +12 s.d. +17 poin.
+2. Faktor pasar lokal: 28% kasus buruk (0,40–0,56, rugi nyata; dulu 24% pada 0,58–0,72 yang masih untung), 72% normal (0,90–1,18).
+3. Perputaran modal Tarsis 1,34 dan Kestrel 1,29 agar payback masuk rentang.
+
+**Hasil `tools/sim/Pay2.kt`** (200 seed; bot disiplin; anak usaha dibuka giliran 12–20; diukur 72 bulan kemudian; hanya anak usaha yang hidup ≥48 bulan aktif):
+
+| Negara | Induk bertahan (kontrol 138/200) | Anak usaha rugi kumulatif | Payback kondisi stabil (tahun, p25/median/p75) |
+| :--- | :---: | :---: | :---: |
+| Tarsis | 149/200 | 11% | 6,1 / 6,9 / 9,2 |
+| Kestrel | 149/200 | 17% | 4,9 / 5,9 / 8,2 |
+| Halvenia + IPAL (`Invest solar`) | ≈144/200 | ≈22% | ≈6,3 / 7,7 / sangat lambat |
+| Halvenia tanpa IPAL | ≈141/200 | 88% | tidak pernah (bea karbon CBAM) |
+| Meridia (SPV) | ≈131/200 | ≈24% | ≈5,7 / 6,9 / sangat lambat |
+
+Halvenia tanpa sertifikat ESG sengaja merugi (pungutan CBAM bulanan tetap); itu pelajaran kepatuhan, bukan salah kalibrasi, tetapi harus terlihat jelas oleh pemain. Angka dengan tanda ≈ berasal dari satu putaran sebelum penyetelan perputaran modal Tarsis/Kestrel.
+
+**Tes baru** (`StressCalibrationTest.kt`): identitas neraca induk, anak usaha, konsolidasi, arus kas, dan ekuitas pada 100 seed × hingga 60 giliran dengan aksi acak (anak usaha, repatriasi, transfer pricing, valas, obligasi, IPO, bank grup, akuisisi, investasi, saham, karbon, equity cure): 1.829 giliran-permainan, selisih terbesar 1,5e-10 (batas 1e-6). Rata-rata permainan hanya ±18 giliran karena banyak yang berakhir dini, jadi horizon panjang kurang tercakup. Uji determinisme: dua kali jalan, hasil identik.
+
+**Keterbatasan yang diketahui:** CTA dihitung sebagai selisih (bukan akumulasi terpisah), sehingga identitas neraca konsolidasi tidak menguji laba bersih konsolidasi; rekonsiliasi ekuitas konsolidasi per periode belum ada. Perputaran, margin, dan pajak anak usaha adalah perkiraan model, bukan data riil.

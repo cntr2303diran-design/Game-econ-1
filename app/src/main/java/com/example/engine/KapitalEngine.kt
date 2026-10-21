@@ -703,7 +703,7 @@ class KapitalEngine(val seed: Long) {
         // Sinergi bahan baku hulu dari anak usaha yang benar-benar berproduksi (dikalikan utilisasi nyata anak usaha)
         for (sub in subsidiaries.values) {
             if (sub.active && !sub.nationalized) {
-                r -= sub.spec.cogsReduction * sub.lastUtilization.coerceIn(0.4, 1.0)
+                r -= SUB_SYNERGY * sub.spec.cogsReduction * sub.lastUtilization.coerceIn(0.4, 1.0)
             }
         }
         val kestrelTariff = foreignMeta["kestrel"]?.tariffPct ?: 8.0
@@ -761,7 +761,7 @@ class KapitalEngine(val seed: Long) {
     }
 
     fun demandIdx(): Double {
-        val subDem = subsidiaries.values.filter { it.active && !it.nationalized }.sumOf { it.spec.demandBoost * it.lastUtilization.coerceIn(0.4, 1.0) }
+        val subDem = subsidiaries.values.filter { it.active && !it.nationalized }.sumOf { SUB_SYNERGY * it.spec.demandBoost * it.lastUtilization.coerceIn(0.4, 1.0) }
         return 1.0 + demandBoost + subDem
     }
 
@@ -1063,13 +1063,13 @@ class KapitalEngine(val seed: Long) {
         val totalCost = subsidiaryCostRs(spec)
         val sub = SubsidiaryState(spec, turn)
         // Faktor kecocokan pasar lokal deterministik dari (seed, countryId):
-        // ~24% kasus menghadapi hambatan struktural lokal (potensi rugi/payback lambat), ~76% kasus beroperasi normal (payback 3,5–6,5 tahun)
+        // ~28% kasus menghadapi hambatan struktural lokal (permintaan jauh di bawah rencana: rugi nyata), ~72% beroperasi normal
         val rSub = Random(seed * 65537L + countryId.hashCode().toLong() * 997L + 13L)
         val roll = rSub.nextDouble()
-        sub.localDemandFactor = if (roll < 0.24) {
-            0.58 + rSub.nextDouble() * 0.14
+        sub.localDemandFactor = if (roll < 0.28) {
+            0.40 + rSub.nextDouble() * 0.16
         } else {
-            0.94 + rSub.nextDouble() * 0.22
+            0.90 + rSub.nextDouble() * 0.28
         }
         subsidiaries[countryId] = sub
         currentEra = max(currentEra, 2)
@@ -2732,7 +2732,7 @@ class KapitalEngine(val seed: Long) {
                 workersAdded = 140,
                 benefitText = "HPP −2,2%, kapasitas +6%, permintaan +4%, pembukuan lokal TRS (PPh lokal 20%, pajak dividen 10%)",
                 riskText = "Rentan kekeringan El Niño, kurva belajar 12 bulan, dan gejolak politik Tarsis.",
-                capitalTurnoverAnnual = 1.25,
+                capitalTurnoverAnnual = 1.34,
                 baseLocalCogsRatio = 0.66,
                 fixedOpexRs = 42.0,
                 isFactory = true
@@ -2751,7 +2751,7 @@ class KapitalEngine(val seed: Long) {
                 workersAdded = 110,
                 benefitText = "HPP −1,8%, kapasitas +6%, kebal hold-up suku cadang Kestrel, pembukuan lokal KST (PPh 18%, pajak dividen 8%)",
                 riskText = "Terpapar perang tarif Aurelia–Kestrel, kurva belajar 12 bulan, dan pembatasan ekspor teknologi.",
-                capitalTurnoverAnnual = 1.22,
+                capitalTurnoverAnnual = 1.29,
                 baseLocalCogsRatio = 0.65,
                 fixedOpexRs = 52.0,
                 isFactory = true
@@ -2796,6 +2796,8 @@ class KapitalEngine(val seed: Long) {
             )
         )
 
+        /** Sinergi anak usaha terhadap induk (HPP/permintaan) diskon: pendapatan anak usaha sendiri sudah dikonsolidasi, jadi tidak dihitung ganda penuh. */
+        const val SUB_SYNERGY = 0.5
         const val LOT = 0.1
         const val BROKER_FEE = 0.0015
         const val SELL_TAX = 0.001
