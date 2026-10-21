@@ -656,6 +656,8 @@ class GameRepository(
             "Menaikkan harga membuat Anda kehilangan pangsa karena pesaing tidak ikut naik."
 
         return GameState(
+            hasSavedGame = log.isNotEmpty() || e.turn > 39,
+            companyEquityText = "${fmt(e.equity)} jt RS",
             rivals = rivalItems,
             playerShareText = shareText,
             unemploymentText = unempText,

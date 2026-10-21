@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material.icons.filled.HomeWork
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.outlined.Apartment
@@ -34,7 +35,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -51,6 +51,7 @@ import com.example.ui.theme.MonoFontFamily
 import com.example.ui.theme.MyApplicationTheme
 import com.example.viewmodel.KapitalViewModel
 
+const val ROUTE_MENU = "menu"
 const val ROUTE_MARKAS = "markas"
 const val ROUTE_PETA = "peta"
 const val ROUTE_PERUSAHAAN = "perusahaan"
@@ -92,8 +93,9 @@ fun KapitalAppScaffold(
     viewModel: KapitalViewModel
 ) {
     val navController = rememberNavController()
+    val isDarkNow = KapitalSemanticColors.isDark
     val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route ?: ROUTE_MARKAS
+    val currentRoute = navBackStackEntry?.destination?.route ?: ROUTE_MENU
 
     val bottomTabs = remember {
         listOf(
@@ -115,7 +117,8 @@ fun KapitalAppScaffold(
                 KapitalTopTurnBar(
                     gameState = gameState,
                     isDark = KapitalSemanticColors.isDark,
-                    onToggleTheme = { viewModel.toggleTheme(it) }
+                    onToggleTheme = { viewModel.toggleTheme(it) },
+                    onOpenMenu = { navController.navigate(ROUTE_MENU) { launchSingleTop = true } }
                 )
             }
         },
@@ -132,7 +135,7 @@ fun KapitalAppScaffold(
                             selected = selected,
                             onClick = {
                                 navController.navigate(tab.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
+                                    popUpTo(ROUTE_MARKAS) {
                                         saveState = true
                                     }
                                     launchSingleTop = true
@@ -169,12 +172,32 @@ fun KapitalAppScaffold(
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = ROUTE_MARKAS,
+            startDestination = ROUTE_MENU,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
+            composable(ROUTE_MENU) {
+                MenuScreen(
+                    gameState = gameState,
+                    onContinue = {
+                        navController.navigate(ROUTE_MARKAS) {
+                            popUpTo(ROUTE_MENU) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
+                    onNewGame = {
+                        viewModel.newGame()
+                        navController.navigate(ROUTE_MARKAS) {
+                            popUpTo(ROUTE_MENU) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
+                    onToggleTheme = { viewModel.toggleTheme(isDarkNow) }
+                )
+            }
+
             composable(ROUTE_MARKAS) {
                 MarkasScreen(
                     gameState = gameState,
@@ -332,7 +355,8 @@ fun KapitalAppScaffold(
 fun KapitalTopTurnBar(
     gameState: GameState,
     isDark: Boolean,
-    onToggleTheme: (Boolean) -> Unit
+    onToggleTheme: (Boolean) -> Unit,
+    onOpenMenu: () -> Unit = {}
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
@@ -342,9 +366,12 @@ fun KapitalTopTurnBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+                    .padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                IconButton(onClick = onOpenMenu, modifier = Modifier.size(48.dp).testTag("open_menu_button")) {
+                    Icon(Icons.Filled.Menu, contentDescription = "Menu utama", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = gameState.dateText,

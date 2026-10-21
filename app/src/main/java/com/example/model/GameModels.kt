@@ -301,6 +301,8 @@ data class GameState(
     val periodLabel: String = "",
     val prevPeriodLabel: String = "",
     val accrualWarning: String? = null,
+    val hasSavedGame: Boolean = false,
+    val companyEquityText: String = "",
     val rivals: List<RivalItem> = emptyList(),
     val playerShareText: String = "",
     val unemploymentText: String = "",

@@ -17,6 +17,10 @@ import androidx.compose.material.icons.outlined.Newspaper
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,7 +46,8 @@ fun MarkasScreen(
     onShowLastReport: () -> Unit,
     onNewGame: () -> Unit,
     onOpenChronicle: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenMenu: () -> Unit = {}
 ) {
     val gameOver = gameState.gameOverReason
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
@@ -138,6 +143,7 @@ fun MarkasScreen(
 
                     EndTurnPrimaryButton(
                         enabled = gameOver == null,
+                        gameState = gameState,
                         onAdvanceTurn = onAdvanceTurn,
                         onShowLastReport = onShowLastReport
                     )
@@ -223,6 +229,7 @@ fun MarkasScreen(
 
                 EndTurnPrimaryButton(
                     enabled = gameOver == null,
+                    gameState = gameState,
                     onAdvanceTurn = onAdvanceTurn,
                     onShowLastReport = onShowLastReport
                 )
@@ -615,12 +622,21 @@ private fun CognitiveCalibrationCard(
 @Composable
 private fun EndTurnPrimaryButton(
     enabled: Boolean,
+    gameState: GameState,
     onAdvanceTurn: () -> Unit,
     onShowLastReport: () -> Unit
 ) {
+    var confirming by rememberSaveable { mutableStateOf(false) }
+    if (confirming) {
+        EndTurnConfirmDialog(
+            gameState = gameState,
+            onConfirm = { confirming = false; onAdvanceTurn() },
+            onCancel = { confirming = false }
+        )
+    }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Button(
-            onClick = onAdvanceTurn,
+            onClick = { confirming = true },
             enabled = enabled,
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -646,6 +662,45 @@ private fun EndTurnPrimaryButton(
             Text("Lihat laporan bulan lalu")
         }
     }
+}
+
+@Composable
+private fun EndTurnConfirmDialog(
+    gameState: GameState,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit
+) {
+    val pending = gameState.pendingDecisions.filter { !it.isCompleted }
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text("Akhiri giliran ${gameState.dateText}?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Setelah giliran diakhiri, bulan berjalan: pendapatan, biaya, bunga, dan kejadian acak diproses. Keputusan tidak bisa ditarik kembali.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                HorizontalDivider()
+                Text("AP tersisa: ${gameState.apCurrent} dari ${gameState.apMax}" +
+                    if (gameState.apCurrent > 0) " (AP tidak dibawa ke bulan depan)" else "",
+                    style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                Text("Kas: ${gameState.markasIndicators.firstOrNull()?.valueText ?: "-"} · ${gameState.covenantWarningTitle}",
+                    style = MaterialTheme.typography.bodySmall)
+                if (pending.isNotEmpty()) {
+                    Text("Keputusan belum diambil (${pending.size}):", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                    pending.take(5).forEach { Text("• ${it.title}", style = MaterialTheme.typography.bodySmall) }
+                    Text("Keputusan yang dibiarkan bisa menimbulkan akibat (mis. tenggat serikat).", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onConfirm, modifier = Modifier.testTag("confirm_end_turn")) { Text("Ya, akhiri giliran") }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onCancel, modifier = Modifier.testTag("cancel_end_turn")) { Text("Tidak, kembali") }
+        }
+    )
 }
 
 @Composable
