@@ -1522,6 +1522,13 @@ class KapitalEngine(val seed: Long) {
         var chosen = opt.outcomes.last()
         for (o in opt.outcomes) { if (x < o.p) { chosen = o; break }; x -= o.p }
         chosen.effects.forEach { applyEffect(it) }
+        // Rantai sebab-akibat: keputusan ini dapat memicu kartu lanjutan beberapa bulan kemudian
+        for (rule in EventDeck.chainRules) {
+            if (rule.from != ev.templateId || (rule.options.isNotEmpty() && opt.id !in rule.options)) continue
+            if (r.nextDouble() < rule.p && scheduledChainEvents.none { it.templateId == rule.to }) {
+                scheduledChainEvents += ScheduledChainEvent(turn + rule.delay, rule.to, rule.cause)
+            }
+        }
         openEvents.remove(ev)
         if (!auto && opt.tone != Tone.BAD) crisesSurvived++
         eventHistory += EventRecord(turn, ev.title, opt.title, chosen.text, auto)

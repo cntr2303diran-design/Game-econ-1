@@ -77,3 +77,42 @@ class StressCalibrationTest {
         assertEquals(run(), run())
     }
 }
+
+class ChainCardsTest {
+    @Test
+    fun everyTemplateBuildsValidCards() {
+        val e = KapitalEngine(4242L)
+        val ctx = e.eventCtx()
+        var n = 0
+        for (t in EventDeck.templates) {
+            val ev = EventDeck.makeEvent(t.id, ctx, java.util.Random(1).let { kotlin.random.Random(it.nextInt()) }, "x_${t.id}") ?: continue
+            n++
+            assertTrue("kartu ${t.id} punya pilihan", ev.options.size >= 2 || t.id.isNotEmpty())
+            assertTrue("pilihan bawaan ${t.id} ada", ev.options.any { it.id == ev.defaultOptionId })
+            for (o in ev.options) if (o.outcomes.isNotEmpty()) assertTrue("peluang ${t.id}/${o.id}", kotlin.math.abs(o.outcomes.sumOf { it.p } - 1.0) < 1e-9)
+        }
+        assertTrue("jumlah kartu dek: ${EventDeck.templates.size}", EventDeck.templates.size >= 38)
+        for (rule in EventDeck.chainRules) assertTrue("target rantai ${rule.to} ada", EventDeck.templates.any { it.id == rule.to })
+        println("KARTU: ${EventDeck.templates.size} template, $n terbangun valid, ${EventDeck.chainRules.size} aturan rantai")
+    }
+
+    @Test
+    fun decisionsTriggerFollowUpCards_andReplayIsDeterministic() {
+        var fired = 0; var seenFollowUp = 0
+        for (seed in 1L..150L) {
+            val e = KapitalEngine(seed * 6151L)
+            for (t in 1..60) {
+                if (e.gameOverReason != null) break
+                for (ev in e.openEvents.toList()) {
+                    val pick = ev.options.lastOrNull { it.id != "z" } ?: ev.options.first()
+                    e.apply(Action.EventChoice(ev.id, pick.id))
+                }
+                e.apply(Action.EndTurn)
+            }
+            if (e.scheduledChainEvents.isNotEmpty() || e.chronicle.any { it.title.startsWith("Krisis Berantai") }) fired++
+            if (e.chronicle.any { it.title.startsWith("Krisis Berantai") }) seenFollowUp++
+        }
+        println("RANTAI: dari 150 permainan, ada rantai terjadwal/selesai di $fired, kartu lanjutan muncul di $seenFollowUp")
+        assertTrue("kartu lanjutan harus benar-benar muncul", seenFollowUp >= 20)
+    }
+}

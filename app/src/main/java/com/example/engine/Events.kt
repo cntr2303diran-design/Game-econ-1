@@ -453,7 +453,195 @@ object EventDeck {
                         Outcome(0.5, "Pelanggan loyal bertahan.", emptyList()),
                         Outcome(0.5, "Sebagian ritel pindah ke startup.", listOf(Effect("lostcust", 0.04), Effect("start_dumping", 5.0))))
                 ), t, 2, "b")
+        },
+        // ------------------------------------------------------------------ KARTU BERANTAI (hanya muncul sebagai akibat kartu/keputusan lain; bobot acak 0)
+        Template("union_wildcat", "SDM", 12, { 0.0 }) { c, r, id, t ->
+            ev(id, "union_wildcat", "SDM", "Mogok liar menyebar ke lini lain",
+                "Penolakan tuntutan upah memicu mogok tanpa izin serikat pusat di dua lini. Pesanan ritel mulai terlambat dan pembeli menelepon.",
+                "Efek berantai dari penolakan tuntutan upah.",
+                listOf(
+                    o("a", "Berunding langsung dengan wakil pekerja", 2, "Upah naik ±${fmt(c.wu * 5)} jt RS per bulan; mogok berakhir", "menurut Direktur Operasi", Tone.GOOD,
+                        sure("Kesepakatan tercapai.", Effect("wage", c.wu * 5), Effect("loyalty", 0.1, 0, "exec_factory"))),
+                    o("b", "Ancam PHK dan rekrut pengganti", 1, "Murah sekarang; produktivitas jatuh dan reputasi buruk", "menurut Kepala Pabrik", Tone.BAD,
+                        Outcome(0.5, "Mogok pecah dan pekerja baru belum terampil.", listOf(Effect("strike", 0.0, 2), Effect("unskilled", 0.0, 6), Effect("lostcust", 0.015))),
+                        Outcome(0.5, "Pekerja kembali bekerja dengan dendam.", listOf(Effect("unskilled", 0.0, 4), Effect("mod", 0.97, 4, "prod"))))
+                ), t, 2, "b")
+        },
+        Template("labor_inspection", "Regulasi", 20, { 0.0 }) { c, r, id, t ->
+            ev(id, "labor_inspection", "Regulasi", "Dinas ketenagakerjaan memeriksa keselamatan kerja",
+                "Setelah kecelakaan di lini tenun, inspektur memeriksa seluruh pabrik dan menemukan beberapa pelanggaran standar keselamatan.",
+                "Efek berantai dari kecelakaan kerja sebelumnya.",
+                listOf(
+                    o("a", "Perbaiki semua temuan segera", 2, "±${fmt(c.m(260.0))} jt RS", "menurut Kepala Pabrik", Tone.GOOD,
+                        sure("Pabrik lolos pemeriksaan ulang.", Effect("capex", c.m(260.0)))),
+                    o("b", "Perbaiki sebagian dan negosiasi denda", 1, "Denda ±${fmt(c.m(180.0))} jt RS; risiko pemeriksaan ulang", "menurut penasihat hukum", Tone.WARN,
+                        Outcome(0.6, "Denda dibayar.", listOf(Effect("fine", c.m(180.0)))),
+                        Outcome(0.4, "Pemeriksaan ulang menemukan pelanggaran sama; denda berlipat.", listOf(Effect("fine", c.m(520.0)), Effect("mod", 0.95, 1, "prod"))))
+                ), t, 2, "b")
+        },
+        Template("retailer_audit", "Pasar", 20, { 0.0 }) { c, r, id, t ->
+            ev(id, "retailer_audit", "Pasar", "Peritel besar mengaudit mutu pemasoknya",
+                "Setelah masalah mutu, pembeli ritel terbesar mengirim tim audit ke pabrik dan mengancam mengurangi pesanan bila standar tidak dinaikkan.",
+                "Efek berantai dari masalah mutu sebelumnya.",
+                listOf(
+                    o("a", "Investasi sistem kendali mutu", 2, "±${fmt(c.m(300.0))} jt RS; pesanan aman", "menurut Direktur Operasi", Tone.GOOD,
+                        sure("Audit lulus bersyarat.", Effect("capex", c.m(300.0)), Effect("mod", 1.01, 6, "rev"))),
+                    o("b", "Janji perbaikan tanpa investasi", 1, "Tanpa biaya; peritel bisa kehilangan sabar", "menurut Direktur Penjualan", Tone.BAD,
+                        Outcome(0.5, "Peritel menunggu satu kuartal lagi.", emptyList()),
+                        Outcome(0.5, "Peritel memangkas pesanan dan memindahkan sebagian ke pesaing.", listOf(Effect("lostcust", 0.05))))
+                ), t, 3, "b")
+        },
+        Template("supplier_squeeze", "Keuangan", 20, { 0.0 }) { c, r, id, t ->
+            ev(id, "supplier_squeeze", "Keuangan", "Pemasok menuntut bayar di muka",
+                "Kabar piutang macet pelanggan besar menyebar. Pemasok kapas dan benang mulai meminta pembayaran di muka dan menahan kredit dagang.",
+                "Efek berantai dari kebangkrutan pelanggan.",
+                listOf(
+                    o("a", "Bayar di muka sebagian", 1, "Kas keluar ±${fmt(c.m(450.0))} jt RS, kredit dagang pulih", "menurut Direktur Keuangan", Tone.INFO,
+                        sure("Pemasok kembali memberi kredit.", Effect("prepay", c.m(450.0)))),
+                    o("b", "Pindah ke pemasok lain", 2, "Biaya peralihan ±${fmt(c.m(120.0))} jt RS; mutu belum pasti", "menurut Direktur Operasi", Tone.WARN,
+                        Outcome(0.6, "Pemasok baru bersedia memberi kredit.", listOf(Effect("cost", c.m(120.0)))),
+                        Outcome(0.4, "Pemasok baru mengirim barang bermutu rendah.", listOf(Effect("cost", c.m(120.0)), Effect("mod", 0.97, 3, "prod"))))
+                ), t, 2, "a")
+        },
+        Template("bank_early_review", "Keuangan", 24, { 0.0 }) { c, r, id, t ->
+            ev(id, "bank_early_review", "Keuangan", "Bank meminta tinjauan dini kondisi keuangan",
+                "Setelah pengetatan kredit, bank pemberi pinjaman meminta laporan tambahan dan menimbang ulang batas pinjaman Anda.",
+                "Efek berantai dari pengetatan kredit.",
+                listOf(
+                    o("a", "Serahkan laporan lengkap dan rencana kas", 1, "Tanpa biaya; hubungan membaik bila angka sehat", "menurut Direktur Keuangan", Tone.GOOD,
+                        sure("Bank menerima rencana Anda.", Effect("board_trust", 3.0))),
+                    o("b", "Tunda dan cari bank lain", 2, "Risiko bank menaikkan spread", "menurut Anda", Tone.WARN,
+                        Outcome(0.5, "Bank lain menolak.", listOf(Effect("credit_shock", 0.3))),
+                        Outcome(0.5, "Bank lama menurunkan batas pinjaman.", listOf(Effect("credit_shock", 0.5))))
+                ), t, 2, "b")
+        },
+        Template("journalist_probe", "Etika", 30, { 0.0 }) { c, r, id, t ->
+            ev(id, "journalist_probe", "Etika", "Jurnalis investigasi mengajukan pertanyaan",
+                "Seorang jurnalis bisnis menelepon dengan dokumen yang menyinggung praktik masa lalu perusahaan dan meminta tanggapan sebelum naik cetak.",
+                "Jejak keputusan lama mulai terbaca pihak luar.",
+                listOf(
+                    o("a", "Akui, jelaskan, dan perbaiki", 2, "Reputasi tergores, tetapi beban etika turun", "menurut penasihat hukum", Tone.GOOD,
+                        sure("Berita terbit apa adanya; dewan menghargai keterbukaan.", Effect("ethics_reduce", 1.0), Effect("lostcust", 0.01), Effect("board_trust", 2.0))),
+                    o("b", "Ancam jalur hukum", 1, "Murah; bisa memicu liputan lebih besar", "menurut pengacara perusahaan", Tone.BAD,
+                        Outcome(0.5, "Jurnalis mundur sementara.", emptyList()),
+                        Outcome(0.5, "Berita naik dengan nada keras; pelanggan dan bank ikut bertanya.", listOf(Effect("lostcust", 0.03), Effect("fine", c.m(300.0)), Effect("ethics", 1.0, 0, "media_pressure"))))
+                ), t, 2, "b")
+        },
+        Template("data_lawsuit", "Teknologi", 24, { 0.0 }) { c, r, id, t ->
+            ev(id, "data_lawsuit", "Teknologi", "Pelanggan menggugat karena data bocor",
+                "Data pesanan sejumlah pelanggan ritel ikut bocor saat serangan siber. Dua pelanggan menuntut ganti rugi.",
+                "Efek berantai dari serangan siber.",
+                listOf(
+                    o("a", "Berdamai dan beri kompensasi", 1, "±${fmt(c.m(220.0))} jt RS", "menurut penasihat hukum", Tone.GOOD,
+                        sure("Kasus selesai di luar pengadilan.", Effect("cost", c.m(220.0)))),
+                    o("b", "Lawan di pengadilan", 2, "Biaya hukum ±${fmt(c.m(90.0))} jt RS; putusan tidak pasti", "menurut pengacara", Tone.WARN,
+                        Outcome(0.5, "Gugatan ditolak.", listOf(Effect("cost", c.m(90.0)))),
+                        Outcome(0.5, "Gugatan dikabulkan sebagian.", listOf(Effect("cost", c.m(90.0)), Effect("fine", c.m(500.0)))))
+                ), t, 3, "b")
+        },
+        Template("tariff_retaliation", "Regulasi", 24, { 0.0 }) { c, r, id, t ->
+            ev(id, "tariff_retaliation", "Regulasi", "Negara asal impor membalas dengan tarif",
+                "Setelah bea antidumping dikenakan, negara pengekspor membalas dengan tarif atas bahan dan mesin yang Anda impor.",
+                "Efek berantai dari sengketa antidumping.",
+                listOf(
+                    o("a", "Cari sumber alternatif", 2, "Biaya peralihan ±${fmt(c.m(200.0))} jt RS", "menurut Direktur Operasi", Tone.INFO,
+                        sure("Pemasok alternatif ditemukan dengan harga sedikit lebih tinggi.", Effect("cost", c.m(200.0)), Effect("mod", 1.01, 6, "cogs"))),
+                    o("b", "Teruskan impor dan bayar tarif", 0, "Biaya bahan naik beberapa bulan", "menurut Direktur Keuangan", Tone.WARN,
+                        sure("Biaya impor naik.", Effect("mod", 1.025, 6, "cogs")))
+                ), t, 3, "b")
+        },
+        Template("cartel_investigation", "Etika", 40, { 0.0 }) { c, r, id, t ->
+            ev(id, "cartel_investigation", "Etika", "KPPU membuka penyelidikan kartel",
+                "Komisi pengawas persaingan usaha memanggil sejumlah produsen tekstil, termasuk Anda, terkait kesepakatan harga bertahun lalu.",
+                "Konsekuensi dari keikutsertaan dalam pemufakatan harga.",
+                listOf(
+                    o("a", "Kooperatif dan ajukan keringanan", 2, "Denda lebih kecil ±${fmt(c.m(700.0))} jt RS; beban etika turun", "menurut penasihat hukum", Tone.GOOD,
+                        sure("Denda dikurangi karena kerja sama.", Effect("fine", c.m(700.0)), Effect("ethics_reduce", 2.0))),
+                    o("b", "Bantah semua tuduhan", 1, "Peluang lolos ±35%; bila kalah denda berat", "menurut pengacara perusahaan", Tone.BAD,
+                        Outcome(0.35, "Bukti tidak cukup; kasus ditutup.", emptyList()),
+                        Outcome(0.65, "Terbukti bersalah; denda berat dan kepercayaan dewan turun.", listOf(Effect("fine", c.m(2200.0)), Effect("ethics", 2.0, 0, "cartel"), Effect("board_trust", -10.0))))
+                ), t, 2, "b")
+        },
+        // ------------------------------------------------------------------ Kartu baru berdiri sendiri
+        Template("esg_activist", "Pasar", 30, { c -> 0.3 + (if (!c.dumping) 0.1 else 0.0) }) { c, r, id, t ->
+            ev(id, "esg_activist", "Pasar", "Aktivis lingkungan menyoroti limbah pewarna",
+                "Kelompok aktivis memublikasikan foto saluran limbah dekat pabrik. Beberapa merek ritel mengutip laporan itu dalam penilaian pemasok.",
+                "Pembeli besar mulai menyaratkan sertifikasi ESG.",
+                listOf(
+                    o("a", "Bangun instalasi pengolahan limbah", 2, "±${fmt(c.m(520.0))} jt RS; memenuhi syarat ESG", "menurut Direktur Operasi", Tone.GOOD,
+                        sure("Instalasi dibangun dan disertifikasi.", Effect("capex", c.m(520.0)), Effect("esg_clean"), Effect("mod", 1.015, 8, "rev"))),
+                    o("b", "Terbitkan klarifikasi dan tunda", 1, "Murah; risiko inspeksi lingkungan", "menurut humas", Tone.WARN,
+                        Outcome(0.6, "Isu mereda.", emptyList()),
+                        Outcome(0.4, "Pemerintah daerah menjadwalkan inspeksi mendadak.", listOf(Effect("chain", 0.0, 2, "env_inspection:Sorotan aktivis memicu inspeksi lingkungan.")))),
+                    o("c", "Tekan aktivis lewat jalur hukum", 1, "Murah; reputasi memburuk", "menurut penasihat hukum", Tone.BAD,
+                        sure("Gugatan balik menjadi berita negatif.", Effect("lostcust", 0.02), Effect("ethics", 1.0, 0, "intimidation")))
+                ), t, 2, "b")
+        },
+        Template("gov_tender", "Pasar", 30, { c -> if (c.econ < 1.05) 0.35 else 0.15 }) { c, r, id, t ->
+            ev(id, "gov_tender", "Pasar", "Tender seragam pegawai negeri",
+                "Kementerian membuka tender seragam bernilai besar. Seorang perantara menawarkan \"memastikan\" Anda menang dengan imbalan komisi di luar pembukuan.",
+                "Margin tender besar, tetapi pesaing juga mengincarnya.",
+                listOf(
+                    o("a", "Ikut tender secara bersih", 2, "Biaya penawaran ±${fmt(c.m(60.0))} jt RS; peluang menang ±35%", "menurut Direktur Penjualan", Tone.GOOD,
+                        Outcome(0.35, "Anda memenangkan tender.", listOf(Effect("cost", c.m(60.0)), Effect("mod", 1.06, 8, "rev"))),
+                        Outcome(0.65, "Tender dimenangkan pesaing.", listOf(Effect("cost", c.m(60.0))))),
+                    o("b", "Pakai perantara dengan komisi", 1, "Komisi ±${fmt(c.m(300.0))} jt RS; peluang menang tinggi, jejak etika", "menurut perantara", Tone.BAD,
+                        Outcome(0.8, "Tender dimenangkan.", listOf(Effect("cost", c.m(300.0)), Effect("mod", 1.07, 8, "rev"), Effect("ethics", 2.0, 0, "bribery"))),
+                        Outcome(0.2, "Tender dibatalkan karena dugaan kolusi.", listOf(Effect("cost", c.m(300.0)), Effect("ethics", 2.0, 0, "bribery")))),
+                    o("c", "Lewati", 0, "Tanpa efek", "menurut Anda", Tone.NEUTRAL, sure("Anda tidak ikut."))
+                ), t, 2, "c")
+        },
+        Template("rival_price_war", "Pasar", 24, { c -> if (c.dumping) 0.0 else 0.3 }) { c, r, id, t ->
+            ev(id, "rival_price_war", "Pasar", "Pesaing menurunkan harga serempak",
+                "Dua pesaing besar menurunkan harga 8% pada produk yang sama dengan lini Anda, menguji seberapa jauh pembeli setia.",
+                "Mereka membaca bahwa kas Anda tidak banyak.",
+                listOf(
+                    o("a", "Ikuti sebagian", 1, "Margin turun, pangsa terjaga", "menurut Direktur Penjualan", Tone.WARN,
+                        sure("Anda menurunkan harga.", Effect("mod", 0.97, 4, "rev"), Effect("start_dumping", 4.0))),
+                    o("b", "Pertahankan harga", 0, "Sebagian pembeli pindah", "menurut Anda", Tone.INFO,
+                        Outcome(0.5, "Pelanggan loyal bertahan.", emptyList()),
+                        Outcome(0.5, "Pangsa turun.", listOf(Effect("lostcust", 0.03), Effect("start_dumping", 4.0))))
+                ), t, 2, "b")
+        },
+        Template("tech_licence", "Teknologi", 36, { c -> if (c.cash > c.m(4000.0)) 0.25 else 0.0 }) { c, r, id, t ->
+            ev(id, "tech_licence", "Teknologi", "Lisensi teknologi pencelupan hemat air",
+                "Sebuah institut menawarkan lisensi teknologi pencelupan hemat air dan energi. Hasil di pabrik lain bervariasi.",
+                "Dua pabrik pesaing sudah mencobanya.",
+                listOf(
+                    o("a", "Ambil lisensi", 2, "±${fmt(c.m(380.0))} jt RS; efisiensi tidak pasti", "menurut Direktur Operasi", Tone.INFO,
+                        Outcome(0.6, "Biaya produksi turun.", listOf(Effect("capex", c.m(380.0)), Effect("mod", 0.985, 12, "cogs"))),
+                        Outcome(0.4, "Hasil jauh di bawah janji.", listOf(Effect("capex", c.m(380.0))))),
+                    o("b", "Tolak", 0, "Tanpa efek", "menurut Anda", Tone.NEUTRAL, sure("Anda menolak."))
+                ), t, 3, "b")
+        },
+        Template("green_subsidy", "Regulasi", 36, { c -> if (c.econ < 1.0) 0.3 else 0.1 }) { c, r, id, t ->
+            ev(id, "green_subsidy", "Regulasi", "Subsidi bunga untuk investasi hemat energi",
+                "Pemerintah membuka subsidi bagi pabrik yang memasang panel surya dan mesin hemat energi. Dana terbatas dan pemeriksa cermat.",
+                "Pesaing tampak sudah mengajukan.",
+                listOf(
+                    o("a", "Ajukan dengan dokumen lengkap", 2, "Biaya pengurusan ±${fmt(c.m(70.0))} jt RS; peluang ±55%", "menurut Direktur Keuangan", Tone.GOOD,
+                        Outcome(0.55, "Subsidi cair.", listOf(Effect("cost", c.m(70.0)), Effect("income", c.m(450.0)))),
+                        Outcome(0.45, "Dana habis sebelum giliran Anda.", listOf(Effect("cost", c.m(70.0))))),
+                    o("b", "Lewati", 0, "Tanpa efek", "menurut Anda", Tone.NEUTRAL, sure("Anda tidak mengajukan."))
+                ), t, 3, "b")
         }
+    )
+
+    /** Aturan rantai: setelah kartu [from] diselesaikan dengan salah satu pilihan [options] (kosong = semua), peluang [p] memicu kartu [to] setelah [delay] giliran. */
+    class ChainRule(val from: String, val options: Set<String>, val p: Double, val to: String, val delay: Int, val cause: String)
+
+    val chainRules: List<ChainRule> = listOf(
+        ChainRule("union", setOf("c", "z"), 0.70, "union_wildcat", 3, "Tuntutan upah serikat ditolak atau dibiarkan; pekerja melawan di luar serikat pusat."),
+        ChainRule("accident", setOf("b"), 0.50, "labor_inspection", 3, "Operator dinyatakan lalai setelah kecelakaan; dinas ketenagakerjaan turun tangan."),
+        ChainRule("accident", setOf("a"), 0.15, "labor_inspection", 4, "Kecelakaan kerja menarik perhatian inspektur."),
+        ChainRule("quality_recall", setOf("b", "c", "z"), 0.55, "retailer_audit", 3, "Keluhan mutu tidak ditangani tuntas; peritel besar mengaudit pemasok."),
+        ChainRule("customer_bankrupt", emptySet(), 0.45, "supplier_squeeze", 2, "Kabar piutang macet pelanggan besar memicu pemasok menuntut bayar di muka."),
+        ChainRule("credit_crunch", setOf("b", "z"), 0.45, "bank_early_review", 2, "Pengetatan kredit membuat bank meninjau debitur lebih dini."),
+        ChainRule("fraud_internal", setOf("b", "c", "z"), 0.45, "journalist_probe", 4, "Kecurangan internal yang tidak tuntas bocor ke jurnalis."),
+        ChainRule("bribe_permit", setOf("a"), 0.45, "journalist_probe", 6, "Jejak pembayaran fasilitator diketahui pihak luar."),
+        ChainRule("cartel_offer", setOf("a"), 0.55, "cartel_investigation", 10, "Keikutsertaan dalam pemufakatan harga akhirnya diselidiki."),
+        ChainRule("cyber", setOf("a", "c", "z"), 0.40, "data_lawsuit", 3, "Data pelanggan ikut bocor saat serangan siber."),
+        ChainRule("antidumping", emptySet(), 0.40, "tariff_retaliation", 3, "Bea antidumping memancing pembalasan tarif dari negara pengekspor.")
     )
 
     val notices: List<NoticeTemplate> = listOf(

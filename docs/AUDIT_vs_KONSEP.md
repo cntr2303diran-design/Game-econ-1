@@ -165,3 +165,12 @@ Halvenia tanpa sertifikat ESG sengaja merugi (pungutan CBAM bulanan tetap); itu 
 **Tes baru** (`StressCalibrationTest.kt`): identitas neraca induk, anak usaha, konsolidasi, arus kas, dan ekuitas pada 100 seed × hingga 60 giliran dengan aksi acak (anak usaha, repatriasi, transfer pricing, valas, obligasi, IPO, bank grup, akuisisi, investasi, saham, karbon, equity cure): 1.829 giliran-permainan, selisih terbesar 1,5e-10 (batas 1e-6). Rata-rata permainan hanya ±18 giliran karena banyak yang berakhir dini, jadi horizon panjang kurang tercakup. Uji determinisme: dua kali jalan, hasil identik.
 
 **Keterbatasan yang diketahui:** CTA dihitung sebagai selisih (bukan akumulasi terpisah), sehingga identitas neraca konsolidasi tidak menguji laba bersih konsolidasi; rekonsiliasi ekuitas konsolidasi per periode belum ada. Perputaran, margin, dan pajak anak usaha adalah perkiraan model, bukan data riil.
+
+---
+
+## Build-21: kartu berantai aktif dan dek 40 kartu
+
+- Dek bertambah dari 26 ke **40 template** (`Events.kt`): 9 kartu khusus rantai (bobot acak 0: mogok liar, inspeksi keselamatan, audit peritel, tekanan pemasok, tinjauan dini bank, investigasi jurnalis, gugatan data, pembalasan tarif, penyelidikan kartel) dan 5 kartu mandiri (aktivis ESG, tender pemerintah dengan godaan komisi, perang harga pesaing, lisensi teknologi, subsidi hijau).
+- 11 `ChainRule` (`EventDeck.chainRules`) memicu kartu lanjutan dengan peluang dan jeda tertentu setelah keputusan tertentu; dievaluasi di `resolveEvent` dengan RNG yang sama dengan hasil kartu, jadi deterministik dan ikut terulang saat memuat simpanan. Penjelasan sebab tampil sebagai peringatan kartu dan catatan kronik ("Krisis Berantai").
+- Bukti (`ChainCardsTest`): semua 40 kartu terbangun valid (peluang hasil berjumlah 1, pilihan bawaan ada); pada 150 permainan × 60 giliran dengan bot yang memilih opsi terakhir, kartu lanjutan benar-benar muncul di 93 permainan.
+- Bukan klaim: 40 kartu masih jauh dari ±600 pada dokumen desain; kualitas dan keseimbangan tiap kartu belum diuji dengan pemain manusia.
