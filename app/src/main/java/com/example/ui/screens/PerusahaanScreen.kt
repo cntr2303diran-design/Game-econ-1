@@ -45,9 +45,10 @@ fun PerusahaanScreen(
     onReviewOffer: (String) -> Unit = {},
     onAcceptOffer: (String) -> Unit = {},
     onDeclineOffer: (String) -> Unit = {},
+    onInvest: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val subTabs = listOf("Laporan keuangan", "Organisasi", "Proyek", "Kontrak", "Bank", "Pelaku")
+    val subTabs = listOf("Laporan keuangan", "Organisasi", "Proyek", "Kontrak", "Bank", "Pelaku", "Investasi")
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -125,6 +126,7 @@ fun PerusahaanScreen(
                         onDecline = onDeclineOffer
                     )
                     5 -> PelakuTabContent(gameState.actors)
+                    6 -> InvestTabContent(gameState.investments, gameState.investSummary, gameState.actionPoints, onInvest)
                 }
             }
         }
@@ -199,6 +201,18 @@ private fun LaporanKeuanganTabContent(
                     rows = gameState.balanceSheetRows,
                     onInspectOrigin = onInspectOrigin
                 )
+                FinancialStatementTableCard(
+                    title = "4. Laporan perubahan ekuitas",
+                    subtitle = "Dari ekuitas awal ke akhir · ${gameState.periodLabel}",
+                    rows = gameState.equityRows,
+                    onInspectOrigin = onInspectOrigin
+                )
+                FinancialStatementTableCard(
+                    title = "5. Catatan atas laporan keuangan",
+                    subtitle = "Umur piutang, utang bank, karyawan, rasio",
+                    rows = gameState.notesRows,
+                    onInspectOrigin = onInspectOrigin
+                )
             }
         }
     } else {
@@ -218,6 +232,18 @@ private fun LaporanKeuanganTabContent(
             title = "3. Laporan arus kas",
             subtitle = "Rekonsiliasi laba bersih terhadap kas bank · ${gameState.periodLabel}",
             rows = gameState.cashFlowRows,
+            onInspectOrigin = onInspectOrigin
+        )
+        FinancialStatementTableCard(
+            title = "4. Laporan perubahan ekuitas",
+            subtitle = "Dari ekuitas awal ke akhir · ${gameState.periodLabel}",
+            rows = gameState.equityRows,
+            onInspectOrigin = onInspectOrigin
+        )
+        FinancialStatementTableCard(
+            title = "5. Catatan atas laporan keuangan",
+            subtitle = "Umur piutang, utang bank, karyawan, rasio",
+            rows = gameState.notesRows,
             onInspectOrigin = onInspectOrigin
         )
     }

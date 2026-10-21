@@ -224,6 +224,19 @@ data class EventOptionItem(
     val tone: SemanticTone
 )
 
+data class InvestItem(
+    val id: String,
+    val title: String,
+    val description: String,
+    val costText: String,
+    val durationText: String,
+    val benefitText: String,
+    val apCost: Int,
+    val enabled: Boolean,
+    val blockReason: String?,
+    val statusText: String
+)
+
 data class EventDialogModel(
     val id: String,
     val title: String,
@@ -349,6 +362,10 @@ data class GameState(
     val incomeStatementRows: List<FinancialRowItem>,
     val balanceSheetRows: List<FinancialRowItem>,
     val cashFlowRows: List<FinancialRowItem>,
+    val equityRows: List<FinancialRowItem> = emptyList(),
+    val notesRows: List<FinancialRowItem> = emptyList(),
+    val investments: List<InvestItem> = emptyList(),
+    val investSummary: List<Pair<String, String>> = emptyList(),
     val executives: List<Executive>,
     val ganttTasks: List<GanttTask>,
     val contracts: List<ContractItem>,

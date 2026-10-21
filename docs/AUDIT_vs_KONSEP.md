@@ -104,3 +104,12 @@ Perbaikan:
 - `Events.kt`: dek 26 kartu keputusan (serikat, pembajakan eksekutif, kecelakaan kerja, upah minimum, termin pelanggan, peritel bangkrut, tren motif, batch cacat, pemasok kapas, kenaikan suku cadang, pelabuhan, listrik, banjir, ransomware, audit pajak, inspeksi limbah, insentif, anti-dumping, kredit mengetat, dividen khusus, mesin bekas, kecurangan internal, pemberitaan, kartel, suap izin, pesaing baru) dan 6 pemberitahuan. Peluang tiap kartu bergantung pada kondisi dunia (inflasi, pengangguran, bunga, umur piutang, perawatan mesin, riwayat etika).
 - Setiap pilihan berisiko (hasil acak deterministik dari seed), kartu yang dibiarkan sampai tenggat memakai hasil bawaan yang biasanya terburuk, dan jalan pintas (suap, kartel) menambah beban etika yang bisa meledak menjadi skandal.
 - Simpanan lama tidak kompatibel: skenario dibangkitkan dari seed, sehingga permainan lama harus dimulai ulang.
+
+## Pembaruan build-17: laporan lengkap, ekspansi bebas, berita dinamis
+
+- Laba rugi kini merinci HPP (bahan, energi, tenaga langsung, overhead) dan beban operasional (gaji staf dengan jumlah karyawan dan rata-rata per orang, administrasi, pemasaran, utilitas, asuransi, lain-lain, biaya satu kali, program investasi).
+- Neraca merinci aset lancar, piutang normal dan berisiko, investasi saham, liabilitas lancar, dan total liabilitas.
+- Arus kas dibagi operasi, investasi, pendanaan, dan selalu cocok dengan perubahan kas; laporan perubahan ekuitas cocok dengan ekuitas neraca (diuji lintas 12 seed, 30 bulan).
+- Catatan: umur piutang, jadwal utang bank, karyawan dan kapasitas, rasio keuangan.
+- Tab Investasi: lini tenun, otomasi, R&D, kampanye merek, gudang, pasar ekspor. Kapasitas dan permintaan dimodelkan terpisah, sehingga ekspansi tanpa permintaan menganggur dan permintaan tanpa kapasitas tertolak.
+- Berita mengikuti kondisi dunia (upah, kapas, impor murah, kredit, pesaing, dan kartu kejadian yang sedang terbuka sebagai peringatan dini).

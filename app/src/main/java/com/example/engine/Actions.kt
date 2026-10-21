@@ -32,6 +32,7 @@ sealed class Action {
     data class ReviewOffer(val appId: String) : Action()
     data class AcceptOffer(val appId: String) : Action()
     data class DeclineOffer(val appId: String) : Action()
+    data class Invest(val typeId: String) : Action()
     data class BuyStock(val companyId: String, val lots: Int) : Action()
     data class SellStock(val companyId: String, val lots: Int) : Action()
 
@@ -55,6 +56,7 @@ sealed class Action {
         is Fire -> "FIR|${esc(execId)}"
         is AdjustPrice -> "PRC|$deltaPct"
         is ApplyCredit -> "APL|${esc(bankId)}|$amount|$tenor|${esc(purpose)}|$floating|$bullet"
+        is Invest -> "INV|${esc(typeId)}"
         is ReviewOffer -> "ROF|${esc(appId)}"
         is AcceptOffer -> "AOF|${esc(appId)}"
         is DeclineOffer -> "DOF|${esc(appId)}"
@@ -77,6 +79,7 @@ sealed class Action {
                     "JRN" -> Journal(p[1], p[2], p[3].toInt(), p[4].toDouble(), p[5], p[6], p[7])
                     "REJ" -> RejectProposal(p[1])
                     "EVC" -> EventChoice(p[1], p[2])
+                    "INV" -> Invest(p[1])
                     "SAL" -> SetSalesScheme(SalesScheme.valueOf(p[1]))
                     "FAC" -> SetFactoryScheme(FactoryScheme.valueOf(p[1]))
                     "CHK" -> CrossCheck(p[1])

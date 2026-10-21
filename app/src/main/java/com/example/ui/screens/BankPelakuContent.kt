@@ -216,3 +216,41 @@ fun PelakuTabContent(actors: List<ActorItem>) {
         }
     }
 }
+
+
+@Composable
+fun InvestTabContent(
+    items: List<InvestItem>,
+    summary: List<Pair<String, String>>,
+    ap: Int,
+    onInvest: (String) -> Unit
+) {
+    Text("Ekspansi dan investasi", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    Text(
+        "Anda bebas memilih. Kapasitas pabrik dan permintaan pasar harus tumbuh bersama: lini baru tanpa tambahan permintaan hanya menambah biaya, " +
+            "sedangkan permintaan tanpa kapasitas berarti pesanan tertolak. Dana keluar bertahap dari kas; ajukan kredit di tab Bank bila perlu. AP sekarang: $ap.",
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    PanelCard {
+        Text("Kondisi kapasitas", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        summary.forEach { (k, v) -> PairRow(k, v) }
+    }
+    items.forEach { inv ->
+        PanelCard {
+            Text(inv.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(inv.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            PairRow("Anggaran", inv.costText)
+            PairRow("Durasi", inv.durationText)
+            PairRow("Manfaat", inv.benefitText)
+            PairRow("Status", inv.statusText)
+            Button(
+                onClick = { onInvest(inv.id) },
+                enabled = inv.enabled,
+                modifier = Modifier.fillMaxWidth().testTag("invest_${inv.id}")
+            ) { Text("Mulai (${inv.apCost} AP)") }
+            if (!inv.enabled && inv.blockReason != null) {
+                Text(inv.blockReason, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+}

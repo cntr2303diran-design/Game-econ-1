@@ -284,4 +284,38 @@ class ExampleUnitTest {
         val r2 = GameRepository(store)
         assertEquals(before, r2.gameState.value.credit.applications.map { it.statusLabel + it.stageText })
     }
+
+    @Test
+    fun statementsReconcile_cashFlowEquityAndCostBreakdown() {
+        for (seed in 1L..12L) {
+            val e = KapitalEngine(seed)
+            repeat(30) { n ->
+                for (ev in e.openEvents.toList()) e.apply(Action.EventChoice(ev.id, ev.options.first { it.id != "z" }.id))
+                if (n == 2) e.apply(Action.BuyStock("sx_mitra", 1))
+                if (n == 4) e.apply(Action.Invest("rnd"))
+                e.apply(Action.EndTurn)
+                val d = e.lastDetail; val i = e.lastIncome
+                assertTrue("arus kas cocok seed $seed", abs(d.getValue("d_resid")) < 1e-6)
+                assertTrue("ekuitas cocok seed $seed", abs(d.getValue("e_resid")) < 1e-6)
+                val opex = listOf("op_salary", "op_admin", "op_mkt", "op_util", "op_ins", "op_other", "op_lines", "op_proj", "op_oneoff", "op_loss").sumOf { i.getValue(it) } - i.getValue("op_gain")
+                assertTrue("rincian beban cocok", abs(opex - i.getValue("opex")) < 1e-6)
+                if (e.gameOverReason != null) return@repeat
+            }
+        }
+    }
+
+    @Test
+    fun investment_buildsCapacityOverTime_andNeedsCashAndAp() {
+        assertEquals(Action.Invest("line"), Action.decode(Action.Invest("line").encode()))
+        val e = KapitalEngine(4L)
+        assertFalse("proyek tak dikenal", e.apply(Action.Invest("xx")))
+        val cap0 = e.capacityIdx()
+        assertTrue(e.apply(Action.Invest("line")))
+        assertFalse("tidak boleh ganda saat berjalan", e.apply(Action.Invest("line")))
+        repeat(5) { e.apply(Action.EndTurn); if (e.gameOverReason != null) return }
+        assertEquals(1, e.extraLines)
+        assertTrue(e.capacityIdx() > cap0)
+        assertTrue("utilisasi turun karena permintaan tetap", e.utilization() < 1.0)
+        assertTrue("neraca seimbang", abs(e.totalAssets() - e.totalLiabilities() - e.equity) < 1e-6)
+    }
 }

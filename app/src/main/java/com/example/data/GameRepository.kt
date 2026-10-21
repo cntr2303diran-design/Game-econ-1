@@ -146,6 +146,8 @@ class GameRepository(
         Action.Journal(decisionId, optionId, confidencePct, predictedCash, strategicReason, numericPrediction, failureScenario)
     )
 
+    fun invest(typeId: String) = perform(Action.Invest(typeId))
+
     fun rejectDecision(decisionId: String) = perform(Action.RejectProposal(decisionId))
 
     fun resolveEventOption(option: EventOptionItem) {
@@ -393,6 +395,26 @@ class GameRepository(
             }
         }
 
+        // ---- Investasi dan ekspansi ----
+        val investItems = KapitalEngine.INVEST.map { sp ->
+            val block = e.investBlock(sp.id)
+            val running = e.projectsInv.firstOrNull { it.type == sp.id && !it.done }
+            val count = e.investCount(sp.id)
+            InvestItem(sp.id, sp.title, sp.desc, "${fmt(e.investCost(sp))} jt RS", "${sp.months} bulan", sp.benefit, sp.ap, block == null, block,
+                when {
+                    running != null -> "Berjalan: ${fmt(running.spent)} dari ${fmt(running.totalCost)} jt RS dibayar"
+                    count > 0 -> "Selesai ($count)"
+                    else -> "Belum dimulai"
+                })
+        }
+        val investSummary = listOf(
+            "Kapasitas" to "${fmt1(e.capacityIdx() * 100)}% dari basis",
+            "Permintaan" to "${fmt1(e.demandIdx() * 100)}% dari basis",
+            "Utilisasi" to "${fmt1(e.utilization() * 100)}% ${if (e.utilization() > 1.0) "(pesanan tertolak, tambah kapasitas)" else "(ada ruang)"}",
+            "Lini tambahan" to "${e.extraLines} dari 3",
+            "Pekerja produksi" to "${e.headcountProd()}"
+        )
+
         // ---- Laporan keuangan ----
         val inc = e.lastIncome
         val pinc = e.prevIncome
@@ -408,53 +430,148 @@ class GameRepository(
         val pgp = iv(pinc, "revenue") - iv(pinc, "cogs")
         val ebitda = iv(inc, "ebit") + iv(inc, "dep")
         val pebitda = iv(pinc, "ebit") + iv(pinc, "dep")
+        val staff = e.headcountStaff(); val prod = e.headcountProd()
+        val salaryPer = if (staff > 0) iv(inc, "op_salary") / staff else 0.0
+        val laborPer = if (prod > 0) iv(inc, "cogs_labor") / prod else 0.0
+        fun sub(label: String, cur: Double, prior: Double, note: String, negative: Boolean = true, tone: SemanticTone = SemanticTone.NEUTRAL_GRAY) =
+            FinancialRowItem("    $label", money(cur, negative && cur != 0.0), money(prior, negative && prior != 0.0), note, false, tone, stmtOrigin)
+        fun optRow(label: String, key: String, note: String, negative: Boolean = true): List<FinancialRowItem> =
+            if (iv(inc, key) != 0.0 || iv(pinc, key) != 0.0) listOf(sub(label, iv(inc, key), iv(pinc, key), note, negative)) else emptyList()
+        val pebt = iv(pinc, "ebit") - iv(pinc, "interest") + iv(pinc, "intinc")
+        val ebt = iv(inc, "ebit") - iv(inc, "interest") + iv(inc, "intinc")
         val incomeRows = listOf(
-            row("Pendapatan (akrual)", "revenue", "Termasuk penjualan kredit yang kasnya belum masuk"),
-            row("Harga pokok penjualan", "cogs", "Kapas, benang, suku cadang Kestrel", negative = true),
+            row("Pendapatan (akrual)", "revenue", "Termasuk penjualan kredit yang kasnya belum masuk", total = true),
+            row("Harga pokok penjualan", "cogs", "Rasio ${fmt1(iv(inc, "cogs") / max(1.0, iv(inc, "revenue")) * 100)}% dari pendapatan", negative = true),
+            sub("Bahan baku (kapas, benang)", iv(inc, "cogs_mat"), iv(pinc, "cogs_mat"), "Mengikuti indeks harga kapas ${fmt2(e.commodities.cotton.index)}"),
+            sub("Energi dan utilitas pabrik", iv(inc, "cogs_energy"), iv(pinc, "cogs_energy"), "Listrik, uap, bahan bakar"),
+            sub("Tenaga kerja langsung", iv(inc, "cogs_labor"), iv(pinc, "cogs_labor"), "$prod pekerja produksi · rata-rata ${fmt1(laborPer)} jt RS per orang per bulan"),
+            sub("Overhead pabrik", iv(inc, "cogs_oh"), iv(pinc, "cogs_oh"), "Suku cadang habis pakai, gudang, pengiriman masuk"),
             FinancialRowItem("Laba kotor", money(gp), money(pgp), "Margin ${fmt1(gp / max(1.0, iv(inc, "revenue")) * 100)}%", true, SemanticTone.NEUTRAL_GRAY, stmtOrigin),
-            row("Beban operasional dan upah", "opex", "Termasuk biaya audit, hukum, pesangon bulan ini", negative = true),
-            row("Perawatan mesin", "maint", "Bandingkan dengan kebutuhan teknis ±${fmt(610 * e.costIndex)} jt RS", negative = true),
+            row("Beban operasional", "opex", "Total beban usaha di luar HPP dan perawatan", negative = true),
+            sub("Gaji staf dan manajemen", iv(inc, "op_salary"), iv(pinc, "op_salary"), "$staff karyawan · rata-rata ${fmt1(salaryPer)} jt RS per orang per bulan (termasuk kenaikan upah yang disepakati)"),
+            sub("Administrasi dan kantor", iv(inc, "op_admin"), iv(pinc, "op_admin"), "Sewa kantor, IT, perjalanan, profesional"),
+            sub("Pemasaran dan distribusi", iv(inc, "op_mkt"), iv(pinc, "op_mkt"), "Tim penjualan, pengiriman keluar, promosi"),
+            sub("Utilitas kantor dan gudang", iv(inc, "op_util"), iv(pinc, "op_util"), "Listrik, air, komunikasi"),
+            sub("Asuransi dan pajak bumi", iv(inc, "op_ins"), iv(pinc, "op_ins"), "Polis kebakaran dan pajak properti"),
+            sub("Beban lain-lain", iv(inc, "op_other"), iv(pinc, "op_other"), "Perlengkapan, perizinan, iuran asosiasi")
+        ) + optRow("Operasi lini dan fasilitas tambahan", "op_lines", "Tenaga dan utilitas dari ekspansi") +
+            optRow("Program investasi (R&D, pemasaran)", "op_proj", "Dibebankan sebagai biaya, bukan aset") +
+            optRow("Biaya satu kali (audit, hukum, pesangon, provisi, denda)", "op_oneoff", "Muncul karena keputusan atau kejadian bulan ini") +
+            optRow("Kerugian persediaan", "op_loss", "Banjir atau kerusakan stok") +
+            optRow("Pendapatan lain (asuransi, insentif, pemulihan)", "op_gain", "Mengurangi beban", negative = false) + listOf(
+            row("Perawatan mesin", "maint", "Bandingkan dengan kebutuhan teknis ±${fmt(e.sc.baseMaint * e.costIndex)} jt RS", negative = true),
             row("Kredit macet dihapusbukukan", "baddebt", "Piutang berumur 6 bulan yang gagal ditagih", negative = true,
                 t = if (iv(inc, "baddebt") > 0) SemanticTone.DANGER_RED else SemanticTone.NEUTRAL_GRAY),
             FinancialRowItem("EBITDA", money(ebitda), money(pebitda), "Acuan rasio utang bersih/EBITDA", true, SemanticTone.NEUTRAL_GRAY, stmtOrigin),
-            row("Penyusutan", "dep", "Mesin dan bangunan", negative = true),
+            row("Penyusutan", "dep", "Mesin dan bangunan (0,81% per bulan dari nilai buku)", negative = true),
             row("EBIT (laba operasi)", "ebit", "Acuan covenant ICR", total = true),
             row("Beban bunga", "interest", "Mengikuti suku bunga dan saldo utang", negative = true, t = SemanticTone.DANGER_RED),
             row("Pendapatan bunga deposito", "intinc", "Bunga atas kas mengendap"),
-            row("Pajak penghasilan badan", "tax", "Dihitung dari laba akrual, dibayar tunai", negative = true),
+            FinancialRowItem("Laba sebelum pajak", money(ebt), money(pebt), "Dasar pajak sebelum kompensasi rugi", true, SemanticTone.NEUTRAL_GRAY, stmtOrigin),
+            row("Pajak penghasilan badan", "tax", "22%, setelah kompensasi rugi fiskal ${fmt(e.taxLossCarryforward())} jt RS", negative = true),
             row("Laba bersih", "ni", "Laba di atas kertas; cek arus kas", total = true,
                 t = if (iv(inc, "ni") >= 0) SemanticTone.GOOD_GREEN else SemanticTone.DANGER_RED)
         )
         val bal = e.balanceSnapshot()
         val pbal = e.prevBalance
+        fun bv(m: Map<String, Double>, k: String) = m[k] ?: 0.0
         fun brow(label: String, key: String, note: String, total: Boolean = false, t: SemanticTone = SemanticTone.NEUTRAL_GRAY) =
             FinancialRowItem(label, money(bal[key] ?: 0.0), money(pbal[key] ?: 0.0), note, total, t, stmtOrigin)
+        fun bsub(label: String, key: String, note: String) =
+            FinancialRowItem("    $label", money(bv(bal, key)), money(bv(pbal, key)), note, false, SemanticTone.NEUTRAL_GRAY, stmtOrigin)
+        fun bsum(label: String, cur: Double, prior: Double, note: String, t: SemanticTone = SemanticTone.NEUTRAL_GRAY) =
+            FinancialRowItem(label, money(cur), money(prior), note, true, t, stmtOrigin)
+        val curA = bv(bal, "cash") + bv(bal, "ar") + bv(bal, "inv")
+        val pcurA = bv(pbal, "cash") + bv(pbal, "ar") + bv(pbal, "inv")
+        val curL = bv(bal, "payables") + bv(bal, "debt_st")
+        val pcurL = bv(pbal, "payables") + bv(pbal, "debt_st")
         val balanceRows = listOf(
-            brow("Kas dan setara kas", "cash", "Runway ${if (e.runwayMonths() >= 99) "> 24" else e.runwayMonths().toString()} bulan", true,
-                if (burn > 0) SemanticTone.DANGER_RED else SemanticTone.GOOD_GREEN),
-            brow("Piutang usaha", "ar", "DSO ${e.dso().toInt()} hari"),
-            brow("Persediaan", "inv", "DIO ${e.dio().toInt()} hari"),
-            brow("Aset tetap bersih", "fa", "Agunan utama pinjaman"),
+            bsub("Kas dan setara kas", "cash", "Runway ${if (e.runwayMonths() >= 99) "> 24" else e.runwayMonths().toString()} bulan"),
+            bsub("Piutang usaha normal", "ar_normal", "DSO total ${e.dso().toInt()} hari"),
+            bsub("Piutang berisiko (obral kredit)", "ar_risky", "Rentan macet; lihat umur piutang di Catatan"),
+            bsub("Persediaan", "inv", "DIO ${e.dio().toInt()} hari"),
+            bsum("Total aset lancar", curA, pcurA, "Rasio lancar ${fmt2(curA / max(1.0, curL))}x", SemanticTone.PRIMARY_BLUE),
+            bsub("Aset tetap bersih", "fa", "Agunan utama pinjaman; perawatan tertunda ${e.deferredMonths} bulan"),
+            bsub("Investasi saham (nilai pasar)", "pf", "Portofolio di Bursa; selisih nilai masuk ekuitas"),
             brow("Total aset", "assets", "Aset = liabilitas + ekuitas", true, SemanticTone.PRIMARY_BLUE),
-            brow("Utang dagang", "payables", "DPO ${e.dpo().toInt()} hari"),
-            brow("Utang bank jatuh tempo ≤12 bulan", "debt_st", "Risiko refinancing", t = SemanticTone.WARNING_YELLOW),
-            brow("Utang bank jangka panjang", "debt_lt", "Termasuk utang A$ dinilai dengan kurs hari ini"),
+            bsub("Utang dagang", "payables", "DPO ${e.dpo().toInt()} hari"),
+            bsub("Utang bank jatuh tempo ≤12 bulan", "debt_st", "Risiko refinancing"),
+            bsum("Total liabilitas lancar", curL, pcurL, "Harus dibayar dalam 12 bulan", SemanticTone.WARNING_YELLOW),
+            bsub("Utang bank jangka panjang", "debt_lt", "Termasuk utang A$ dinilai dengan kurs hari ini"),
+            brow("Total liabilitas", "liab", "Utang dagang + utang bank", true),
             brow("Total ekuitas", "equity", "Modal disetor + laba ditahan − rugi kurs", true, SemanticTone.GOOD_GREEN)
         )
         val cf = e.lastCashFlow
         val pcf = e.prevCashFlow
-        fun crow(label: String, key: String, note: String, total: Boolean = false) =
-            FinancialRowItem(label, signed(cf[key] ?: 0.0), if (pcf.isEmpty()) "—" else signed(pcf[key] ?: 0.0), note, total,
-                if ((cf[key] ?: 0.0) < 0 && total) SemanticTone.DANGER_RED else if (total) SemanticTone.GOOD_GREEN else SemanticTone.NEUTRAL_GRAY, stmtOrigin)
-        val cashFlowRows = listOf(
-            crow("Laba bersih", "ni", "Titik awal rekonsiliasi"),
-            crow("Penyusutan (non-kas)", "dep", "Ditambahkan kembali"),
-            crow("Perubahan modal kerja", "wc", "Piutang, persediaan, utang dagang"),
-            crow("Arus kas operasi", "cfo", "Bisa negatif walau laba positif", true),
-            crow("Arus kas investasi", "capex", "Proyek pemintalan"),
-            crow("Arus kas pendanaan", "fin", "Pencairan dikurangi cicilan pokok"),
-            crow("Perubahan kas bersih", "net", "Sama dengan perubahan kartu Kas", true)
-        )
+        val dt = e.lastDetail
+        val pdt = e.prevDetail
+        fun drow(label: String, key: String, note: String, total: Boolean = false, indent: Boolean = true, forceShow: Boolean = false): List<FinancialRowItem> {
+            val cur = dt[key] ?: 0.0; val pr = pdt[key] ?: 0.0
+            if (!total && !forceShow && abs(cur) < 0.5 && abs(pr) < 0.5) return emptyList()
+            return listOf(FinancialRowItem((if (indent && !total) "    " else "") + label, if (dt.isEmpty()) "—" else signed(cur), if (pdt.isEmpty()) "—" else signed(pr), note, total,
+                if (total && cur < 0) SemanticTone.DANGER_RED else if (total) SemanticTone.GOOD_GREEN else SemanticTone.NEUTRAL_GRAY, stmtOrigin))
+        }
+        val cashFlowRows = listOf(FinancialRowItem("A. ARUS KAS OPERASI", "", "", "", true, SemanticTone.NEUTRAL_GRAY, stmtOrigin)) +
+            drow("Laba bersih", "d_ni", "Titik awal rekonsiliasi", forceShow = true) +
+            drow("Penyusutan (non-kas)", "d_dep", "Ditambahkan kembali", forceShow = true) +
+            drow("Perubahan piutang", "d_ar", "Penjualan kredit menahan kas", forceShow = true) +
+            drow("Perubahan persediaan", "d_inv", "Stok menahan kas", forceShow = true) +
+            drow("Perubahan utang dagang", "d_pay", "Pemasok membiayai sebagian modal kerja", forceShow = true) +
+            drow("Arus kas operasi", "cfo", "Bisa negatif walau laba positif", true) +
+            listOf(FinancialRowItem("B. ARUS KAS INVESTASI", "", "", "", true, SemanticTone.NEUTRAL_GRAY, stmtOrigin)) +
+            drow("Penggantian mesin (belanja modal rutin)", "d_capex_repl", "70% dari penyusutan", forceShow = true) +
+            drow("Proyek pemintalan", "d_capex_spin", "Tahapan proyek hulu") +
+            drow("Ekspansi dan investasi lain", "d_capex_exp", "Lini baru, otomasi, gudang, IPAL, mesin bekas") +
+            drow("Pembelian saham", "d_stock_buy", "Termasuk komisi broker") +
+            drow("Penjualan saham", "d_stock_sell", "Dikurangi komisi dan pajak jual") +
+            drow("Dividen saham diterima", "d_divin", "Dari emiten yang dimiliki") +
+            drow("Arus kas investasi", "cfi", "Belanja modal dan portofolio", true) +
+            listOf(FinancialRowItem("C. ARUS KAS PENDANAAN", "", "", "", true, SemanticTone.NEUTRAL_GRAY, stmtOrigin)) +
+            drow("Pencairan kredit baru", "d_newdebt", "Termasuk refinancing") +
+            drow("Pembayaran pokok pinjaman", "d_repay", "Cicilan, pelunasan paksa, pelunasan refinancing") +
+            drow("Fasilitas modal kerja (tarik/lunasi)", "d_rcf", "Revolving otomatis saat kas menipis") +
+            drow("Pelunasan paksa covenant", "d_forced", "Tuntutan bank setelah pelanggaran") +
+            drow("Penjualan piutang (factoring)", "d_factor", "Dana darurat dengan potongan 4%") +
+            drow("Dividen dibayar", "d_divpaid", "RUPS atau dividen khusus") +
+            drow("Suntikan ekuitas", "d_cure", "Equity cure pemegang saham") +
+            drow("Arus kas pendanaan", "cff", "Pinjaman, pemegang saham", true) +
+            drow("Perubahan kas bersih", "net", "Sama dengan perubahan kartu Kas (A + B + C)", true)
+        val eqRows = listOf(
+            FinancialRowItem("Ekuitas awal periode", if (dt.isEmpty()) "—" else money(dt["e_open"] ?: 0.0), if (pdt.isEmpty()) "—" else money(pdt["e_open"] ?: 0.0), "Ekuitas akhir bulan lalu", true, SemanticTone.NEUTRAL_GRAY, stmtOrigin)) +
+            drow("Laba bersih", "e_ni", "Dari laporan laba rugi", forceShow = true) +
+            drow("Nilai pasar saham dan dividen saham", "e_mtm", "Kenaikan atau penurunan nilai portofolio belum direalisasi") .map { it } +
+            drow("Dividen saham diterima", "e_divin", "Langsung masuk ekuitas") +
+            drow("Biaya transaksi saham", "e_fees", "Komisi broker dan pajak jual") +
+            drow("Biaya factoring", "e_factor", "Potongan penjualan piutang") +
+            drow("Rugi selisih kurs utang A$", "e_fx", "Belum direalisasi") +
+            drow("Dividen dibayar", "e_div", "Pembagian laba kepada pemegang saham") +
+            drow("Suntikan ekuitas", "e_cure", "Modal baru dari pemegang saham") +
+            listOf(FinancialRowItem("Ekuitas akhir periode", money(bal["equity"] ?: 0.0), money(pbal["equity"] ?: 0.0), "Sama dengan ekuitas di neraca", true, SemanticTone.GOOD_GREEN, stmtOrigin))
+        fun nrow(label: String, value: String, note: String, header: Boolean = false) =
+            FinancialRowItem(label, value, "", note, header, SemanticTone.NEUTRAL_GRAY, stmtOrigin)
+        val ageSum = { lo: Int, hi: Int -> e.stuffedBuckets.filter { (turn - 1 - it.first) in lo..hi }.sumOf { it.second } }
+        val notesRows = mutableListOf<FinancialRowItem>()
+        notesRows += nrow("Umur piutang", "", "", true)
+        notesRows += nrow("    Piutang normal (termin ≤ 60 hari)", money(e.normalAR), "Pelanggan reguler")
+        notesRows += nrow("    Piutang berisiko 0–1 bulan", money(ageSum(0, 1)), "Obral kredit baru")
+        notesRows += nrow("    Piutang berisiko 2–3 bulan", money(ageSum(2, 3)), "Mulai perlu ditagih")
+        notesRows += nrow("    Piutang berisiko 4–6 bulan", money(ageSum(4, 6)), "Perkiraan ${fmt(ageSum(4, 6) * KapitalEngine.STUFFED_LOSS)} jt RS akan macet (45%)")
+        notesRows += nrow("Utang bank", "", "", true)
+        for (l in e.loans.filter { it.balance > 0.5 }) {
+            val bs = if (l.currencyAud) l.balance * e.kurs else l.balance
+            notesRows += nrow("    ${l.lender}", money(bs), "Bunga ${fmt2(l.annualRatePct)}%${if (l.floatingSpreadPct != null) " mengambang" else " tetap"} · ${if (l.maturityTurn < 900) "jatuh tempo ${dateText(l.maturityTurn)}" else "revolving"}" +
+                (if (l.amortPerMonth > 0) " · cicilan ${fmt(l.amortPerMonth * (if (l.currencyAud) e.kurs else 1.0))} jt RS/bulan" else ""))
+        }
+        notesRows += nrow("Karyawan dan kapasitas", "", "", true)
+        notesRows += nrow("    Pekerja produksi", "$prod", "Rata-rata ${fmt1(laborPer)} jt RS per orang per bulan (di HPP)")
+        notesRows += nrow("    Staf dan manajemen", "$staff", "Rata-rata ${fmt1(salaryPer)} jt RS per orang per bulan (di beban operasional)")
+        notesRows += nrow("    Utilisasi kapasitas", "${fmt1(e.utilization() * 100)}%", "Permintaan ${fmt1(e.demandIdx() * 100)}% dari basis · kapasitas ${fmt1(e.capacityIdx() * 100)}%")
+        notesRows += nrow("Rasio keuangan", "", "", true)
+        notesRows += nrow("    Margin EBIT", "${fmt1(iv(inc, "ebit") / max(1.0, iv(inc, "revenue")) * 100)}%", "EBIT / pendapatan")
+        notesRows += nrow("    Perputaran kas (DSO + DIO − DPO)", "${(e.dso() + e.dio() - e.dpo()).toInt()} hari", "Makin panjang makin banyak kas tertahan")
+        notesRows += nrow("    ICR (EBIT / bunga, 3 bulan)", "${fmt2(e.ebitHist.takeLast(3).sum() / max(1.0, e.interestHist.takeLast(3).sum()))}x", "Batas covenant ${fmt2(e.covenantThreshold())}x")
+        notesRows += nrow("    Utang bersih / EBITDA", "${fmt2((e.totalDebt() - e.cash) / max(1.0, (e.ebitHist.takeLast(3).sum() + 3 * iv(inc, "dep")) * 4.0))}x", "Batas covenant 3,5x")
+        notesRows += nrow("    Rasio lancar", "${fmt2(curA / max(1.0, curL))}x", "Aset lancar / liabilitas lancar")
         val ni = iv(inc, "ni")
         val cfo = cf["cfo"] ?: 0.0
         val accrual = if (ni > 0 && cfo < 0)
@@ -729,6 +846,10 @@ class GameRepository(
             incomeStatementRows = incomeRows,
             balanceSheetRows = balanceRows,
             cashFlowRows = cashFlowRows,
+            equityRows = eqRows,
+            notesRows = notesRows,
+            investments = investItems,
+            investSummary = investSummary,
             executives = executives,
             ganttTasks = gantt,
             contracts = contracts,
