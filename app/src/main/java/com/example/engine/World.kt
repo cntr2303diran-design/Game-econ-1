@@ -11,7 +11,7 @@ import kotlin.random.Random
  * Lapisan dunia berbasis agen untuk KAPITAL.
  *
  * Agen yang benar-benar disimulasikan:
- *  - [HOUSEHOLDS] rumah tangga (status kerja, pendapatan, kecenderungan konsumsi). Mereka kehilangan dan
+ *  - [households] rumah tangga (status kerja, pendapatan, kecenderungan konsumsi). Mereka kehilangan dan
  *    menemukan pekerjaan lewat proses pencocokan; konsumsi gabungan mereka adalah permintaan agregat.
  *  - 4 pesaing tekstil dengan fungsi reaksi harga sendiri (menyamai potongan harga, menaikkan harga
  *    bila biaya naik, dan satu importir yang sesekali membanting harga).
@@ -20,14 +20,13 @@ import kotlin.random.Random
  * Inflasi, suku bunga, pengangguran, dan permintaan TIDAK diskrip: semuanya muncul dari interaksi agen.
  * Semua keacakan berasal dari [Random] yang diberikan mesin (deterministik per seed dan giliran).
  */
-class World {
+class World(
+    private val households: Int = 50_000,
+    private val inflationTarget: Double = 3.0,
+    private val neutralRealRate: Double = 2.5
+) {
 
     companion object {
-        const val HOUSEHOLDS = 50_000
-        /** Target inflasi bank sentral Sundara (%), dekat target BI 2,5 ± 1 yang dibulatkan ke atas karena Sundara lebih terbuka. */
-        const val INFLATION_TARGET = 3.0
-        /** Suku bunga riil netral (%). Suku bunga acuan netral = target + ini. */
-        const val NEUTRAL_REAL_RATE = 2.5
         const val SEP_BASE = 0.0158
         const val FIND_BASE = 0.30
         private const val PRICE_SENSITIVITY = 4.0
@@ -58,9 +57,9 @@ class World {
     private val playerShare0 = 0.20
 
     // ---- Rumah tangga ----
-    private val employed = BooleanArray(HOUSEHOLDS)
-    private val income = DoubleArray(HOUSEHOLDS)
-    private val mpc = DoubleArray(HOUSEHOLDS)
+    private val employed = BooleanArray(households)
+    private val income = DoubleArray(households)
+    private val mpc = DoubleArray(households)
     private var baseConsumption = 1.0
 
     // ---- Keadaan makro ----
@@ -81,7 +80,7 @@ class World {
     init {
         // Populasi awal deterministik (tidak bergantung seed agar dunia awal sama untuk semua pemain)
         val r = Random(20330301L)
-        for (i in 0 until HOUSEHOLDS) {
+        for (i in 0 until households) {
             employed[i] = r.nextDouble() > 0.05
             val z = gauss(r)
             income[i] = exp(0.55 * z)            // lognormal, rata-rata ±1,16
@@ -97,7 +96,7 @@ class World {
 
     private fun rawConsumption(): Double {
         var s = 0.0
-        for (i in 0 until HOUSEHOLDS) if (employed[i]) s += income[i] * mpc[i]
+        for (i in 0 until households) if (employed[i]) s += income[i] * mpc[i]
         return s
     }
 
@@ -160,7 +159,7 @@ class World {
         // ---- 1. Guncangan permintaan (kepercayaan konsumen) ----
         confidence = 0.85 * confidence + gauss(r) * 0.010 + extraDemandShock
         val realRate = policyRate - inflation
-        val rateDrag = -0.012 * (realRate - NEUTRAL_REAL_RATE)   // suku bunga riil tinggi menekan konsumsi
+        val rateDrag = -0.012 * (realRate - neutralRealRate)   // suku bunga riil tinggi menekan konsumsi
 
         // ---- 2. Pasar tenaga kerja: pencocokan pada tingkat pekerja ----
         val gapLag = gap
@@ -168,7 +167,7 @@ class World {
         val find = (FIND_BASE * (1.0 + 4.0 * gapLag)).coerceIn(0.08, 0.60)
         var emp = 0
         var consumption = 0.0
-        for (i in 0 until HOUSEHOLDS) {
+        for (i in 0 until households) {
             if (employed[i]) { if (r.nextDouble() < sep) employed[i] = false }
             else { if (r.nextDouble() < find) employed[i] = true }
             if (employed[i]) {
@@ -176,7 +175,7 @@ class World {
                 consumption += income[i] * mpc[i]
             }
         }
-        unemployment = 100.0 * (1.0 - emp.toDouble() / HOUSEHOLDS)
+        unemployment = 100.0 * (1.0 - emp.toDouble() / households)
 
         // ---- 3. Permintaan agregat = konsumsi rumah tangga * kepercayaan * efek suku bunga riil ----
         demand = ((consumption / baseConsumption) * (1.0 + confidence + rateDrag)).coerceIn(0.80, 1.20)
@@ -221,12 +220,12 @@ class World {
         val demandPush = 22.0 * gap
         val pressure = inflationExpectation + demandPush + fxExcess
         inflation = (0.80 * inflation + 0.20 * pressure + gauss(r) * 0.15).coerceIn(-1.0, 25.0)
-        inflationExpectation = 0.90 * inflationExpectation + 0.06 * inflation + 0.04 * INFLATION_TARGET
+        inflationExpectation = 0.90 * inflationExpectation + 0.06 * inflation + 0.04 * inflationTarget
 
         // ---- 6. Bank sentral: aturan Taylor, langkah 25 bp, dengan kelembaman ----
         kursHistory.addLast(kurs); if (kursHistory.size > 4) kursHistory.removeFirst()
         val depr3m = if (kursHistory.size >= 4) (kurs / kursHistory.first() - 1.0) * 100.0 else 0.0
-        val star = NEUTRAL_REAL_RATE + inflation + 0.5 * (inflation - INFLATION_TARGET) +
+        val star = neutralRealRate + inflation + 0.5 * (inflation - inflationTarget) +
             0.5 * (gap * 100.0) + 0.12 * max(0.0, depr3m - 1.5)
         taylorStar = star
         shadowRate += (0.30 * (star - shadowRate)).coerceIn(-0.5, 0.5)

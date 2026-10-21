@@ -328,7 +328,14 @@ class GameRepository(
                 inflationRange = "${fmt1(inflLo)}–${fmt1(inflLo + 2.0)}%",
                 policyRate = "${fmt2(e.policyRate)}%",
                 electionCountdown = if (monthsToElection > 0) "$monthsToElection bulan lagi" else "Selesai (${dateText(e.electionTurn)})"
-            ) else c
+            ) else e.foreign[c.id]?.let { f ->
+                // Perkiraan statistik asing punya ketidakpastian ±0,6 pp (imperfect information)
+                val lo = f.inflation - 0.6
+                c.copy(
+                    inflationRange = "${fmt1(max(0.0, lo))}–${fmt1(max(0.0, lo) + 1.2)}%",
+                    policyRate = "${fmt2(f.policyRate)}%"
+                )
+            } ?: c
         }
         val markets = StaticWorldData.marketInstruments().map { m ->
             if (m.id == "mkt_kurs") {

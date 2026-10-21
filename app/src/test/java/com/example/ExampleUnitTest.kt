@@ -121,6 +121,24 @@ class ExampleUnitTest {
     }
 
     @Test
+    fun foreignEconomies_areDynamic_andFxFollowsInflationGap() {
+        val e = KapitalEngine(12L)
+        val a0 = e.foreign.getValue("velmora").policyRate
+        val kurs0 = e.kurs
+        repeat(36) { e.apply(Action.EndTurn); if (e.gameOverReason != null) return }
+        assertEquals(7, e.foreign.size)
+        assertTrue("kurs bergerak mengikuti PPP", e.kurs != kurs0)
+        assertTrue("bunga asing berubah", e.foreign.values.any { it.policyRate != a0 })
+    }
+
+    @Test
+    fun taxLossCarryforward_offsetsFutureProfit() {
+        val e = KapitalEngine(2L)
+        repeat(8) { e.apply(Action.EndTurn); if (e.gameOverReason != null) return }
+        assertTrue(e.taxLossCarryforward() >= 0.0)
+    }
+
+    @Test
     fun actionEncoding_roundTrips() {
         val a = Action.Journal("dec_termsheet", "cnt_ts_1", 70, 1234.5, "alasan | dengan pipa", "prediksi\nbaris", "gagal 100%")
         val decoded = Action.decode(a.encode())

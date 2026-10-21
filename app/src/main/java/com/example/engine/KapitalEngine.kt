@@ -123,6 +123,38 @@ class KapitalEngine(val seed: Long) {
 
     // ---------- Makro ----------
     val world = World()
+
+    /** Ekonomi asing: tiap negara punya rumah tangga, pesaing, dan bank sentral sendiri (skala kecil). */
+    class ForeignProfile(val id: String, val infl: Double, val policy: Double, val target: Double, val rStar: Double)
+    val foreignProfiles = listOf(
+        ForeignProfile("aurelia", 2.6, 4.25, 2.0, 1.5),
+        ForeignProfile("norvaldia", 5.7, 7.00, 4.5, 2.5),
+        ForeignProfile("kestrel", 2.1, 3.10, 2.0, 1.0),
+        ForeignProfile("halvenia", 2.15, 3.50, 2.0, 1.0),
+        ForeignProfile("meridia", 2.8, 3.25, 2.5, 1.0),
+        ForeignProfile("tarsis", 7.6, 6.75, 5.0, 2.0),
+        ForeignProfile("velmora", 10.5, 10.00, 6.0, 3.0)
+    )
+    val foreign: Map<String, World> = foreignProfiles.associate { p ->
+        p.id to World(2_000, p.target, p.rStar).also { it.initScenario(p.infl, p.policy) }
+    }
+    private var fxPassState = 1.0
+    /** Rugi fiskal yang boleh dikompensasi 5 tahun ke depan (aturan PPh badan Indonesia). */
+    private val lossPool = mutableListOf<Pair<Int, Double>>()
+    fun taxLossCarryforward(): Double = lossPool.sumOf { it.second }
+    private fun computeTax(taxable: Double): Double {
+        lossPool.removeAll { turn - it.first > 60 }
+        if (taxable <= 0.0) { if (taxable < 0.0) lossPool += turn to -taxable; return 0.0 }
+        var left = taxable
+        val it = lossPool.sortedBy { x -> x.first }.toMutableList()
+        lossPool.clear()
+        for ((t, v) in it) {
+            if (left <= 0.0) { lossPool += t to v; continue }
+            val use = min(left, v); left -= use
+            if (v - use > 0.01) lossPool += t to (v - use)
+        }
+        return left * 0.22
+    }
     var policyRate = 6.50; private set
     var kurs = 15450.0; private set
     var econ = 1.0; private set
@@ -287,7 +319,7 @@ class KapitalEngine(val seed: Long) {
     }
 
     /** Tingkat harga paritas impor: 60% dari depresiasi rial menular ke harga jual (kain impor bersaing dalam USD). */
-    fun fxPassLevel(): Double = 1.0 + 0.6 * ((0.8 + 0.2 * kurs / 15450.0) - 1.0)
+    fun fxPassLevel(): Double = fxPassState
 
     /** Pendapatan tanpa efek harga diskresioner dan paritas impor (basis HPP). */
     private fun volumeRevenue(revenue: Double): Double = revenue / ((1.0 + priceAdjPct / 100.0) * fxPassLevel())
@@ -607,7 +639,13 @@ class KapitalEngine(val seed: Long) {
         val rMacro = rng(1)
         val rWorld = rng(8)
         val kursBefore = kurs
-        kurs *= 1.0 + 0.002 + gaussian(rMacro) * 0.008
+        // Ekonomi asing berjalan dulu; kurs RS/A$ mengikuti selisih inflasi (PPP) + premi risiko negara berkembang
+        foreignProfiles.forEachIndexed { i, p ->
+            foreign.getValue(p.id).step(rng(20 + i), 1.0, 1.0, 1.0, 0.0, 1.0)
+        }
+        val infDiff = inflationAnnual - foreign.getValue("aurelia").inflation
+        val driftMonthly = infDiff / 1200.0 + 0.0012
+        kurs *= 1.0 + driftMonthly + gaussian(rMacro) * 0.008
         var demandShock = 0.0
         if (turn == electionTurn) {
             lines += ReportLine("Pemilu Sundara berlangsung bulan ini.", Tone.INFO)
@@ -626,6 +664,9 @@ class KapitalEngine(val seed: Long) {
                 lines += ReportLine("Pasar tenang setelah pemilu; kurs relatif stabil.", Tone.GOOD)
             }
         }
+        // Harga impor menyesuaikan bertahap (puncak di kuartal kedua); 60% dari depresiasi menular ke harga jual
+        val fxTarget = 1.0 + 0.6 * ((0.8 + 0.2 * kurs / 15450.0) - 1.0)
+        fxPassState += 0.35 * (fxTarget - fxPassState)
         val costPressure = (0.8 + 0.2 * kurs / 15450.0) * (costIndex / priceIndex)
         val rpPlayer = (1.0 + priceAdjPct / 100.0) * fxPassLevel()
         volOverride = world.volumeFactor(rpPlayer)          // pembeli melihat harga pesaing bulan lalu
@@ -724,7 +765,8 @@ class KapitalEngine(val seed: Long) {
         val ebit = revenue - cogs - opex - maint - dep - writeOff
         val interest = monthlyInterest()
         val interestIncome = max(0.0, cash) * max(0.0, policyRate - 3.0) / 1200.0
-        val tax = max(0.0, ebit - interest + interestIncome) * 0.22
+        val taxable = ebit - interest + interestIncome
+        val tax = computeTax(taxable)
         val ni = ebit - interest + interestIncome - tax
         equity += ni
 
