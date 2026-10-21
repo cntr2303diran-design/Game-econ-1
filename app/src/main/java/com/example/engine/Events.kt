@@ -465,15 +465,19 @@ object EventDeck {
         NoticeTemplate("bank_rumor", 30, { c -> if (c.policyDelta > 0.5) 0.4 else 0.1 }) { c, r -> Notice("Desas-desus bank kecil bermasalah membuat bankir lebih berhati-hati terhadap debitur tekstil.", Tone.WARN, listOf(Effect("credit_shock", 0.4))) }
     )
 
-    fun makeEvent(templateId: String, ctx: EventCtx, r: Random, id: String): GameEvent? =
-        templates.firstOrNull { it.id == templateId }?.build?.invoke(ctx, r, id, ctx.turn)
+    fun makeEvent(templateId: String, ctx: EventCtx, r: Random, id: String, customWarning: String? = null): GameEvent? {
+        val e = templates.firstOrNull { it.id == templateId }?.build?.invoke(ctx, r, id, ctx.turn) ?: return null
+        if (customWarning == null) return e
+        return GameEvent(e.id, e.templateId, e.category, e.title, e.body, customWarning, e.options, e.raisedTurn, e.deadlineTurn, e.defaultOptionId)
+    }
 
     class Drawn(val event: GameEvent?, val notice: Notice?, val noticeId: String?)
 
     /** Memilih kartu baru (atau pemberitahuan) untuk giliran ini. */
-    fun draw(ctx: EventCtx, r: Random, open: Set<String>, lastFired: Map<String, Int>, counter: Int): Drawn {
+    fun draw(ctx: EventCtx, r: Random, open: Set<String>, lastFired: Map<String, Int>, counter: Int, rateMult: Double = 1.0): Drawn {
         val roll = r.nextDouble()
-        if (roll < 0.30) {
+        val pEvent = (0.30 * rateMult).coerceIn(0.0, 0.8)
+        if (roll < pEvent) {
             val cands = templates.filter { it.id !in open && ctx.turn - (lastFired[it.id] ?: -999) >= it.cooldown }
                 .map { it to it.weight(ctx) }.filter { it.second > 0.0 }
             if (cands.isNotEmpty()) {
@@ -486,7 +490,7 @@ object EventDeck {
                     x -= w
                 }
             }
-        } else if (roll < 0.47) {
+        } else if (roll < pEvent + 0.17) {
             val cands = notices.filter { ctx.turn - (lastFired[it.id] ?: -999) >= it.cooldown }
                 .map { it to it.weight(ctx) }.filter { it.second > 0.0 }
             if (cands.isNotEmpty()) {

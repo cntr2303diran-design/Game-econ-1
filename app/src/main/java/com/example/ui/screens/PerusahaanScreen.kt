@@ -46,6 +46,7 @@ fun PerusahaanScreen(
     onAcceptOffer: (String) -> Unit = {},
     onDeclineOffer: (String) -> Unit = {},
     onInvest: (String) -> Unit = {},
+    onCorporateAction: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val subTabs = listOf("Laporan keuangan", "Organisasi", "Proyek", "Kontrak", "Bank", "Pelaku", "Investasi")
@@ -126,7 +127,7 @@ fun PerusahaanScreen(
                         onDecline = onDeclineOffer
                     )
                     5 -> PelakuTabContent(gameState.actors)
-                    6 -> InvestTabContent(gameState.investments, gameState.investSummary, gameState.actionPoints, onInvest)
+                    6 -> InvestTabContent(gameState.investments, gameState.investSummary, gameState.actionPoints, onInvest, onCorporateAction)
                 }
             }
         }

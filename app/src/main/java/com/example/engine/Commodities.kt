@@ -66,6 +66,12 @@ class Commodities {
         return events
     }
 
+    /** Guncangan pasokan kapas buatan pesaing (memborong spot). */
+    fun triggerCorneringShock(months: Int, size: Double) {
+        cotton.supplyShockMonths = max(cotton.supplyShockMonths, months)
+        cotton.supplyShockSize = max(cotton.supplyShockSize, size * 8.0 / months)
+    }
+
     /** Indeks biaya bahan (kapas 78%, energi 22%) terhadap awal skenario. */
     fun materialIndex(): Double = 0.78 * cotton.index + 0.22 * oil.index
 }

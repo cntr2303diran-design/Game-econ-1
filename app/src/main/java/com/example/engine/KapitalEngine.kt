@@ -1,10 +1,12 @@
 package com.example.engine
 
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import kotlin.random.Random
 
@@ -16,6 +18,26 @@ enum class SalesScheme(val label: String) {
 enum class FactoryScheme(val label: String) {
     HEMAT("KPI penghematan biaya kuartalan"),
     ANDAL("KPI keandalan mesin + audit perawatan")
+}
+
+enum class Difficulty(
+    val label: String,
+    val noiseMult: Double,
+    val eventRateMult: Double,
+    val allowRivalCoalition: Boolean,
+    val ironman: Boolean,
+    val description: String
+) {
+    MAGANG("Magang", 0.25, 0.75, false, false, "Informasi akurat, kejadian ringan, AI pesaing pasif, cocok untuk belajar."),
+    MANAJER("Manajer", 1.0, 1.0, false, false, "Sedikit bising, kejadian normal, pesaing kompetitif."),
+    DIREKTUR("Direktur", 1.45, 1.20, true, false, "Data tertunda dan bias, kejadian berantai aktif, pesaing belajar dari pola Anda."),
+    KRISIS_ABADI("Krisis Abadi", 2.0, 1.40, true, true, "Sangat bising, angsa hitam lebih sering, pesaing berkoalisi melawan pemimpin pasar, Ironman wajib.")
+}
+
+enum class TransferPricingMode(val label: String, val description: String) {
+    WAJAR("Harga Wajar (Arm's Length)", "Pajak dihitung normal di tiap negara (Sundara 22%); aman dari pemeriksaan transfer pricing."),
+    OPTIMAL("Optimalisasi Sah", "Menggeser margin lisensi dan pengadaan secara wajar ke anak usaha berpajak rendah (hemat PPh 3–5 poin)."),
+    AGRESIF("Penghindaran Agresif via Meridia", "Mengalihkan sebagian besar laba ke SPV Meridia (8,5%); hemat pajak besar tetapi menumpuk risiko audit & skandal etika.")
 }
 
 enum class Tone { BAD, WARN, GOOD, INFO, NEUTRAL }
@@ -68,6 +90,36 @@ data class PendingDecision(
 
 data class Phase(val name: String, val startMonth: Int, val months: Int, val budget: Double)
 
+/** Bukti pelanggaran etika yang tersimpan di skor rahasia (Bagian 16 Dokumen Desain). */
+data class EthicsEvidence(
+    val id: String,
+    val kind: String,
+    val severity: Double,
+    val witnessExecId: String,
+    val countryId: String,
+    val turnCommitted: Int
+)
+
+/** Kartu berantai yang dijadwalkan muncul beberapa giliran setelah pemicu (Bagian 15 Dokumen Desain). */
+data class ScheduledChainEvent(
+    val dueTurn: Int,
+    val templateId: String,
+    val causeNote: String
+)
+
+/** Evaluasi 5 komponen akhir kampanye (Bagian 19 Dokumen Desain). */
+data class CampaignEvaluation(
+    val nilaiPerusahaanScore: Int,   // Bobot 30%
+    val ketahananScore: Int,         // Bobot 20%
+    val kualitasKeputusanScore: Int, // Bobot 20%
+    val etikaReputasiScore: Int,     // Bobot 15%
+    val dampakSosialScore: Int,      // Bobot 15%
+    val totalScore: Int,
+    val grade: String,
+    val archetypeTitle: String,
+    val summaryText: String
+)
+
 class Loan(
     val id: String,
     val lender: String,
@@ -109,78 +161,239 @@ class ExecState(
 }
 
 /**
- * Mesin simulasi Era 1 KAPITAL. Kotlin murni (tanpa Android) agar bisa diuji di JVM.
+ * Mesin simulasi KAPITAL (Era 1 s.d. Era 4). Kotlin murni (tanpa Android) agar bisa diuji di JVM.
  * Semua angka uang dalam juta Rial Sundara (jt RS), kecuali disebut lain.
  * Keacakan dunia diambil dari aliran per giliran (seed, giliran, subsistem), sehingga
  * dua cabang "Bagaimana Jika" mengalami dunia yang sama.
  */
 class KapitalEngine(val seed: Long) {
 
-    /** Skenario awal acak (premis, tanggal, ukuran usaha, utang, kondisi makro) yang ditentukan seed. */
     val sc: Scenario = ScenarioGen.make(seed)
 
-    // ---------- Waktu dan sumber daya ----------
+    // ---------- Waktu, kesulitan, dan sumber daya ----------
     var turn = sc.turn0; private set
+    var difficulty: Difficulty = Difficulty.MANAJER; private set
     var ap = 4; private set
     val apMax: Int get() = 7 - execs.count { !it.present }
     var gameOverReason: String? = null; private set
+    var isVictory: Boolean = false; private set
+    var boardTrust: Int = 78; private set
 
     // ---------- Neraca ----------
     var cash = sc.cash; private set
     var normalAR = sc.ar; private set
-    val stuffedBuckets = mutableListOf<Pair<Int, Double>>() // (giliran dibuat, nilai)
+    val stuffedBuckets = mutableListOf<Pair<Int, Double>>()
     var inventory = sc.inv; private set
     var payables = sc.pay; private set
     var fixedAssets = sc.fa; private set
     var equity = 0.0; private set
     val loans = mutableListOf<Loan>()
+    private var initialEquity = 0.0
 
-    // ---------- Makro ----------
+    // ---------- Makro & Dunia Multinasional (Era 2–4) ----------
     val world = World()
     val bourse = Bourse()
     val credit = CreditDesk()
     private val policyHist = MutableList(6) { sc.policy }
-    /** Kepemilikan saham dalam lot (1 lot = 100 ribu lembar), biaya perolehan total (jt RS). */
     val holdings = LinkedHashMap<String, Int>()
     val costBasis = HashMap<String, Double>()
     var dividendsReceivedTotal = 0.0; private set
     var realizedGainTotal = 0.0; private set
-    /** Kas bersih keluar untuk saham sejak giliran lalu (untuk laporan arus kas). */
     var periodInvestOut = 0.0; private set
     var periodInvestIn = 0.0; private set
     private var periodStartCash = sc.cash
     var lastDividendIncome = 0.0; private set
     val commodities = Commodities()
 
-    /** Ekonomi asing: tiap negara punya rumah tangga, pesaing, dan bank sentral sendiri (skala kecil). */
-    class ForeignProfile(val id: String, val infl: Double, val policy: Double, val target: Double, val rStar: Double)
-    val foreignProfiles = listOf(
-        ForeignProfile("aurelia", 2.6, 4.25, 2.0, 1.5),
-        ForeignProfile("norvaldia", 5.7, 7.00, 4.5, 2.5),
-        ForeignProfile("kestrel", 2.1, 3.10, 2.0, 1.0),
-        ForeignProfile("halvenia", 2.15, 3.50, 2.0, 1.0),
-        ForeignProfile("meridia", 2.8, 3.25, 2.5, 1.0),
-        ForeignProfile("tarsis", 7.6, 6.75, 5.0, 2.0),
-        ForeignProfile("velmora", 10.5, 10.00, 6.0, 3.0)
+    class ForeignProfile(
+        val id: String,
+        val name: String,
+        val currencyCode: String,
+        val infl: Double,
+        val policy: Double,
+        val target: Double,
+        val rStar: Double,
+        val baseFxToRs: Double,
+        val corpTaxPct: Double,
+        val withholdingTaxPct: Double,
+        val baseTariffPct: Double,
+        val baseTension: Int
     )
+
+    class ForeignCountryMeta(val profile: ForeignProfile) {
+        var fxToRs: Double = profile.baseFxToRs
+        var tariffPct: Double = profile.baseTariffPct
+        var tensionScore: Int = profile.baseTension
+        var politicalRisk: Int = profile.baseTension
+        var capitalControlTurnsLeft: Int = 0
+    }
+
+    val foreignProfiles = listOf(
+        ForeignProfile("aurelia", "Aurelia", "A$", 2.6, 4.25, 2.0, 1.5, sc.kurs0, 21.0, 15.0, 5.0, 58),
+        ForeignProfile("norvaldia", "Norvaldia", "NRV", 5.7, 7.00, 4.5, 2.5, 1820.0, 24.0, 10.0, 6.0, 66),
+        ForeignProfile("kestrel", "Kestrel", "KST", 2.1, 3.10, 2.0, 1.0, 2150.0, 18.0, 8.0, 8.0, 64),
+        ForeignProfile("halvenia", "Halvenia", "HLV", 2.15, 3.50, 2.0, 1.0, 16800.0, 26.0, 5.0, 4.0, 32),
+        ForeignProfile("meridia", "Meridia", "MRD", 2.8, 3.25, 2.5, 1.0, 11200.0, 8.5, 0.0, 0.0, 24),
+        ForeignProfile("tarsis", "Tarsis", "TRS", 7.6, 6.75, 5.0, 2.0, 185.0, 20.0, 10.0, 6.0, 44),
+        ForeignProfile("velmora", "Velmora", "VLM", 10.5, 10.00, 6.0, 3.0, 420.0, 25.0, 20.0, 14.0, 76)
+    )
+
     val foreign: Map<String, World> = foreignProfiles.associate { p ->
         p.id to World(2_000, p.target, p.rStar).also { it.initScenario(p.infl, p.policy) }
     }
+    val foreignMeta: Map<String, ForeignCountryMeta> = foreignProfiles.associate { p ->
+        p.id to ForeignCountryMeta(p)
+    }
+
+    // ---------- Anak Usaha Lintas Negara (Tahap 3: Entitas dengan Pembukuan Lokal & Konsolidasi) ----------
+    class SubsidiarySpec(
+        val countryId: String,
+        val countryName: String,
+        val currencyCode: String,
+        val title: String,
+        val desc: String,
+        val baseCostRs: Double,
+        val buildMonths: Int,
+        val apCost: Int,
+        val cogsReduction: Double,
+        val demandBoost: Double,
+        val workersAdded: Int,
+        val benefitText: String,
+        val riskText: String,
+        val capitalTurnoverAnnual: Double = 0.88,
+        val baseLocalCogsRatio: Double = 0.67,
+        val fixedOpexRs: Double = 36.0,
+        val fixedOpexRateMonthly: Double = 0.0080,
+        val intercompanyShare: Double = 0.25,
+        val isFactory: Boolean = true,
+        val monthlyOpexRs: Double = fixedOpexRs,
+        val localSurplusRate: Double = 0.015
+    )
+
+    /**
+     * Entitas anak usaha multinasional dengan pembukuan akrual penuh dalam mata uang lokal ([spec.currencyCode]).
+     * Identitas neraca lokal: totalAssetsLocal() == totalLiabilitiesLocal() + equityLocal() (< 1e-6).
+     */
+    class SubsidiaryState(val spec: SubsidiarySpec, val startTurn: Int) {
+        var spentRs: Double = 0.0
+        var active: Boolean = false
+        var nationalized: Boolean = false
+        var totalRepatriatedRs: Double = 0.0
+
+        // Neraca dalam mata uang lokal (juta unit lokal)
+        var cashLocal: Double = 0.0
+        var arLocal: Double = 0.0
+        var invLocal: Double = 0.0
+        var faLocal: Double = 0.0
+        var apLocal: Double = 0.0
+        var bankDebtLocal: Double = 0.0
+        var intercompanyPayableLocal: Double = 0.0
+        var paidInCapitalLocal: Double = 0.0
+        var retainedEarningsLocal: Double = 0.0
+
+        // Pelacakan kos historis untuk eliminasi konsolidasi & Selisih Kurs Translasi (CTA)
+        var paidInCapitalHistoricalRs: Double = 0.0
+        var cumulativeTranslatedNiRs: Double = 0.0
+        var cumulativeDivGrossRs: Double = 0.0
+
+        // Status operasi lokal
+        var monthsActive: Int = 0
+        var monthsOperating: Int
+            get() = monthsActive
+            set(value) { monthsActive = value }
+        var cumulativeNetIncomeRs: Double
+            get() = cumulativeTranslatedNiRs
+            set(value) { cumulativeTranslatedNiRs = value }
+        var localPriceIndex: Double = 1.0
+        var localCostIndex: Double = 1.0
+        var localDemandFactor: Double = 1.0
+        var lastUtilization: Double = 0.0
+        var lossCarryLocal: Double = 0.0
+        var monthlyDebtAmortLocal: Double = 0.0
+        var periodCapitalInjectedLocal: Double = 0.0
+        var periodNewDebtLocal: Double = 0.0
+        var periodDivPaidLocal: Double = 0.0
+
+        var lastIncomeLocal: Map<String, Double> = emptyMap()
+        var lastBalanceLocal: Map<String, Double> = emptyMap()
+        var lastCashFlowLocal: Map<String, Double> = emptyMap()
+
+        fun totalAssetsLocal(): Double = cashLocal + arLocal + invLocal + faLocal
+        fun totalLiabilitiesLocal(): Double = apLocal + bankDebtLocal + intercompanyPayableLocal
+        fun equityLocal(): Double = paidInCapitalLocal + retainedEarningsLocal
+        fun totalAssetsForeign(): Double = totalAssetsLocal()
+        fun totalLiabForeign(): Double = totalLiabilitiesLocal()
+        val localEquity: Double get() = equityLocal()
+        val localDebt: Double get() = bankDebtLocal
+        fun retainedEarningsHistoricalRs(): Double = cumulativeTranslatedNiRs - cumulativeDivGrossRs
+
+        /** Kapasitas dividen kas lokal yang dapat direpatriasi (diturunkan dari laba ditahan & kas lokal nyata). */
+        val retainedForeign: Double
+            get() = if (!active || nationalized) 0.0 else max(0.0, min(retainedEarningsLocal, cashLocal * 0.80))
+    }
+
+    val subsidiaries = LinkedHashMap<String, SubsidiaryState>()
+    var currentEra: Int = 1; private set
+    var investmentInSubsRs: Double = 0.0; private set
+    val subsidiaryInvestmentRs: Double get() = investmentInSubsRs
+    var goodwill: Double = 0.0; private set
+    var ctaEquity: Double = 0.0; private set
+    var lastConsolidatedIncome: Map<String, Double> = emptyMap(); private set
+    var lastConsolidatedBalance: Map<String, Double> = emptyMap(); private set
+    var lastConsolidatedCashFlow: Map<String, Double> = emptyMap(); private set
+
+    // Era 3 & Era 4 state
+    var isPublicCompany: Boolean = false; private set
+    var founderSharePct: Double = 100.0; private set
+    val publicFloatPct: Double get() = (100.0 - founderSharePct) / 100.0
+    var dualClassShares: Boolean = false; private set
+    var captiveBankActive: Boolean = false; private set
+    var captiveBankCapitalRs: Double = 0.0; private set
+    var mediaOwned: Boolean = false; private set
+    var lobbyCount: Int = 0; private set
+    var carbonCredits: Int = 0; private set
+    var appointedSuccessorId: String? = null; private set
+    val successorExecId: String? get() = appointedSuccessorId
+    var successorReadiness: Double = 0.0; private set
+
+    private var pendingWithholdingTaxRs: Double = 0.0
+    private var periodSubInvestOutRs: Double = 0.0
+    private var periodSubDivInGrossRs: Double = 0.0
+    private var periodGoodwillImpairmentRs: Double = 0.0
+    private var periodIntercompanyFeeToSubRs: Double = 0.0
+
+    var transferPricingMode: TransferPricingMode = TransferPricingMode.WAJAR; private set
+    var fxHedgeUntilTurn = -1; private set
+    var hedgedKurs = sc.kurs0; private set
+    val fxHedgeActive: Boolean get() = turn <= fxHedgeUntilTurn
+    var acquiredRivalsCount = 0; private set
+    var esgCompliant = false; private set
+
     private var fxPassState = 1.0
     private var aurPrice = 1.0
-    /** Kurs riil: kurs nominal dibagi kurs paritas daya beli. Hanya penyimpangan dari PPP yang mengubah daya saing. */
     fun fxReal(): Double = kurs / (sc.kurs0 * priceIndex / aurPrice)
     var creditAdj = 0.0; private set
     var hedgeUntilTurn = -1; private set
     var cureUsed = false; private set
     private var hedgeCottonIdx = 1.0
     val hedgeActive: Boolean get() = turn <= hedgeUntilTurn
-    /** Indeks biaya bahan efektif: kapas dikunci kontrak berjangka bila ada lindung nilai. */
+
     fun materialIndexEff(): Double =
         0.78 * (if (hedgeActive) hedgeCottonIdx else commodities.cotton.index) + 0.22 * commodities.oil.index
-    /** Rugi fiskal yang boleh dikompensasi 5 tahun ke depan (aturan PPh badan Indonesia). */
+
     private val lossPool = mutableListOf<Pair<Int, Double>>()
     fun taxLossCarryforward(): Double = lossPool.sumOf { it.second }
+
+    /** Tarif pajak penghasilan badan induk Sundara (22% dasar) dan tarif efektif grup. */
+    fun effectiveTaxRate(): Double {
+        val consEbt = lastConsolidatedIncome["ebt"] ?: 0.0
+        val consTax = lastConsolidatedIncome["tax"] ?: 0.0
+        if (consEbt > 10.0 && consTax >= 0.0) {
+            return (consTax / consEbt).coerceIn(0.05, 0.35)
+        }
+        return 0.22
+    }
+
     private fun computeTax(taxable: Double): Double {
         lossPool.removeAll { turn - it.first > 60 }
         if (taxable <= 0.0) { if (taxable < 0.0) lossPool += turn to -taxable; return 0.0 }
@@ -194,6 +407,7 @@ class KapitalEngine(val seed: Long) {
         }
         return left * 0.22
     }
+
     var policyRate = sc.policy; private set
     var kurs = sc.kurs0; private set
     var econ = 1.0; private set
@@ -218,6 +432,7 @@ class KapitalEngine(val seed: Long) {
     var wageAddOn = 0.0; private set
     var lostCustomerShare = 0.0; private set
     var priceAdjPct = 0; private set
+
     // ---------- Investasi dan ekspansi ----------
     class InvestSpec(val id: String, val title: String, val desc: String, val baseCost: Double, val months: Int, val ap: Int, val capex: Boolean, val benefit: String, val maxCount: Int)
     class InvestProject(val type: String, val startTurn: Int, val months: Int, val totalCost: Double, val capex: Boolean) {
@@ -235,12 +450,17 @@ class KapitalEngine(val seed: Long) {
     var lastDetail: Map<String, Double> = emptyMap(); private set
     var prevDetail: Map<String, Double> = emptyMap(); private set
 
-    // ---------- Kartu kejadian ----------
+    // ---------- Kartu kejadian, Kartu Berantai, & Skor Etika ----------
     class Mod(val key: String, val value: Double, val until: Int)
     class EventRecord(val turn: Int, val title: String, val choice: String, val result: String, val auto: Boolean)
     val mods = mutableListOf<Mod>()
     val openEvents = mutableListOf<GameEvent>()
+    val scheduledChainEvents = mutableListOf<ScheduledChainEvent>()
     val eventHistory = mutableListOf<EventRecord>()
+    val ethicsEvidences = mutableListOf<EthicsEvidence>()
+    var scandalsTriggered = 0; private set
+    var crisesSurvived = 0; private set
+    var factoringUsedCount = 0; private set
     private val eventLastFired = HashMap<String, Int>()
     private var eventCounter = 0
     var ethicsLoad = 0.0; private set
@@ -254,7 +474,6 @@ class KapitalEngine(val seed: Long) {
     private var pendingDividend = 0.0
     private var pendingInvLoss = 0.0
     private val scheduledWage = mutableListOf<Pair<Int, Double>>()
-    private val reportExtra = mutableListOf<ReportLine>()
     fun modProduct(key: String): Double = mods.filter { it.key == key && turn <= it.until }.fold(1.0) { a, m -> a * m.value }
     fun modSum(key: String): Double = mods.filter { it.key == key && turn <= it.until }.sumOf { it.value }
     var strikeMonthsLeft = 0; private set
@@ -267,7 +486,7 @@ class KapitalEngine(val seed: Long) {
     val checkedNews = mutableSetOf<String>()
     var termSheetChosen: String? = null; private set
     private var termSheetDisburseTurn = -1
-    var spinningDecision: String? = null; private set  // "approved" / "rejected"
+    var spinningDecision: String? = null; private set
     var spinningStartTurn = -1; private set
     var spinningDelayed = false; private set
     var spinningSpent = 0.0; private set
@@ -292,7 +511,6 @@ class KapitalEngine(val seed: Long) {
     var prevCashFlow: Map<String, Double> = emptyMap(); private set
     var totalCrossChecks = 0; private set
 
-    // Laporan keuangan bulan terakhir (untuk layar Perusahaan)
     var lastIncome: Map<String, Double> = emptyMap(); private set
     var prevIncome: Map<String, Double> = emptyMap(); private set
     var lastCashFlow: Map<String, Double> = emptyMap(); private set
@@ -323,9 +541,9 @@ class KapitalEngine(val seed: Long) {
         loans += Loan("bank_b", "Bank Niaga Sundara (Bank B)", sc.bankB, sc.policy + bSpread, false, 0.0, 999, sc.turn0 + sc.bankBMaturityOffset, bSpread, sc.bankBCov)
         loans += Loan("rcf", "Fasilitas Modal Kerja Bank B (revolving, plafon ${fmt(sc.rcfLimit)} jt RS)", 0.0, sc.policy + 3.5, false, 0.0, 999, 999, 3.5, 0.0)
         loans += Loan("bank_lama", "Bank Pembangunan (pinjaman lama)", sc.bankLama, sc.bankLamaRate, false, 200.0 * sc.size, 0, 999, null, 0.0)
-        // Piutang hasil "obral kredit" 5 bulan terakhir (sudah terjadi sebelum giliran awal)
         if (sc.stuffedPerMonth > 1.0) for (t in (turn - 5) until turn) stuffedBuckets += t to sc.stuffedPerMonth
         equity = totalAssets() - totalLiabilities()
+        initialEquity = max(1000.0, equity)
         periodStartEquity = equity
         prevBalance = balanceSnapshot()
         val est = estimateMonth()
@@ -350,9 +568,11 @@ class KapitalEngine(val seed: Long) {
         lastCashFlow = mapOf("ni" to est.getValue("ni"), "dep" to dep, "wc" to -sc.size * 600.0, "cfo" to est.getValue("ni") + dep - sc.size * 600.0,
             "capex" to -dep * REPLACEMENT_CAPEX, "fin" to -200.0 * sc.size,
             "net" to est.getValue("ni") + dep - sc.size * 600.0 - dep * REPLACEMENT_CAPEX - 200.0 * sc.size)
+        lastConsolidatedIncome = est + mapOf("ebt" to (est.getValue("ebit") - est.getValue("interest")), "wht_tax" to 0.0, "elim_intercompany_rev" to 0.0, "elim_intercompany_div" to 0.0)
+        lastConsolidatedBalance = consolidatedBalanceSnapshot()
+        lastConsolidatedCashFlow = mapOf("cfo" to lastCashFlow.getValue("cfo"), "cfi" to lastCashFlow.getValue("capex"), "cff" to lastCashFlow.getValue("fin"), "elim_div" to 0.0, "net" to lastCashFlow.getValue("net"))
         memos = generateMemos(Random(seed + 7))
         news = generateNews(Random(seed + 11))
-        // Kartu awal sesuai premis skenario
         sc.initialEvents.forEachIndexed { i, (tpl, off) ->
             val ev = EventDeck.makeEvent(tpl, eventCtx(), Random(seed + 900 + i), "evt_${turn}_${i}_$tpl")
             if (ev != null) {
@@ -380,16 +600,81 @@ class KapitalEngine(val seed: Long) {
     fun loanBalanceRs(l: Loan): Double = if (l.currencyAud) l.balance * kurs else l.balance
     fun totalDebt(): Double = loans.sumOf { loanBalanceRs(it) }
     fun portfolioValue(): Double = holdings.entries.sumOf { (id, lots) -> lots * LOT * (bourse.company(id)?.price ?: 0.0) }
-    fun totalAssets(): Double = cash + totalAR() + inventory + fixedAssets + portfolioValue()
+    fun totalAssets(): Double = cash + totalAR() + inventory + fixedAssets + portfolioValue() + investmentInSubsRs + goodwill + captiveBankCapitalRs
     fun totalLiabilities(): Double = payables + totalDebt()
 
     fun balanceSnapshot(): Map<String, Double> = mapOf(
-        "cash" to cash, "ar" to totalAR(), "ar_normal" to normalAR, "ar_risky" to stuffedTotal(), "inv" to inventory, "fa" to fixedAssets, "pf" to portfolioValue(),
+        "cash" to cash, "ar" to totalAR(), "ar_normal" to normalAR, "ar_risky" to stuffedTotal(),
+        "inv" to inventory, "fa" to fixedAssets, "pf" to portfolioValue(),
+        "inv_subs" to investmentInSubsRs, "goodwill" to goodwill, "captive_bank" to captiveBankCapitalRs,
         "assets" to totalAssets(), "payables" to payables,
         "debt_st" to loans.filter { it.maturityTurn - turn <= 12 }.sumOf { loanBalanceRs(it) },
         "debt_lt" to loans.filter { it.maturityTurn - turn > 12 }.sumOf { loanBalanceRs(it) },
         "liab" to totalLiabilities(), "equity" to equity
     )
+
+    // ---------- Konsolidasi Grup (Induk + Anak Usaha dengan Eliminasi Antar-Entitas & CTA) ----------
+    fun consolidatedTotalAssets(): Double {
+        val validSubs = subsidiaries.values.filter { !it.nationalized }
+        val subAssetsRs = validSubs.sumOf { it.totalAssetsLocal() * foreignMeta.getValue(it.spec.countryId).fxToRs }
+        val icElimRs = validSubs.sumOf { it.intercompanyPayableLocal * foreignMeta.getValue(it.spec.countryId).fxToRs }
+        return (totalAssets() - investmentInSubsRs) + subAssetsRs - icElimRs
+    }
+
+    fun consolidatedTotalLiabilities(): Double {
+        val validSubs = subsidiaries.values.filter { !it.nationalized }
+        val subLiabRs = validSubs.sumOf { it.totalLiabilitiesLocal() * foreignMeta.getValue(it.spec.countryId).fxToRs }
+        val icElimRs = validSubs.sumOf { it.intercompanyPayableLocal * foreignMeta.getValue(it.spec.countryId).fxToRs }
+        return totalLiabilities() + subLiabRs - icElimRs
+    }
+
+    fun computeCtaEquity(): Double {
+        val validSubs = subsidiaries.values.filter { !it.nationalized }
+        return validSubs.sumOf { sub ->
+            val fx = foreignMeta.getValue(sub.spec.countryId).fxToRs
+            (sub.equityLocal() * fx) - (sub.paidInCapitalHistoricalRs + sub.retainedEarningsHistoricalRs())
+        }
+    }
+
+    fun consolidatedEquity(): Double {
+        val validSubs = subsidiaries.values.filter { !it.nationalized }
+        val subRetainedHistRs = validSubs.sumOf { it.retainedEarningsHistoricalRs() }
+        return equity + subRetainedHistRs + computeCtaEquity()
+    }
+
+    fun consolidatedBalanceSnapshot(): Map<String, Double> {
+        val validSubs = subsidiaries.values.filter { !it.nationalized }
+        fun sumSub(sel: (SubsidiaryState) -> Double): Double =
+            validSubs.sumOf { sel(it) * foreignMeta.getValue(it.spec.countryId).fxToRs }
+        val icElimRs = sumSub { it.intercompanyPayableLocal }
+        val consCash = cash + sumSub { it.cashLocal }
+        val consAr = max(0.0, totalAR() + sumSub { it.arLocal } - icElimRs)
+        val consInv = inventory + sumSub { it.invLocal }
+        val consFa = fixedAssets + sumSub { it.faLocal }
+        val consAp = max(0.0, payables + sumSub { it.apLocal + it.intercompanyPayableLocal } - icElimRs)
+        val subDebtRs = sumSub { it.bankDebtLocal }
+        val debtSt = loans.filter { it.maturityTurn - turn <= 12 }.sumOf { loanBalanceRs(it) } + subDebtRs * 0.25
+        val debtLt = loans.filter { it.maturityTurn - turn > 12 }.sumOf { loanBalanceRs(it) } + subDebtRs * 0.75
+        val cta = computeCtaEquity()
+        val consEq = consolidatedEquity()
+        return mapOf(
+            "cash" to consCash,
+            "ar" to consAr,
+            "inv" to consInv,
+            "fa" to consFa,
+            "pf" to portfolioValue(),
+            "goodwill" to goodwill,
+            "captive_bank" to captiveBankCapitalRs,
+            "elim_inv_subs" to -investmentInSubsRs,
+            "assets" to consolidatedTotalAssets(),
+            "payables" to consAp,
+            "debt_st" to debtSt,
+            "debt_lt" to debtLt,
+            "liab" to consolidatedTotalLiabilities(),
+            "cta_equity" to cta,
+            "equity" to consEq
+        )
+    }
 
     val stuffingActive: Boolean
         get() = salesScheme == SalesScheme.OMZET && exec("exec_sales").present && !exec("exec_sales").stopped
@@ -404,27 +689,35 @@ class KapitalEngine(val seed: Long) {
         return 0.05 * min(1.0, months / 6.0)
     }
 
-    /** Tingkat harga paritas impor: 60% dari depresiasi rial menular ke harga jual (kain impor bersaing dalam USD). */
     fun fxPassLevel(): Double = fxPassState
 
-    /** Pendapatan tanpa efek harga diskresioner dan paritas impor (basis HPP). */
     private fun volumeRevenue(revenue: Double): Double = revenue / ((1.0 + priceAdjPct / 100.0) * fxPassLevel())
 
     fun cogsRatio(): Double {
-        // 65% HPP adalah bahan (kapas + energi); sisanya upah langsung dan overhead
-        var r = sc.cogsBase * (0.8 + 0.2 * fxReal()) * (0.35 + 0.65 * materialIndexEff()) * modProduct("cogs")
+        val fxFactor = if (fxHedgeActive) min(fxReal(), hedgedKurs / sc.kurs0) else fxReal()
+        var r = sc.cogsBase * (0.8 + 0.2 * fxFactor) * (0.35 + 0.65 * materialIndexEff()) * modProduct("cogs")
         if (kickbackActive) r += 0.01
         if (dualSourcing) r += 0.012
         r -= spinningBenefit()
         if (automation) r -= 0.015
-        return r
+        // Sinergi bahan baku hulu dari anak usaha yang benar-benar berproduksi (dikalikan utilisasi nyata anak usaha)
+        for (sub in subsidiaries.values) {
+            if (sub.active && !sub.nationalized) {
+                r -= sub.spec.cogsReduction * sub.lastUtilization.coerceIn(0.4, 1.0)
+            }
+        }
+        val kestrelTariff = foreignMeta["kestrel"]?.tariffPct ?: 8.0
+        val hasKestrelSub = subsidiaries["kestrel"]?.let { it.active && !it.nationalized } == true
+        if (!hasKestrelSub && kestrelTariff > 10.0) {
+            r += (kestrelTariff - 10.0) * 0.0008
+        }
+        return r.coerceIn(0.45, 0.92)
     }
 
     fun monthlyInterest(): Double = loans.sumOf { loanBalanceRs(it) * it.annualRatePct / 100.0 / 12.0 }
 
     fun covenantThreshold(): Double = loans.filter { it.balance > 0.5 }.maxOfOrNull { it.covenantIcr } ?: 0.0
 
-    /** Perkiraan laba rugi bulan berjalan tanpa kejadian acak (dipakai untuk peringatan dini). */
     fun estimateMonth(): Map<String, Double> {
         val normalRev = baseNormalRevenue(1.0)
         val stuff = if (stuffingActive) normalRev * 0.08 else 0.0
@@ -441,7 +734,6 @@ class KapitalEngine(val seed: Long) {
             "baddebt" to baddebt, "ebit" to ebit, "interest" to interest, "tax" to tax, "ni" to ebit - interest - tax) + costDetail(cogs)
     }
 
-    /** Rincian biaya (tampilan): pembagian HPP dan beban operasional ke pos-pos. Jumlahnya selalu sama dengan total. */
     private fun costDetail(cogs: Double): Map<String, Double> {
         val ob = opexBase()
         return mapOf(
@@ -450,10 +742,8 @@ class KapitalEngine(val seed: Long) {
             "op_util" to ob * 0.08, "op_ins" to ob * 0.05, "op_other" to ob * 0.05, "op_lines" to extraOpex())
     }
 
-    /** Faktor harga: pendapatan per unit naik, volume mengikuti pangsa pasar yang ditentukan harga pesaing. */
     fun priceRevenueFactor(): Double = (1.0 + priceAdjPct / 100.0) * priceVolumeFactor()
 
-    /** Volume relatif akibat harga Anda vs harga pesaing saat ini (pesaing bereaksi, lihat World). */
     fun priceVolumeFactor(): Double = volOverride ?: world.volumeFactor((1.0 + priceAdjPct / 100.0) * fxPassLevel())
 
     fun playerShare(): Double = world.playerShare((1.0 + priceAdjPct / 100.0) * fxPassLevel())
@@ -465,20 +755,29 @@ class KapitalEngine(val seed: Long) {
         return r
     }
 
-    /** Kapasitas produksi relatif (1,08 = ada ruang 8% di atas permintaan awal). */
-    fun capacityIdx(): Double = 1.08 + 0.12 * extraLines
-    fun demandIdx(): Double = 1.0 + demandBoost
-    /** Volume yang bisa dijual: permintaan, tetapi tidak melebihi kapasitas pabrik. */
+    fun capacityIdx(): Double {
+        val subCap = subsidiaries.values.count { it.active && !it.nationalized && it.spec.isFactory } * 0.06
+        return 1.08 + 0.12 * extraLines + subCap
+    }
+
+    fun demandIdx(): Double {
+        val subDem = subsidiaries.values.filter { it.active && !it.nationalized }.sumOf { it.spec.demandBoost * it.lastUtilization.coerceIn(0.4, 1.0) }
+        return 1.0 + demandBoost + subDem
+    }
+
     fun volumeCap(): Double = min(demandIdx(), capacityIdx())
     fun utilization(): Double = demandIdx() / capacityIdx()
-    fun headcountProd(): Int = (sc.workers * (1.0 + 0.12 * extraLines) * (if (automation) 0.9 else 1.0)).toInt()
+    fun foreignWorkers(): Int = subsidiaries.values.filter { it.active && !it.nationalized }.sumOf { it.spec.workersAdded }
+    fun headcountProd(): Int = (sc.workers * (1.0 + 0.12 * extraLines) * (if (automation) 0.9 else 1.0)).toInt() + foreignWorkers()
     fun headcountStaff(): Int = (sc.workers * 0.26).toInt()
-    private fun extraOpex(): Double = (extraLines * 70.0 + (if (exportOn) 40.0 else 0.0) + (if (warehouse) 25.0 else 0.0)) * sc.size * costIndex
 
-    /** Pertumbuhan riil tren industri (2,5%/tahun; tekstil Indonesia tumbuh 6,4% pada Q2 2026 tetapi dari basis yang lemah). */
+    /** Biaya operasional tambahan di induk (beban lokal anak usaha sudah dibukukan di laporan entitas anak masing-masing!). */
+    private fun extraOpex(): Double {
+        return (extraLines * 70.0 + (if (exportOn) 40.0 else 0.0) + (if (warehouse) 25.0 else 0.0) + (if (isPublicCompany) 35.0 else 0.0)) * sc.size * costIndex
+    }
+
     private fun trendGrowth(): Double = Math.pow(1.025, trendMonths / 12.0)
 
-    /** Beban usaha: tumbuh dengan inflasi dan 80% dari pertumbuhan volume (biaya semi-tetap). */
     private fun opexBase(): Double = sc.baseOpex * costIndex * Math.pow(trendGrowth(), 0.95) * (if (automation) 0.945 else 1.0)
 
     private fun maintenanceSpend(): Double {
@@ -488,7 +787,6 @@ class KapitalEngine(val seed: Long) {
         else needed + if (deferredMonths > 0) sc.baseMaint * 120.0 / 610.0 * scale else 0.0
     }
 
-    /** ICR tiga bulan terakhir termasuk perkiraan bulan berjalan. */
     fun projectedIcr(): Double {
         val est = estimateMonth()
         val e = ebitHist.takeLast(2).sum() + est.getValue("ebit")
@@ -522,6 +820,57 @@ class KapitalEngine(val seed: Long) {
         val ev = journals.filter { it.outcome != null }
         if (ev.isEmpty()) return 0.25
         return ev.sumOf { val p = it.confidencePct / 100.0; val o = if (it.outcome == true) 1.0 else 0.0; (p - o) * (p - o) } / ev.size
+    }
+
+    /** Evaluasi 5 komponen kemenangan kampanye sesuai Bagian 19 Dokumen Desain. */
+    fun evaluateCampaign(): CampaignEvaluation {
+        // 1. Nilai perusahaan riil disesuaikan inflasi (30%) — menggunakan Ekuitas Konsolidasi Grup
+        val realEquityMultiple = (consolidatedEquity() / max(0.5, priceIndex)) / max(1000.0, initialEquity)
+        val nilaiScore = ((realEquityMultiple - 0.5) * 65.0).roundToInt().coerceIn(0, 100)
+
+        // 2. Ketahanan: krisis dilewati tanpa bailout / equity cure (20%)
+        val baseKetahanan = 72 + crisesSurvived * 6 - (if (cureUsed) 22 else 0) - factoringUsedCount * 8 - covenantBreaches * 12 +
+            (if (appointedSuccessorId != null) (successorReadiness * 10.0).roundToInt() else 0)
+        val ketahananScore = baseKetahanan.coerceIn(0, 100)
+
+        // 3. Kualitas keputusan: skor kalibrasi Brier & jurnal (20%)
+        val brier = brierScore()
+        val calBase = ((0.35 - brier) / 0.35 * 85.0).roundToInt() + min(15, journals.size * 3) + min(10, totalCrossChecks * 2)
+        val kualitasScore = calBase.coerceIn(0, 100)
+
+        // 4. Reputasi dan skor etika (15%)
+        val etikaScore = (100.0 - ethicsLoad * 16.0 - scandalsTriggered * 24.0).roundToInt().coerceIn(0, 100)
+
+        // 5. Dampak sosial: lapangan kerja, upah, dan kepatuhan lingkungan/IPAL & karbon (15%)
+        val jobGrowth = (headcountProd() + headcountStaff()).toDouble() / max(1, (sc.workers * 1.26).toInt())
+        val sosialScore = (55.0 + (jobGrowth - 1.0) * 70.0 + (if (esgCompliant) 15.0 else 0.0) + (if (wageAddOn > 0) 10.0 else 0.0) + min(10, carbonCredits)).roundToInt().coerceIn(0, 100)
+
+        val total = (0.30 * nilaiScore + 0.20 * ketahananScore + 0.20 * kualitasScore + 0.15 * etikaScore + 0.15 * sosialScore).roundToInt().coerceIn(0, 100)
+        val grade = when {
+            gameOverReason != null && !isVictory -> "F"
+            total >= 85 -> "S"
+            total >= 75 -> "A"
+            total >= 65 -> "B"
+            total >= 50 -> "C"
+            else -> "D"
+        }
+        val activeSubsCount = subsidiaries.values.count { it.active && !it.nationalized }
+        val archetype = when {
+            gameOverReason != null && !isVictory -> when {
+                gameOverReason!!.contains("Penjara") || gameOverReason!!.contains("Kejaksaan") -> "Oligarki Tumbang di Penjara"
+                gameOverReason!!.contains("Dewan") -> "CEO yang Digulingkan Dewan"
+                gameOverReason!!.contains("menyita") -> "Korban Penyitaan Covenant Bank"
+                else -> "Korban Jebakan Akrual & Krisis Kas"
+            }
+            activeSubsCount >= 2 && etikaScore >= 75 && total >= 75 -> "Arsitek Institusi Multinasional Bersih"
+            activeSubsCount >= 2 && etikaScore < 55 -> "Konglomerat Lintas Batas Abu-Abu"
+            total >= 75 -> "Nakhoda Industri Tangguh"
+            total >= 55 -> "Manajer Bertahan Hidup"
+            else -> "Pengelola di Tepi Jurang"
+        }
+        val summary = "Skor Kampanye $total/100 ( Kelas $grade · $archetype ) — " +
+            "Nilai Riil $nilaiScore · Ketahanan $ketahananScore · Kalibrasi $kualitasScore · Etika $etikaScore · Sosial $sosialScore."
+        return CampaignEvaluation(nilaiScore, ketahananScore, kualitasScore, etikaScore, sosialScore, total, grade, archetype, summary)
     }
 
     fun pendingDecisions(): List<PendingDecision> {
@@ -603,7 +952,7 @@ class KapitalEngine(val seed: Long) {
             }
             Action.HedgeCotton -> {
                 if (!hedgeActive && spend(1)) {
-                    hedgeCottonIdx = commodities.cotton.index * 1.02   // premi kontrak berjangka 2%
+                    hedgeCottonIdx = commodities.cotton.index * 1.02
                     hedgeUntilTurn = turn + 6
                     oneOffOpex += 60.0
                     true
@@ -642,9 +991,340 @@ class KapitalEngine(val seed: Long) {
                 val target = (priceAdjPct + action.deltaPct).coerceIn(-15, 15)
                 if (target != priceAdjPct && spend(1)) { priceAdjPct = target; true } else false
             }
+            is Action.SetDifficulty -> {
+                difficulty = action.difficulty
+                true
+            }
+            is Action.OpenSubsidiary -> doOpenSubsidiary(action.countryId)
+            is Action.SetTransferPricing -> {
+                if (action.mode != transferPricingMode && spend(1)) {
+                    transferPricingMode = action.mode
+                    if (action.mode == TransferPricingMode.AGRESIF) {
+                        recordEthicsEvidence("transfer_pricing", 1.5, "exec_cfo", "meridia")
+                    }
+                    chronicle += ChronicleItem(turn, "Kebijakan Transfer Pricing: ${action.mode.label}",
+                        action.mode.description,
+                        "Perubahan kebijakan pajak lintas batas → menggeser basis laba kena pajak antar-yurisdiksi.", actionCount)
+                    true
+                } else false
+            }
+            is Action.Repatriate -> doRepatriate(action.countryId)
+            Action.HedgeFx -> {
+                if (!fxHedgeActive && spend(1)) {
+                    val intDiff = max(0.0, policyRate - foreign.getValue("aurelia").policyRate)
+                    val premiumRs = (45.0 + 10.0 * intDiff) * sc.size
+                    hedgedKurs = kurs * (1.0 + intDiff / 2400.0)
+                    fxHedgeUntilTurn = turn + 6
+                    oneOffOpex += premiumRs
+                    chronicle += ChronicleItem(turn, "Kontrak Forward Valas RS/A$ 6 Bulan",
+                        "Mengunci kurs lindung nilai pada ${fmt(hedgedKurs)} RS/A$ selama 6 bulan (premi ${fmt(premiumRs)} jt RS sesuai selisih bunga).",
+                        "Forward valas → melindungi utang A$ dan biaya impor dari kejatuhan Rial.", actionCount)
+                    true
+                } else false
+            }
+            is Action.AcquireRival -> doAcquireRival(action.rivalId)
+            is Action.BorrowForeignSub -> doBorrowForeignSub(action.countryId, action.amountLocal)
+            is Action.IssueCorporateBond -> doIssueCorporateBond(action.amountRs, action.tenorMonths)
+            is Action.ExecuteIpo -> doExecuteIpo(action.floatPct, action.dualClassShares)
+            Action.OpenCaptiveBank -> doOpenCaptiveBank()
+            is Action.MediaLobby -> doMediaLobby(action.kind)
+            is Action.CarbonAction -> doCarbonAction(action.kind, action.units)
+            is Action.AppointSuccessor -> doAppointSuccessor(action.candidateId)
         }
         if (ok) actionCount++
         return ok
+    }
+
+    // =====================================================================
+    // Era 2–4: Anak Usaha, Repatriasi, Pembiayaan Lokal, M&A, IPO, Obligasi, Karbon & Suksesi
+    // =====================================================================
+    fun subsidiarySpec(countryId: String): SubsidiarySpec? = SUBSIDIARIES.firstOrNull { it.countryId == countryId }
+
+    fun subsidiaryCostRs(spec: SubsidiarySpec): Double = spec.baseCostRs * sc.size * costIndex
+
+    fun subsidiaryBlock(countryId: String): String? {
+        val spec = subsidiarySpec(countryId) ?: return "Negara tujuan anak usaha tidak tersedia."
+        if (subsidiaries.containsKey(countryId)) {
+            val st = subsidiaries.getValue(countryId)
+            return if (st.nationalized) "Aset di ${spec.countryName} telah dibekukan/dinasionalisasi."
+            else if (st.active) "Anak usaha di ${spec.countryName} sudah beroperasi."
+            else "Pembangunan anak usaha di ${spec.countryName} sedang berjalan."
+        }
+        if (ap < spec.apCost) return "AP tidak cukup (butuh ${spec.apCost} AP)."
+        val firstMonthCost = subsidiaryCostRs(spec) / spec.buildMonths
+        if (cash - firstMonthCost < 1500.0) return "Kas tidak cukup untuk tahap pertama (${fmt(firstMonthCost)} jt RS)."
+        return null
+    }
+
+    private fun doOpenSubsidiary(countryId: String): Boolean {
+        val spec = subsidiarySpec(countryId) ?: return false
+        if (subsidiaryBlock(countryId) != null) return false
+        spend(spec.apCost)
+        val totalCost = subsidiaryCostRs(spec)
+        val sub = SubsidiaryState(spec, turn)
+        // Faktor kecocokan pasar lokal deterministik dari (seed, countryId):
+        // ~24% kasus menghadapi hambatan struktural lokal (potensi rugi/payback lambat), ~76% kasus beroperasi normal (payback 3,5–6,5 tahun)
+        val rSub = Random(seed * 65537L + countryId.hashCode().toLong() * 997L + 13L)
+        val roll = rSub.nextDouble()
+        sub.localDemandFactor = if (roll < 0.24) {
+            0.58 + rSub.nextDouble() * 0.14
+        } else {
+            0.94 + rSub.nextDouble() * 0.22
+        }
+        subsidiaries[countryId] = sub
+        currentEra = max(currentEra, 2)
+        projectsInv += InvestProject("sub_$countryId", turn, spec.buildMonths, totalCost, capex = true)
+        chronicle += ChronicleItem(turn, "Pendirian Anak Usaha: ${spec.title}",
+            "Investasi lintas negara di ${spec.countryName} (${spec.currencyCode}) senilai ${fmt(totalCost)} jt RS selama ${spec.buildMonths} bulan.",
+            "Ekspansi Era 2 → entitas anak usaha ${spec.countryName} dengan pembukuan lokal → konsolidasi grup.", actionCount)
+        return true
+    }
+
+    /**
+     * Repatriasi dividen dari anak usaha ke induk:
+     * - Mengurangi kas lokal (`cashLocal`) dan laba ditahan lokal (`retainedEarningsLocal`) di pembukuan anak usaha.
+     * - Pajak withholding lintas batas (`taxRs`) dicatat sebagai beban pajak (`pendingWithholdingTaxRs`), BUKAN beban operasi.
+     * - Dalam konsolidasi grup, dividen antar-entitas (`grossRs`) dieliminasi penuh (bukan pendapatan grup).
+     */
+    private fun doRepatriate(countryId: String): Boolean {
+        val sub = subsidiaries[countryId] ?: return false
+        if (!sub.active || sub.nationalized || sub.retainedForeign <= 0.05) return false
+        val meta = foreignMeta.getValue(countryId)
+        if (meta.capitalControlTurnsLeft > 0) return false
+        val divLocal = sub.retainedForeign
+        val grossRs = divLocal * meta.fxToRs
+        if (grossRs < 10.0) return false
+        if (!spend(1)) return false
+
+        val hasMeridia = subsidiaries["meridia"]?.let { it.active && !it.nationalized } == true
+        val effWithholdingPct = if (hasMeridia && countryId != "meridia") meta.profile.withholdingTaxPct * 0.5 else meta.profile.withholdingTaxPct
+        val taxRs = grossRs * (effWithholdingPct / 100.0)
+
+        // Pembukuan lokal anak usaha: kas keluar pendanaan dividen & pengurangan laba ditahan lokal
+        sub.cashLocal -= divLocal
+        sub.retainedEarningsLocal -= divLocal
+        sub.periodDivPaidLocal += divLocal
+        sub.cumulativeDivGrossRs += grossRs
+        sub.totalRepatriatedRs += (grossRs - taxRs)
+
+        // Pembukuan induk: kas & ekuitas induk menerima dividen bruto (dieliminasi penuh di konsolidasi grup);
+        // pajak withholding lintas batas diakui sebagai beban pajak (pendingWithholdingTaxRs), bukan beban operasi.
+        cash += grossRs
+        equity += grossRs
+        periodSubDivInGrossRs += grossRs
+        pendingWithholdingTaxRs += taxRs
+
+        chronicle += ChronicleItem(turn, "Repatriasi Dividen dari ${sub.spec.countryName}",
+            "Menarik dividen ${fmt2(divLocal)} jt ${sub.spec.currencyCode} (${fmt(grossRs)} jt RS); pajak withholding dividen ${fmt1(effWithholdingPct)}% (${fmt(taxRs)} jt RS).",
+            "Laba ditahan anak usaha → dividen kas lintas batas (dieliminasi pada konsolidasi) → pajak withholding diakui sebagai beban pajak.", actionCount)
+        return true
+    }
+
+    /** Pinjaman bank lokal dalam mata uang anak usaha (Tahap 3.9: Pembiayaan multimata uang). */
+    private fun doBorrowForeignSub(countryId: String, amountLocal: Int): Boolean {
+        val sub = subsidiaries[countryId] ?: return false
+        if (!sub.active || sub.nationalized || amountLocal <= 0) return false
+        val meta = foreignMeta.getValue(countryId)
+        val maxLocalDebt = sub.paidInCapitalLocal * 1.2
+        val amt = if (amountLocal.toDouble() > maxLocalDebt && meta.fxToRs > 1.0) {
+            amountLocal.toDouble() / meta.fxToRs
+        } else {
+            amountLocal.toDouble()
+        }
+        if (sub.bankDebtLocal + amt > maxLocalDebt) return false
+        if (!spend(1)) return false
+        sub.bankDebtLocal += amt
+        sub.cashLocal += amt
+        sub.periodNewDebtLocal += amt
+        sub.monthlyDebtAmortLocal = sub.bankDebtLocal / 36.0
+        chronicle += ChronicleItem(turn, "Pinjaman Bank Lokal ${sub.spec.countryName}",
+            "Anak usaha ${sub.spec.title} menarik fasilitas kredit lokal ${fmt2(amt)} jt ${sub.spec.currencyCode}.",
+            "Pembiayaan mata uang lokal → mencocokkan arus kas dan liabilitas valas (natural hedge).", actionCount)
+        return true
+    }
+
+    fun acquireRivalCostRs(rivalId: String): Double {
+        val rv = world.rivals.firstOrNull { it.id == rivalId } ?: return 999999.0
+        val distressDisc = if (!rv.active) 0.55 else if (rv.weakMonths >= 4) 0.75 else 1.15
+        return 16000.0 * rv.share0 * distressDisc * sc.size * costIndex
+    }
+
+    fun acquireRivalBlock(rivalId: String): String? {
+        val rv = world.rivals.firstOrNull { it.id == rivalId } ?: return "Pesaing tidak ditemukan."
+        if (rv.active && rv.weakMonths < 3 && turn < sc.turn0 + 18) return "Pesaing masih sehat; tunggu saat mereka tertekan (rugi ≥3 bulan) atau setelah 18 bulan bermain."
+        if (ap < 3) return "Butuh 3 AP untuk uji tuntas dan akuisisi."
+        val cost = acquireRivalCostRs(rivalId)
+        if (cash - cost < 1500.0) return "Kas tidak cukup untuk akuisisi (${fmt(cost)} jt RS)."
+        return null
+    }
+
+    /**
+     * Akuisisi Pesaing (M&A) dengan Uji Tuntas Forensik, Pengakuan Goodwill, dan Risiko Liabilitas Tersembunyi (Tahap 4).
+     */
+    private fun doAcquireRival(rivalId: String): Boolean {
+        val rv = world.rivals.firstOrNull { it.id == rivalId } ?: return false
+        if (acquireRivalBlock(rivalId) != null) return false
+        val cost = acquireRivalCostRs(rivalId)
+        if (!spend(3)) return false
+        val fairPhysicalFa = cost * 0.68
+        val acqGoodwill = cost - fairPhysicalFa
+        pendingCapex += fairPhysicalFa
+        goodwill += acqGoodwill
+        cash -= acqGoodwill
+        periodInvestOut += acqGoodwill
+        rv.active = false
+        extraLines += 1
+        demandBoost += rv.share0 * 0.45
+        acquiredRivalsCount++
+        currentEra = max(currentEra, 3)
+
+        // Uji tuntas tidak pernah 100% sempurna: peluang deterministik menemukan tunggakan perawatan/pajak target
+        val rDd = rng(71 + acquiredRivalsCount)
+        val hiddenIssue = if (rDd.nextDouble() < 0.35) {
+            val remediation = 280.0 * sc.size * costIndex
+            oneOffOpex += remediation
+            "Pasca-akuisisi ditemukan tunggakan perawatan mesin target sebesar ${fmt(remediation)} jt RS."
+        } else {
+            "Integrasi aset fisik berjalan lancar."
+        }
+        chronicle += ChronicleItem(turn, "Akuisisi Pesaing (M&A): ${rv.name}",
+            "Harga akuisisi ${fmt(cost)} jt RS (Aset Tetap Wajar ${fmt(fairPhysicalFa)} jt RS + Goodwill ${fmt(acqGoodwill)} jt RS). $hiddenIssue",
+            "Uji tuntas M&A → alokasi harga beli & goodwill di neraca → kapasitas +1 lini.", actionCount)
+        return true
+    }
+
+    private val pendingBonds = mutableListOf<Triple<Double, Double, Int>>()
+
+    /** Penerbitan Obligasi Korporasi (Era 3). */
+    private fun doIssueCorporateBond(amountRs: Int, tenorMonths: Int): Boolean {
+        if (amountRs < 1000 || amountRs > 50000 || tenorMonths < 12 || tenorMonths > 120) return false
+        if (!spend(2)) return false
+        val amt = amountRs.toDouble()
+        val couponPct = (policyRate + 2.8 + covenantBreaches * 1.2).coerceIn(5.5, 16.0)
+        val fee = amt * 0.012
+        pendingBonds += Triple(amt, couponPct, tenorMonths)
+        oneOffOpex += fee
+        currentEra = max(currentEra, 3)
+        chronicle += ChronicleItem(turn, "Penerbitan Obligasi Korporasi ${fmt(amt)} jt RS",
+            "Tenor $tenorMonths bulan (bullet maturity), kupon tetap ${fmt2(couponPct)}%, biaya emisi ${fmt(fee)} jt RS (cair akhir bulan ini).",
+            "Pendanaan pasar modal Era 3 → kas masuk jangka panjang dengan pokok jatuh tempo sekaligus.", actionCount)
+        return true
+    }
+
+    /** Penawaran Umum Perdana Saham / IPO (Era 3). */
+    private fun doExecuteIpo(floatPct: Int, useDualClass: Boolean): Boolean {
+        if (isPublicCompany || floatPct !in 10..45 || stuffingActive) return false
+        if (!spend(3)) return false
+        val govDiscount = if (useDualClass) 0.92 else 1.0
+        val valuation = max(consolidatedEquity() * 1.35, (ebitHist.takeLast(3).sum() * 4.0) * 6.5) * govDiscount
+        val grossProceeds = valuation * (floatPct / 100.0)
+        val ipoFee = grossProceeds * 0.045
+        val netProceeds = grossProceeds - ipoFee
+        isPublicCompany = true
+        dualClassShares = useDualClass
+        founderSharePct = (100.0 - floatPct).coerceIn(50.0, 90.0)
+        cash += netProceeds
+        equity += netProceeds
+        periodCureIn += netProceeds
+        currentEra = max(currentEra, 3)
+        chronicle += ChronicleItem(turn, "IPO di Bursa Efek Sundara ($floatPct% Saham Publik)",
+            "Dana bersih IPO ${fmt(netProceeds)} jt RS masuk ke kas dan ekuitas (${if (useDualClass) "Saham Kelas Ganda aktif" else "Satu saham satu suara"}).",
+            "IPO Era 3 → modal ekuitas meningkat drastis → kewajiban keterbukaan publik.", actionCount)
+        return true
+    }
+
+    /** Mendirikan Unit Bank / Asuransi Grup Sendiri (Era 3). */
+    private fun doOpenCaptiveBank(): Boolean {
+        if (captiveBankActive) return false
+        val minCapital = 3200.0 * sc.size * costIndex
+        if (cash - minCapital < 1500.0 || !spend(3)) return false
+        captiveBankActive = true
+        captiveBankCapitalRs = minCapital
+        cash -= minCapital
+        periodInvestOut += minCapital
+        currentEra = max(currentEra, 3)
+        chronicle += ChronicleItem(turn, "Pendirian Unit Jasa Keuangan & Asuransi Grup",
+            "Modal inti disetor ${fmt(minCapital)} jt RS (CAR ≥ 12%). Menghasilkan margin bunga bersih namun terpapar risiko kredit saat resesi.",
+            "Finansialisasi Era 3 → bank/asuransi internal → pendapatan bunga & risiko likuiditas.", actionCount)
+        return true
+    }
+
+    /** Akuisisi Media atau Lobi Parlemen (Era 3). */
+    private fun doMediaLobby(kind: String): Boolean {
+        if (!spend(2)) return false
+        val cost = if (kind == "media") 1400.0 * sc.size * costIndex else 450.0 * sc.size * costIndex
+        if (cash - cost < 1200.0) return false
+        oneOffOpex += cost
+        lobbyCount++
+        if (kind == "media") {
+            mediaOwned = true
+            boardTrust = (boardTrust + 5).coerceAtMost(100)
+        } else {
+            recordEthicsEvidence("parliament_lobby", 1.1, "exec_coo", "sundara")
+            foreignMeta.values.forEach { it.tariffPct = max(it.profile.baseTariffPct, it.tariffPct - 2.0) }
+        }
+        chronicle += ChronicleItem(turn, if (kind == "media") "Akuisisi Grup Media Nasional" else "Kampanye Lobi Parlemen & Asosiasi",
+            "Biaya ${fmt(cost)} jt RS untuk memengaruhi opini publik dan menahan kenaikan tarif/regulasi.",
+            "Lobi & media Era 3 → meredam tekanan regulasi → meninggalkan jejak bagi jurnalis investigasi.", actionCount)
+        return true
+    }
+
+    /** Perdagangan Kredit Karbon (Era 4). */
+    private fun doCarbonAction(kind: String, units: Int): Boolean {
+        if (units <= 0 || !spend(1)) return false
+        val unitPriceRs = 42.0 * sc.size * costIndex
+        return if (kind.equals("buy", ignoreCase = true)) {
+            val totalCost = units * unitPriceRs
+            if (cash - totalCost < 1000.0) return false
+            oneOffOpex += totalCost
+            carbonCredits += units
+            if (carbonCredits >= 5) esgCompliant = true
+            chronicle += ChronicleItem(turn, "Pembelian $units Kredit Karbon",
+                "Biaya ${fmt(totalCost)} jt RS di bursa karbon untuk menutup jejak emisi pabrik.",
+                "Pasar karbon Era 4 → kepatuhan emisi & bebas penalti CBAM.", actionCount)
+            true
+        } else {
+            if (carbonCredits < units) return false
+            val proceeds = units * unitPriceRs * 0.95
+            carbonCredits -= units
+            pendingIncome += proceeds
+            chronicle += ChronicleItem(turn, "Penjualan $units Kredit Karbon Surplus",
+                "Menerima ${fmt(proceeds)} jt RS dari penjualan kuota emisi hijau.",
+                "Surplus energi bersih → monetisasi kredit karbon.", actionCount)
+            true
+        }
+    }
+
+    /** Penunjukan & Kaderisasi Penerus CEO (Era 4). */
+    private fun doAppointSuccessor(candidateId: String): Boolean {
+        if (candidateId.isBlank() || !spend(2)) return false
+        appointedSuccessorId = candidateId
+        val trainingCost = 380.0 * sc.size * costIndex
+        oneOffOpex += trainingCost
+        val rSuc = Random(seed * 19L + candidateId.hashCode().toLong())
+        successorReadiness = when {
+            candidateId.contains("cfo") || candidateId.contains("coo") -> 0.72 + rSuc.nextDouble() * 0.23
+            candidateId.contains("family") -> 0.40 + rSuc.nextDouble() * 0.45
+            else -> 0.65 + rSuc.nextDouble() * 0.25
+        }
+        currentEra = max(currentEra, 4)
+        boardTrust = (boardTrust + 6).coerceAtMost(100)
+        chronicle += ChronicleItem(turn, "Penetapan Kandidat Suksesi CEO: $candidateId",
+            "Program transisi kepemimpinan dimulai (biaya tata kelola ${fmt(trainingCost)} jt RS).",
+            "Suksesi Era 4 → menyiapkan penerus untuk menjaga warisan korporasi.", actionCount)
+        return true
+    }
+
+    private fun recordEthicsEvidence(kind: String, severity: Double, witnessExecId: String, countryId: String) {
+        ethicsLoad += severity
+        ethicsEvidences += EthicsEvidence(
+            id = "eth_${turn}_${ethicsEvidences.size + 1}",
+            kind = kind,
+            severity = severity,
+            witnessExecId = witnessExecId,
+            countryId = countryId,
+            turnCommitted = turn
+        )
     }
 
     private fun doApplyCredit(a: Action.ApplyCredit): Boolean {
@@ -652,7 +1332,7 @@ class KapitalEngine(val seed: Long) {
         if (a.amount < 500 || a.amount > 60000) return false
         if (credit.bank(a.bankId) == null) return false
         if (ap < 2) return false
-        val app = credit.submit(a.bankId, a.amount.toDouble(), a.tenor, purpose, a.floating, a.bullet, turn) ?: return false
+        credit.submit(a.bankId, a.amount.toDouble(), a.tenor, purpose, a.floating, a.bullet, turn) ?: return false
         ap -= 2
         oneOffOpex += 30.0
         return true
@@ -686,11 +1366,13 @@ class KapitalEngine(val seed: Long) {
         "automation" -> if (automation) 1 else 0
         "warehouse" -> if (warehouse) 1 else 0
         "export" -> if (exportOn) 1 else 0
+        "solar" -> if (esgCompliant) 1 else 0
+        "institute" -> projectsInv.count { it.type == "institute" && it.done }
         "rnd" -> projectsInv.count { it.type == "rnd" && it.done }
         "brand" -> projectsInv.count { it.type == "brand" && it.done && turn - it.startTurn < it.months + 12 }
         else -> 0
     }
-    /** Null bila boleh dijalankan; selain itu alasan penolakan. */
+
     fun investBlock(id: String): String? {
         val spec = investSpec(id) ?: return "Proyek tidak dikenal."
         if (projectsInv.any { it.type == id && !it.done }) return "Proyek ini sedang berjalan."
@@ -713,7 +1395,23 @@ class KapitalEngine(val seed: Long) {
 
     private fun finishInvest(p: InvestProject, lines: MutableList<ReportLine>) {
         p.done = true
-        val spec = investSpec(p.type)!!
+        if (p.type.startsWith("sub_")) {
+            val cid = p.type.removePrefix("sub_")
+            val sub = subsidiaries[cid] ?: return
+            sub.active = true
+            // Alokasi modal disetor lokal dari konstruksi (CIP) menjadi Aset Tetap (72%) & Modal Kerja Awal (28%)
+            val capLocal = sub.paidInCapitalLocal
+            sub.faLocal = capLocal * 0.72
+            sub.invLocal = capLocal * 0.12
+            sub.arLocal = capLocal * 0.08
+            sub.cashLocal = capLocal * 0.08
+            if (cid == "kestrel") dualSourcing = true
+            lines += ReportLine("Anak usaha luar negeri resmi beroperasi: ${sub.spec.title} di ${sub.spec.countryName}. ${sub.spec.benefitText}", Tone.GOOD)
+            chronicle += ChronicleItem(turn, "Anak Usaha Beroperasi: ${sub.spec.title}", sub.spec.benefitText,
+                "Konstruksi lintas batas selesai → pembukuan lokal ${sub.spec.currencyCode} mulai beroperasi.")
+            return
+        }
+        val spec = investSpec(p.type) ?: return
         when (p.type) {
             "line" -> extraLines++
             "automation" -> automation = true
@@ -721,6 +1419,8 @@ class KapitalEngine(val seed: Long) {
             "export" -> { exportOn = true; demandBoost += 0.06 }
             "rnd" -> demandBoost += 0.04
             "brand" -> mods += Mod("rev", 1.03, turn + 11)
+            "solar" -> { esgCompliant = true; demandBoost += 0.03; carbonCredits += 4; currentEra = max(currentEra, 4) }
+            "institute" -> { boardTrust = (boardTrust + 15).coerceAtMost(100); execs.forEach { it.loyalty = (it.loyalty + 0.08).coerceAtMost(0.98) } }
         }
         lines += ReportLine("Investasi selesai: ${spec.title}. ${spec.benefit}.", Tone.GOOD)
         chronicle += ChronicleItem(turn, "Investasi selesai: ${spec.title}", spec.benefit, "Belanja modal atau program → manfaat operasional.")
@@ -731,7 +1431,6 @@ class KapitalEngine(val seed: Long) {
         if (lots <= 0 || !c.listed) return false
         val gross = lots * LOT * c.price
         val fee = gross * BROKER_FEE
-        // jaga kas minimum agar tidak langsung krisis kas
         if (cash - gross - fee < 1500.0) return false
         if (gross > 0.5 * totalAssets()) return false
         if (!spend(1)) return false
@@ -753,7 +1452,6 @@ class KapitalEngine(val seed: Long) {
         val fee = gross * (BROKER_FEE + SELL_TAX)
         val basis = (costBasis[id] ?: 0.0) * lots / have
         cash += gross - fee
-        // selisih harga dengan nilai pasar akhir bulan sudah masuk ekuitas lewat mark-to-market; biaya jual dibebankan
         equity -= fee
         realizedGainTotal += gross - basis
         periodInvestIn += gross - fee
@@ -763,7 +1461,6 @@ class KapitalEngine(val seed: Long) {
         return true
     }
 
-    /** Jumlah kredit refinancing bank domestik (sedikit di atas saldo Bank B untuk menutup biaya). */
     fun termSheetAmount(): Double = Math.round((loans.firstOrNull { it.id == "bank_b" }?.balance ?: sc.bankB) * 1.04 / 100.0) * 100.0
     fun termSheetFixedRate(): Double = Math.round((policyRate + 4.25) * 4.0) / 4.0
     fun termSheetAudAmountRs(): Double = (loans.firstOrNull { it.id == "bank_b" }?.balance ?: sc.bankB)
@@ -801,7 +1498,7 @@ class KapitalEngine(val seed: Long) {
     }
 
     // =====================================================================
-    // Kartu kejadian
+    // Kartu kejadian & Kartu Berantai
     // =====================================================================
     fun eventCtx(): EventCtx = EventCtx(
         turn, sc.turn0, sc.size, costIndex, inflationAnnual, world.unemployment, policyRate, policyRate - policyHist.first(),
@@ -826,6 +1523,7 @@ class KapitalEngine(val seed: Long) {
         for (o in opt.outcomes) { if (x < o.p) { chosen = o; break }; x -= o.p }
         chosen.effects.forEach { applyEffect(it) }
         openEvents.remove(ev)
+        if (!auto && opt.tone != Tone.BAD) crisesSurvived++
         eventHistory += EventRecord(turn, ev.title, opt.title, chosen.text, auto)
         chronicle += ChronicleItem(turn, ev.title,
             (if (auto) "Tenggat lewat tanpa keputusan. " else "Keputusan Anda: ${opt.title}. ") + chosen.text,
@@ -845,7 +1543,26 @@ class KapitalEngine(val seed: Long) {
             "income" -> pendingIncome += f.a
             "invloss" -> pendingInvLoss += f.a
             "dividend" -> pendingDividend += f.a
-            "ethics" -> ethicsLoad += f.a
+            "ethics" -> {
+                val kindLabel = f.s.ifEmpty { "shortcut" }
+                val witness = execs.firstOrNull { it.present }?.id ?: "exec_coo"
+                recordEthicsEvidence(kindLabel, f.a, witness, "sundara")
+            }
+            "ethics_reduce" -> {
+                ethicsLoad = max(0.0, ethicsLoad - f.a)
+                if (ethicsEvidences.isNotEmpty()) ethicsEvidences.removeAt(0)
+            }
+            "esg_clean" -> esgCompliant = true
+            "board_trust" -> boardTrust = (boardTrust + f.a.toInt()).coerceIn(0, 100)
+            "chain" -> {
+                val parts = f.s.split(":", limit = 2)
+                val tplId = parts[0]
+                val cause = parts.getOrElse(1) { "Efek berantai dari keputusan sebelumnya." }
+                val delay = max(1, f.b)
+                if (scheduledChainEvents.none { it.templateId == tplId }) {
+                    scheduledChainEvents += ScheduledChainEvent(turn + delay, tplId, cause)
+                }
+            }
             "lostcust" -> lostCustomerShare = (lostCustomerShare + f.a).coerceAtMost(0.6)
             "loyalty" -> execs.firstOrNull { it.id == f.s }?.let { it.loyalty = (it.loyalty + f.a).coerceIn(0.0, 1.0) }
             "exec_quit" -> execs.firstOrNull { it.id == f.s && it.present }?.let { vacate(it, f.b); it.lastOutcome = "${it.name} pergi." }
@@ -862,7 +1579,31 @@ class KapitalEngine(val seed: Long) {
     private fun drawEvents(lines: MutableList<ReportLine>) {
         val r = rng(60)
         if (gameOverReason != null) return
-        val d = EventDeck.draw(eventCtx(), r, openEvents.map { it.templateId }.toSet(), eventLastFired, eventCounter++)
+
+        // 1. Proses kartu berantai (cascading events) yang jatuh tempo pada giliran ini
+        val dueChains = scheduledChainEvents.filter { it.dueTurn <= turn }
+        scheduledChainEvents.removeAll { it.dueTurn <= turn }
+        for (ch in dueChains) {
+            if (openEvents.none { it.templateId == ch.templateId } && openEvents.size < 4) {
+                val chainedEv = EventDeck.makeEvent(
+                    templateId = ch.templateId,
+                    ctx = eventCtx(),
+                    r = r,
+                    id = "evt_${turn}_${eventCounter++}_${ch.templateId}",
+                    customWarning = ch.causeNote
+                )
+                if (chainedEv != null) {
+                    openEvents += chainedEv
+                    eventLastFired[ch.templateId] = turn
+                    lines += ReportLine("EFEK BERANTAI: ${chainedEv.title} (${ch.causeNote})", Tone.BAD)
+                    chronicle += ChronicleItem(turn, "Krisis Berantai: ${chainedEv.title}", ch.causeNote,
+                        "Keputusan/kejadian lama → rantai transmisi → ${chainedEv.title}.")
+                }
+            }
+        }
+
+        // 2. Undi kartu kejadian reguler sesuai kondisi dunia & tingkat kesulitan
+        val d = EventDeck.draw(eventCtx(), r, openEvents.map { it.templateId }.toSet(), eventLastFired, eventCounter++, difficulty.eventRateMult)
         d.event?.let { ev ->
             if (openEvents.size < 3) {
                 openEvents += ev; eventLastFired[ev.templateId] = turn
@@ -954,24 +1695,42 @@ class KapitalEngine(val seed: Long) {
         prevDetail = lastDetail
         var rcfFlow = 0.0; var factorProceeds = 0.0; var factorDiscount = 0.0; var forcedPay = 0.0
         var mtm = 0.0; var divInCash = 0.0; var eqFx = 0.0
+        var periodSubWriteOffRs = 0.0
 
-        // ---- 1. Makro: dunia berbasis agen (rumah tangga, pesaing, bank sentral) ----
+        // ---- 1. Makro & Geopolitik 7 Negara Asing ----
         val rMacro = rng(1)
         val rWorld = rng(8)
         val kursBefore = kurs
-        // Ekonomi asing berjalan dulu; kurs RS/A$ mengikuti selisih inflasi (PPP) + premi risiko negara berkembang
         foreignProfiles.forEachIndexed { i, p ->
-            foreign.getValue(p.id).step(rng(20 + i), 1.0, 1.0, 1.0, 0.0, 1.0)
+            val fw = foreign.getValue(p.id)
+            fw.step(rng(20 + i), 1.0, 1.0, 1.0, 0.0, 1.0)
+            val meta = foreignMeta.getValue(p.id)
+            if (meta.capitalControlTurnsLeft > 0) meta.capitalControlTurnsLeft--
+            // Kurs mata uang lokal terhadap RS mengikuti PPP selisih inflasi Sundara vs negara tersebut
+            val diffInfl = (inflationAnnual - fw.inflation) / 1200.0
+            meta.fxToRs = (meta.fxToRs * (1.0 + diffInfl + gaussian(rMacro) * 0.005)).coerceAtLeast(meta.profile.baseFxToRs * 0.4)
+            // Skor ketegangan & tarif bea masuk bergerak dinamis
+            val tensionStep = ((rMacro.nextDouble() - 0.49) * 3.2).roundToInt()
+            meta.tensionScore = (meta.tensionScore + tensionStep).coerceIn(15, 92)
+            meta.tariffPct = when {
+                meta.tensionScore >= 70 -> meta.profile.baseTariffPct + 14.0
+                meta.tensionScore >= 60 -> meta.profile.baseTariffPct + 9.0
+                meta.tensionScore >= 45 -> meta.profile.baseTariffPct + 4.0
+                else -> meta.profile.baseTariffPct
+            }
         }
         aurPrice *= 1.0 + foreign.getValue("aurelia").inflation / 1200.0
         val infDiff = inflationAnnual - foreign.getValue("aurelia").inflation
         val driftMonthly = infDiff / 1200.0 + 0.0012
         kurs *= 1.0 + driftMonthly + gaussian(rMacro) * 0.008
+        foreignMeta.getValue("aurelia").fxToRs = kurs
+
         var demandShock = 0.0
         if (turn == electionTurn) {
             lines += ReportLine("Pemilu Sundara berlangsung bulan ini.", Tone.INFO)
             if (electionShock) {
                 kurs *= 1.12
+                foreignMeta.getValue("aurelia").fxToRs = kurs
                 demandShock = -0.03
                 lines += ReportLine("Rial Sundara anjlok sekitar 12% setelah hasil pemilu; inflasi impor naik dan bank sentral akan bereaksi.", Tone.BAD)
                 chronicle += ChronicleItem(turn, "Guncangan kurs pascapemilu",
@@ -985,21 +1744,66 @@ class KapitalEngine(val seed: Long) {
                 lines += ReportLine("Pasar tenang setelah pemilu; kurs relatif stabil.", Tone.GOOD)
             }
         }
-        // Harga impor menyesuaikan bertahap (puncak di kuartal kedua); 60% dari depresiasi menular ke harga jual
+
         commodities.step(rng(30), world.gap)
         commodities.lastEvents.forEach { lines += ReportLine(it, Tone.WARN) }
         if (hedgeUntilTurn == turn) lines += ReportLine("Kontrak berjangka kapas berakhir; HPP kembali mengikuti harga pasar.", Tone.INFO)
-        // Harga jual dan biaya pesaing mengikuti harga PASAR; hanya HPP Anda yang bisa dikunci kontrak berjangka
+        if (fxHedgeUntilTurn == turn) lines += ReportLine("Kontrak forward valas RS/A$ berakhir; nilai tukar kembali terbuka pada kurs spot.", Tone.INFO)
+
         val marketMat = commodities.materialIndex()
         val matCost = 0.35 + 0.65 * marketMat
         val fxTarget = (1.0 + 0.6 * ((0.8 + 0.2 * fxReal()) - 1.0)) * (1.0 + 0.65 * 0.7 * (marketMat - 1.0))
         fxPassState += 0.35 * (fxTarget - fxPassState)
         val costPressure = (0.8 + 0.2 * fxReal()) * (costIndex / priceIndex) * matCost
         val rpPlayer = (1.0 + priceAdjPct / 100.0) * fxPassLevel()
-        volOverride = world.volumeFactor(rpPlayer)          // pembeli melihat harga pesaing bulan lalu
+        volOverride = world.volumeFactor(rpPlayer)
         val prevPolicy = policyRate
-        val out = world.step(rWorld, rpPlayer, costPressure, fxPassLevel(), kurs / kursBefore - 1.0, kurs, demandShock)
+
+        // Observasi pesaing AI atas kondisi publik pemain (Tahap A)
+        val ebitdaEst = max(1.0, (ebitHist.takeLast(3).sum() + 3.0 * fixedAssets * 0.0081) * 4.0)
+        val netDebtRatioNow = (totalDebt() - cash) / ebitdaEst
+        val debtMaturingSoon = loans.any { it.balance > 0.5 && it.maturityTurn - turn in 1..6 }
+        val playerObs = World.PlayerObservation(
+            priceAdjPct = priceAdjPct,
+            netDebtToEbitda = netDebtRatioNow,
+            debtMaturingWithin6m = debtMaturingSoon,
+            singleSupplier = !dualSourcing && subsidiaries["kestrel"]?.active != true && subsidiaries["tarsis"]?.active != true,
+            cottonHedged = hedgeActive,
+            playerMarketShare = playerShare(),
+            allowCoalition = difficulty.allowRivalCoalition
+        )
+
+        val out = world.step(rWorld, rpPlayer, costPressure, fxPassLevel(), kurs / kursBefore - 1.0, kurs, demandShock, playerObs)
         econ = out.demand
+
+        // Tindak lanjut serangan terarah dari pesaing AI yang belajar (Tahap A)
+        when (out.rivalTriggeredAction) {
+            "cornering" -> {
+                commodities.triggerCorneringShock(4, 0.14)
+                chronicle += ChronicleItem(turn, "Serangan Pesaing: Borongan Pasokan Kapas",
+                    "Mitra Tekstil membaca ketergantungan pemasok Anda dan memborong stok kapas spot.",
+                    "Tanpa dual sourcing / lindung nilai → pesaing memborong spot → biaya bahan baku naik.")
+            }
+            "regulatory_sabotage" -> {
+                if (scheduledChainEvents.none { it.templateId == "env_inspection" }) {
+                    scheduledChainEvents += ScheduledChainEvent(turn + 1, "env_inspection", "Dilobi oleh pesaing kroni Prima Garmen Utama untuk menghambat ekspansi Anda.")
+                }
+                chronicle += ChronicleItem(turn, "Serangan Pesaing: Sabotase Regulasi",
+                    "Prima Garmen menggunakan lobi politik untuk mengirim inspeksi ke pabrik Anda.",
+                    "Pangsa pasar tumbuh → pesaing kroni melobi regulator → inspeksi mendadak.")
+            }
+            "predatory_debt" -> {
+                chronicle += ChronicleItem(turn, "Serangan Pesaing: Perang Harga Saat Utang Jatuh Tempo",
+                    "Cahaya Weaving & Importir Velmora memangkas harga tepat saat Anda menghadapi jadwal kredit.",
+                    "Utang tinggi / jatuh tempo dekat → pesaing banting harga → tekanan ICR.")
+            }
+            "coalition" -> {
+                chronicle += ChronicleItem(turn, "Koalisi Pesaing Melawan Pemimpin Pasar",
+                    "Pesaing bersatu menurunkan harga bersama untuk membendung dominasi Anda.",
+                    "Dominasi pangsa pasar → koalisi pesaing AI.")
+            }
+        }
+
         run {
             val pvBefore = portfolioValue()
             val ev = bourse.step(rng(40), Bourse.Ctx(
@@ -1010,14 +1814,12 @@ class KapitalEngine(val seed: Long) {
                 { id -> world.rivals.first { it.id == id }.price },
                 { id -> world.rivals.first { it.id == id }.active },
                 { id -> world.rivals.first { it.id == id }.share0 }))
-            // dividen diterima & penilaian ulang portofolio
             var divIn = 0.0
             for ((id, lots) in holdings) {
                 val c = bourse.company(id) ?: continue
                 val m = c.monthly.lastOrNull() ?: continue
                 if (m.turn == turn && m.dividend > 0 && c.sharesM > 0) divIn += lots * LOT * (m.dividend / c.sharesM)
             }
-            // saham emiten pailit tidak bernilai lagi
             val delisted = holdings.keys.filter { bourse.company(it)?.listed == false }
             for (id in delisted) {
                 lines += ReportLine("Saham $id dihentikan perdagangannya karena emiten pailit; nilai investasi Anda nyaris hilang.", Tone.BAD)
@@ -1029,9 +1831,9 @@ class KapitalEngine(val seed: Long) {
             dividendsReceivedTotal += divIn
             lastDividendIncome = divIn
             if (divIn > 0.0) lines += ReportLine("Dividen saham diterima ${fmt(divIn)} jt RS.", Tone.GOOD)
-            if (holdings.isNotEmpty() && Math.abs(pvAfter - pvBefore) > 0.0) {
+            if (holdings.isNotEmpty() && abs(pvAfter - pvBefore) > 0.0) {
                 val d = pvAfter - pvBefore
-                lines += ReportLine("Portofolio saham ${if (d >= 0) "naik" else "turun"} ${fmt(Math.abs(d))} jt RS bulan ini (nilai ${fmt(pvAfter)} jt RS, belum direalisasi).", if (d >= 0) Tone.GOOD else Tone.WARN)
+                lines += ReportLine("Portofolio saham ${if (d >= 0) "naik" else "turun"} ${fmt(abs(d))} jt RS bulan ini (nilai ${fmt(pvAfter)} jt RS, belum direalisasi).", if (d >= 0) Tone.GOOD else Tone.WARN)
             }
             ev.forEach { lines += ReportLine(it, Tone.INFO) }
         }
@@ -1048,12 +1850,11 @@ class KapitalEngine(val seed: Long) {
                 if (policyRate > prevPolicy) Tone.WARN else Tone.INFO)
         }
         out.events.forEach { lines += ReportLine(it, Tone.WARN) }
-        // Kondisi kredit: saat pengangguran naik, kredit macet bank naik dan spread melebar
         creditShock *= 0.96
         creditAdj = (0.4 * (out.unemployment - 5.0)).coerceIn(-0.5, 2.0) + creditShock
         loans.forEach { l -> l.floatingSpreadPct?.let { l.annualRatePct = policyRate + it + creditAdj } }
 
-        // ---- 2. Kejadian operasional ----
+        // ---- 2. Kejadian operasional, Pembukuan Anak Usaha Lokal, Skandal Etika, & Risiko Politik ----
         val rOps = rng(2)
         scheduledWage.filter { it.first <= turn }.forEach { wageAddOn += it.second; lines += ReportLine("Kenaikan upah yang ditangguhkan mulai berlaku (+${fmt(it.second)} jt RS per bulan).", Tone.WARN) }
         scheduledWage.removeAll { it.first <= turn }
@@ -1064,17 +1865,161 @@ class KapitalEngine(val seed: Long) {
                 lines += ReportLine("Tenggat \"${ev.title}\" lewat tanpa keputusan: $txt", Tone.BAD)
             }
         }
-        // Risiko skandal etika: makin banyak jalan pintas, makin besar peluang terungkap
-        ethicsLoad *= 0.985
-        var scandalCost = 0.0
-        if (ethicsLoad >= 2.0 && rOps.nextDouble() < 0.025 * ethicsLoad) {
-            scandalCost = 900.0 * sc.size * costIndex * (0.6 + 0.4 * ethicsLoad)
-            lostCustomerShare = (lostCustomerShare + 0.03).coerceAtMost(0.6)
-            lines += ReportLine("Skandal: praktik jalan pintas Anda terungkap. Denda dan biaya hukum ${fmt(scandalCost)} jt RS, pelanggan ragu.", Tone.BAD)
-            chronicle += ChronicleItem(turn, "Skandal etika terungkap", "Suap, pemufakatan harga, atau pelanggaran lain yang pernah dilakukan akhirnya muncul ke publik.",
-                "Jalan pintas → catatan menumpuk → terungkap → denda dan reputasi rusak.", actionCount)
-            ethicsLoad *= 0.4
+
+        // Pembukuan entitas anak usaha dalam mata uang lokal, harga transfer antar-entitas, & risiko politik (Tahap 3)
+        periodIntercompanyFeeToSubRs = 0.0
+        val hasMeridiaActive = subsidiaries["meridia"]?.let { it.active && !it.nationalized } == true
+        for ((cid, sub) in subsidiaries) {
+            if (!sub.active || sub.nationalized) continue
+            val meta = foreignMeta.getValue(cid)
+            val fw = foreign.getValue(cid)
+
+            // Risiko politik: pengendalian modal atau nasionalisasi saat ketegangan tinggi
+            if (meta.tensionScore >= 74 && meta.capitalControlTurnsLeft == 0 && rOps.nextDouble() < 0.08) {
+                meta.capitalControlTurnsLeft = 4
+                lines += ReportLine("Pengendalian Modal ${sub.spec.countryName}: otoritas moneter membekukan repatriasi dividen selama 4 bulan.", Tone.WARN)
+            }
+            if (meta.tensionScore >= 86 && rOps.nextDouble() < 0.03) {
+                sub.nationalized = true
+                val lostInvRs = sub.paidInCapitalHistoricalRs
+                investmentInSubsRs = max(0.0, investmentInSubsRs - lostInvRs)
+                equity -= lostInvRs
+                periodSubWriteOffRs += lostInvRs
+                lines += ReportLine("NASIONALISASI ASET: Pemerintah ${sub.spec.countryName} menyita ${sub.spec.title}. Investasi induk ${fmt(lostInvRs)} jt RS dihapusbukukan.", Tone.BAD)
+                chronicle += ChronicleItem(turn, "Nasionalisasi Aset di ${sub.spec.countryName}",
+                    "Ketegangan geopolitik ekstrem memicu penyitaan ${sub.spec.title}.",
+                    "Risiko politik lintas batas → aset anak usaha hilang → ekuitas tergerus.")
+                continue
+            }
+
+            sub.monthsOperating += 1
+            val learningFactor = 0.68 + 0.32 * min(1.0, sub.monthsOperating / 12.0)
+            val util = (0.84 * fw.demand * sub.localDemandFactor * learningFactor).coerceIn(0.35, 1.15)
+            sub.lastUtilization = util
+
+            val annualRevAtParLocal = sub.paidInCapitalLocal * sub.spec.capitalTurnoverAnnual
+            var revLocal = (annualRevAtParLocal / 12.0) * util * (1.0 + fw.inflation / 2400.0)
+            val cogsLocal = revLocal * sub.spec.baseLocalCogsRatio * (0.85 + 0.15 * commodities.materialIndex())
+            val baseOpexLocal = (sub.spec.fixedOpexRs / meta.profile.baseFxToRs) * (1.0 + fw.inflation / 1800.0)
+            val cbamLocal = if (cid == "halvenia" && !esgCompliant) (55.0 * sc.size * costIndex) / meta.fxToRs else 0.0
+            if (cbamLocal > 0.0) {
+                lines += ReportLine("Bea Karbon Halvenia (CBAM): ${sub.spec.title} dikenai pungutan emisi ${fmt2(cbamLocal)} jt HLV karena pabrik belum bersertifikat ESG/IPAL.", Tone.WARN)
+            }
+            val opexLocal = baseOpexLocal + cbamLocal
+            val depLocal = sub.faLocal * 0.0065
+
+            // Penggeseran laba kena pajak (Transfer Pricing / Royalti Antar-Entitas) dari Induk Sundara (22%) ke yurisdiksi pajak rendah
+            if (transferPricingMode != TransferPricingMode.WAJAR) {
+                if (cid == "meridia") {
+                    val shiftRate = if (transferPricingMode == TransferPricingMode.AGRESIF) 0.068 else 0.032
+                    val icFeeRs = baseNormalRevenue(1.0) * shiftRate
+                    periodIntercompanyFeeToSubRs += icFeeRs
+                    revLocal += icFeeRs / meta.fxToRs
+                } else if (!hasMeridiaActive && meta.profile.corpTaxPct < 22.0) {
+                    val shiftRate = if (transferPricingMode == TransferPricingMode.AGRESIF) 0.024 else 0.012
+                    val icFeeRs = baseNormalRevenue(1.0) * shiftRate
+                    periodIntercompanyFeeToSubRs += icFeeRs
+                    revLocal += icFeeRs / meta.fxToRs
+                }
+            }
+
+            val ebitLocal = revLocal - cogsLocal - opexLocal - depLocal
+            val intLocal = sub.bankDebtLocal * ((fw.policyRate + 2.5) / 1200.0)
+            val ebtLocal = ebitLocal - intLocal
+            val taxLocal = max(0.0, ebtLocal) * (meta.profile.corpTaxPct / 100.0)
+            val niLocal = ebtLocal - taxLocal
+            sub.retainedEarningsLocal += niLocal
+            sub.cumulativeNetIncomeRs += niLocal * meta.fxToRs
+
+            val targetArLocal = revLocal * 1.05
+            val targetInvLocal = cogsLocal * 1.05
+            val targetApLocal = cogsLocal * 0.85
+            val newArLocal = sub.arLocal + 0.4 * (targetArLocal - sub.arLocal)
+            val newInvLocal = sub.invLocal + 0.4 * (targetInvLocal - sub.invLocal)
+            val newApLocal = sub.apLocal + 0.4 * (targetApLocal - sub.apLocal)
+            val dArLocal = newArLocal - sub.arLocal; sub.arLocal = newArLocal
+            val dInvLocal = newInvLocal - sub.invLocal; sub.invLocal = newInvLocal
+            val dApLocal = newApLocal - sub.apLocal; sub.apLocal = newApLocal
+
+            val subCapexLocal = depLocal * 0.65
+            sub.faLocal += subCapexLocal - depLocal
+            val subDebtRepayLocal = min(sub.bankDebtLocal, sub.monthlyDebtAmortLocal)
+            sub.bankDebtLocal -= subDebtRepayLocal
+
+            val subCfoLocal = niLocal + depLocal - dArLocal - dInvLocal + dApLocal
+            sub.cashLocal += subCfoLocal - subCapexLocal - subDebtRepayLocal
+            if (sub.cashLocal < 0.0) {
+                val od = -sub.cashLocal
+                sub.cashLocal = 0.0
+                sub.bankDebtLocal += od
+                sub.periodNewDebtLocal += od
+            }
+            val subCfiLocal = -subCapexLocal
+            val subCffLocal = sub.periodNewDebtLocal - subDebtRepayLocal - sub.periodDivPaidLocal
+            sub.lastIncomeLocal = mapOf(
+                "revenue" to revLocal, "cogs" to cogsLocal, "opex" to opexLocal, "dep" to depLocal,
+                "ebit" to ebitLocal, "interest" to intLocal, "ebt" to ebtLocal, "tax" to taxLocal, "ni" to niLocal
+            )
+            sub.lastCashFlowLocal = mapOf(
+                "cfo" to subCfoLocal, "cfi" to subCfiLocal, "cff" to subCffLocal,
+                "net" to (subCfoLocal + subCfiLocal + subCffLocal)
+            )
+            sub.periodNewDebtLocal = 0.0
+            sub.periodDivPaidLocal = 0.0
         }
+
+        // Audit Transfer Pricing lintas batas jika memakai mode AGRESIF
+        if (transferPricingMode == TransferPricingMode.AGRESIF && rOps.nextDouble() < 0.045) {
+            val tpPenalty = 620.0 * sc.size * costIndex
+            oneOffOpex += tpPenalty
+            recordEthicsEvidence("transfer_pricing_audit", 1.2, "exec_cfo", "meridia")
+            lines += ReportLine("Otoritas pajak gabungan mengaudit skema Transfer Pricing Agresif Meridia Anda: denda kurang bayar ${fmt(tpPenalty)} jt RS.", Tone.BAD)
+            chronicle += ChronicleItem(turn, "Denda Audit Transfer Pricing", "Skema pengalihan laba ke Meridia dikoreksi kantor pajak.",
+                "Transfer pricing agresif → audit lintas batas → denda pajak.")
+        }
+
+        // Operasi Unit Bank/Asuransi Grup & Uji Penurunan Nilai Goodwill (Era 3)
+        if (captiveBankActive) {
+            if (out.unemployment >= 6.8) {
+                val nplLoss = captiveBankCapitalRs * 0.018 * (out.unemployment - 5.8)
+                oneOffOpex += nplLoss
+                lines += ReportLine("Unit Bank & Asuransi Grup mencatat kredit macet saat pengangguran naik: beban pencadangan ${fmt(nplLoss)} jt RS.", Tone.BAD)
+            } else {
+                val nimGain = captiveBankCapitalRs * ((policyRate + 2.0) / 1200.0)
+                pendingIncome += nimGain
+            }
+        }
+        if (goodwill > 0.0 && econ < 0.91) {
+            val gwImpair = min(goodwill, goodwill * 0.05)
+            goodwill -= gwImpair
+            equity -= gwImpair
+            periodGoodwillImpairmentRs += gwImpair
+            lines += ReportLine("Penurunan Nilai Goodwill (Impairment): pelemahan pasar pasca-akuisisi memangkas nilai goodwill ${fmt(gwImpair)} jt RS.", Tone.WARN)
+        }
+
+        // Skor Rahasia Etika & Bom Waktu Skandal (Tahap C - Bagian 16 PDF)
+        ethicsLoad *= 0.988
+        var scandalCost = 0.0
+        val departedWitnessBoost = ethicsEvidences.count { ev -> execs.any { it.id == ev.witnessExecId && !it.present } } * 0.035
+        val regimeChangeBoost = if (turn == electionTurn) 0.08 else 0.0
+        val sizeScrutinyBoost = if (totalAssets() > 145_000.0 * sc.size) 0.015 else 0.0
+        val mediaShield = if (mediaOwned) 0.72 else 1.0
+        val scandalProb = (0.022 * ethicsLoad + departedWitnessBoost + regimeChangeBoost + sizeScrutinyBoost) * mediaShield
+        if (ethicsLoad >= 2.0 && rOps.nextDouble() < scandalProb) {
+            scandalsTriggered++
+            boardTrust = (boardTrust - 18).coerceAtLeast(0)
+            if (ethicsLoad >= 6.2 && scandalsTriggered >= 2) {
+                gameOverReason = "Kejaksaan Agung dan Komisi Antikorupsi menahan Anda atas bukti suap, manipulasi pajak, dan kartel berlapis yang dibongkar saksi kunci. Perusahaan dibekukan (Game Over: Penjara & Skandal)."
+            } else {
+                scandalCost = 900.0 * sc.size * costIndex * (0.6 + 0.4 * ethicsLoad)
+                lostCustomerShare = (lostCustomerShare + 0.03).coerceAtMost(0.6)
+                lines += ReportLine("Skandal: praktik jalan pintas Anda terungkap (saksi mantan eksekutif / penyelidikan jurnalis). Denda dan biaya hukum ${fmt(scandalCost)} jt RS, kepercayaan dewan turun.", Tone.BAD)
+                chronicle += ChronicleItem(turn, "Skandal etika terungkap", "Suap, pemufakatan harga, atau pelanggaran lain yang pernah dilakukan akhirnya muncul ke publik.",
+                    "Jalan pintas → bukti tersimpan → saksi keluar / rezim berganti → denda dan reputasi rusak.", actionCount)
+                ethicsLoad *= 0.45
+            }
+        }
+
         var breakdownCost = 0.0
         if (breakdownMonthsLeft == 0) {
             var p = 0.015 * (1.0 + 0.5 * deferredMonths)
@@ -1090,12 +2035,13 @@ class KapitalEngine(val seed: Long) {
             }
         }
         holdupThisTurn = false
-        if (!dualSourcing && rOps.nextDouble() < (if (warehouse) 0.05 else 0.10)) {
+        val hasKestrelSub = subsidiaries["kestrel"]?.let { it.active && !it.nationalized } == true
+        if (!dualSourcing && !hasKestrelSub && rOps.nextDouble() < (if (warehouse) 0.05 else 0.10)) {
             holdupThisTurn = true
             lines += ReportLine("Pemasok Kestrel menahan kiriman sensor dengan alasan \"mesin rusak\"; produksi turun 30% bulan ini.", Tone.BAD)
         }
         var sanctionFine = 0.0
-        if (!dualSourcing && !sanctionHit && turn >= sc.turn0 + sc.sanctionAfter && rOps.nextDouble() < 0.05) {
+        if (!dualSourcing && !hasKestrelSub && !sanctionHit && turn >= sc.turn0 + sc.sanctionAfter && rOps.nextDouble() < 0.05) {
             sanctionHit = true
             sanctionFine = 600.0 * sc.size
             dualSourcing = true
@@ -1110,7 +2056,7 @@ class KapitalEngine(val seed: Long) {
         if (holdupThisTurn) prodFactor *= 0.7
         lastProdFactor = prodFactor
 
-        // ---- 3. Laba rugi ----
+        // ---- 3. Laba rugi Induk ----
         val normalRev = baseNormalRevenue(prodFactor)
         val stuffRev = if (stuffingActive) normalRev * 0.08 else 0.0
         val revenue = normalRev + stuffRev
@@ -1122,12 +2068,11 @@ class KapitalEngine(val seed: Long) {
         val oneOffNow = oneOffOpex + sanctionFine + scandalCost
         val incomeNow = pendingIncome
         val detailNow = costDetail(cogs)
-        val opex = opexBase() + extraOpex() + wageAddOn + oneOffOpex + sanctionFine + scandalCost + otherLoss - pendingIncome + projExp
+        val opex = opexBase() + extraOpex() + wageAddOn + oneOffOpex + sanctionFine + scandalCost + otherLoss - pendingIncome + projExp + periodIntercompanyFeeToSubRs
         oneOffOpex = 0.0; pendingIncome = 0.0
         val maint = maintenanceSpend() + breakdownCost + if (holdupThisTurn) 200.0 else 0.0
         if (deferralActive) deferredMonths += 1 else if (deferredMonths > 0) deferredMonths -= 1
         val dep = fixedAssets * 0.0081
-        // Piutang obral kredit yang berumur 6 bulan: 45% macet, 55% tertagih
         var writeOff = 0.0
         var stuffedCollected = 0.0
         val keep = mutableListOf<Pair<Int, Double>>()
@@ -1148,13 +2093,15 @@ class KapitalEngine(val seed: Long) {
         val interest = monthlyInterest()
         val interestIncome = max(0.0, cash) * max(0.0, policyRate - 3.0) / 1200.0
         val taxable = ebit - interest + interestIncome
-        val tax = computeTax(taxable)
+        val whtNow = pendingWithholdingTaxRs
+        pendingWithholdingTaxRs = 0.0
+        val tax = computeTax(taxable) + whtNow
         val ni = ebit - interest + interestIncome - tax
         equity += ni
 
         volOverride = null
 
-        // ---- 4. Modal kerja ----
+        // ---- 4. Modal kerja Induk ----
         val dsoNormal = (if (salesScheme == SalesScheme.OMZET) 62.0 else 50.0) + modSum("dso")
         val arTarget = normalRev * dsoNormal / 30.0
         val newNormalAR = normalAR + 0.5 * (arTarget - normalAR)
@@ -1189,12 +2136,41 @@ class KapitalEngine(val seed: Long) {
         val capSpin = capex
         val replacement = dep * REPLACEMENT_CAPEX
         var expCapex = 0.0
-        for (p in projectsInv) if (!p.done && p.capex) { val part = p.totalCost / p.months; expCapex += part; p.spent += part }
+        for (p in projectsInv) if (!p.done && p.capex) {
+            val part = p.totalCost / p.months
+            p.spent += part
+            if (p.type.startsWith("sub_")) {
+                val cid = p.type.removePrefix("sub_")
+                val sub = subsidiaries[cid]
+                if (sub != null && !sub.nationalized) {
+                    val fx = foreignMeta.getValue(cid).fxToRs
+                    val partLocal = part / fx
+                    sub.spentRs += part
+                    sub.paidInCapitalHistoricalRs += part
+                    sub.paidInCapitalLocal += partLocal
+                    sub.faLocal += partLocal
+                    investmentInSubsRs += part
+                    periodSubInvestOutRs += part
+                }
+            } else {
+                expCapex += part
+            }
+        }
         for (p in projectsInv.toList()) if (!p.done && p.spent >= p.totalCost - 0.01) finishInvest(p, lines)
         val evCapex = pendingCapex
         capex += replacement + pendingCapex + expCapex
         pendingCapex = 0.0
         fixedAssets += capex - dep
+
+        // Pencairan obligasi korporasi baru (Era 3)
+        for ((amt, couponPct, tenorMonths) in pendingBonds) {
+            loans += Loan("bond_${turn}_${loans.size + 1}", "Obligasi Korporasi PT Benang Sundara", amt, couponPct,
+                currencyAud = false, amortPerMonth = 0.0, amortStartTurn = 9999, maturityTurn = turn + tenorMonths,
+                floatingSpreadPct = null, covenantIcr = 1.6, bullet = true)
+            newDebt += amt
+            lines += ReportLine("Obligasi Korporasi ${fmt(amt)} jt RS resmi tercatat dan cair (kupon tetap ${fmt2(couponPct)}%, jatuh tempo bullet $tenorMonths bulan).", Tone.GOOD)
+        }
+        pendingBonds.clear()
 
         // Pencairan refinancing
         if (termSheetDisburseTurn == turn && termSheetChosen != null) {
@@ -1210,11 +2186,10 @@ class KapitalEngine(val seed: Long) {
                 loans += Loan("aurelia", "Aurelia Global CitiTrust", ts2 / kurs, 5.2, true, 0.0, 999, turn + 36, null, 1.75)
                 newDebt += ts2
                 lines += ReportLine("Pinjaman Aurelia ${fmt2(ts2 / kurs * 1000)} ribu A$ cair; Bank B dilunasi. Utang kini dalam A$.", Tone.INFO)
-                if (turn >= electionTurn && electionShock && macDemandTurn < 0) { /* guncangan sudah lewat */ }
             }
             if (bankB != null) { principal += payoff; bankB.balance = 0.0 }
         }
-        // Meja kredit: keputusan bank, pencairan, dan efek klausul
+        // Meja kredit
         run {
             credit.process(turn, policyRate, { _, amt -> creditMetrics(amt) }, rng(50)).forEach { lines += ReportLine(it.first, it.second) }
             for (a in credit.applications) {
@@ -1268,7 +2243,6 @@ class KapitalEngine(val seed: Long) {
                 }
             }
         }
-        // Tuntutan MAC Aurelia
         if (macDemandTurn == turn) {
             val au = loans.firstOrNull { it.id == "aurelia" }
             if (au != null && au.balance > 0) {
@@ -1278,7 +2252,6 @@ class KapitalEngine(val seed: Long) {
                 lines += ReportLine("Pelunasan paksa 30% pokok Aurelia: ${fmt(pay * kurs)} jt RS.", Tone.BAD)
             }
         }
-        // Cicilan rutin
         for (l in loans) {
             if (l.balance > 0.0 && turn >= l.amortStartTurn && l.amortPerMonth > 0.0) {
                 val p = min(l.balance, l.amortPerMonth)
@@ -1286,7 +2259,6 @@ class KapitalEngine(val seed: Long) {
                 principal += if (l.currencyAud) p * kurs else p
             }
         }
-        // Jatuh tempo Bank B tanpa refinancing
         loans.firstOrNull { it.id == "bank_b" && it.balance > 0.5 && it.maturityTurn == turn }?.let { b ->
             if (covenantBreaches == 0) {
                 b.maturityTurn += 12
@@ -1298,16 +2270,22 @@ class KapitalEngine(val seed: Long) {
                 gameOverReason = "Bank B menolak memperpanjang pinjaman yang jatuh tempo karena covenant dilanggar. Bank menyita Pabrik Kalimas."
             }
         }
-        // Selisih kurs atas utang A$ (rugi/laba kurs belum direalisasi)
+        // Selisih kurs atas utang A$ (dilindungi kontrak Forward Valas jika fxHedgeActive!)
         val fxBefore = prevBalance["debt_st"]!! + prevBalance["debt_lt"]!!
         val debtAfterFlows = totalDebt()
-        val fxLoss = debtAfterFlows - (fxBefore + newDebt - principal)
-        if (kotlin.math.abs(fxLoss) > 1.0) {
-            equity -= fxLoss; eqFx = fxLoss
-            if (fxLoss > 50.0) lines += ReportLine("Rugi selisih kurs utang A$: ${fmt(fxLoss)} jt RS (mengurangi ekuitas).", Tone.BAD)
+        val rawFxLoss = debtAfterFlows - (fxBefore + newDebt - principal)
+        if (abs(rawFxLoss) > 1.0) {
+            if (fxHedgeActive && rawFxLoss > 0.0) {
+                // Kontrak forward valas menutup kerugian depresiasi kurs atas utang A$
+                val covered = rawFxLoss * 0.90
+                pendingIncome += covered
+                lines += ReportLine("Lindung Nilai Forward Valas aktif: kerugian kurs utang A$ sebesar ${fmt(covered)} jt RS dikompensasi kontrak forward.", Tone.GOOD)
+            }
+            equity -= rawFxLoss; eqFx = rawFxLoss
+            if (rawFxLoss > 50.0 && !fxHedgeActive) lines += ReportLine("Rugi selisih kurs utang A$: ${fmt(rawFxLoss)} jt RS (mengurangi ekuitas).", Tone.BAD)
         }
 
-        // ---- 5b. Dividen: pemegang saham menarik kas berlebih tiap Desember ----
+        // ---- 5b. Dividen ----
         var dividend = 0.0
         val cashFloor = 36000.0 * sc.size * costIndex
         if ((turn + 1) % 12 == 0 && covenantBreaches == 0 && loans.none { it.dividendLock && it.balance > 0.5 } && cash + (ni + dep) > cashFloor && gameOverReason == null) {
@@ -1322,14 +2300,13 @@ class KapitalEngine(val seed: Long) {
             if (d > 0.0) lines += ReportLine("Dividen khusus dibayar ${fmt(d)} jt RS.", Tone.INFO)
         }
 
-        // ---- 6. Kas ----
+        // ---- 6. Kas Induk ----
         val dAR = totalAR() - startAR
         val dInv = inventory - startInv
         val dPay = payables - startPay
         val cfo = ni + dep - dAR - dInv + dPay
-        cash += cfo - capex + newDebt - principal - dividend
+        cash += cfo - capex - periodSubInvestOutRs + newDebt - principal - dividend
 
-        // Fasilitas modal kerja: tarik otomatis saat kas negatif, lunasi saat kas longgar
         loans.firstOrNull { it.id == "rcf" }?.let { f ->
             if (cash < 0.0 && f.balance < sc.rcfLimit) {
                 val draw = min(-cash, sc.rcfLimit - f.balance)
@@ -1341,7 +2318,6 @@ class KapitalEngine(val seed: Long) {
             }
         }
 
-        // Likuiditas darurat: factoring otomatis
         if (cash < 0.0) {
             val needed = -cash
             val maxFactor = normalAR * 0.7
@@ -1352,13 +2328,14 @@ class KapitalEngine(val seed: Long) {
             cash += proceeds
             equity -= discount
             factorProceeds += proceeds; factorDiscount += discount
+            factoringUsedCount++
             lines += ReportLine("Kas negatif: piutang ${fmt(faceValue)} jt RS dijual ke perusahaan factoring dengan potongan 4%.", Tone.BAD)
             if (cash < 0.0) {
                 gameOverReason = "Kas habis dan tidak ada lagi piutang yang bisa dijual. Perusahaan bangkrut karena cash crunch, walaupun laporan laba rugi masih bisa terlihat untung."
             }
         }
 
-        // ---- 7. Covenant kuartalan ----
+        // ---- 7. Covenant kuartalan & Kepercayaan Dewan ----
         ebitHist += ebit
         interestHist += interest
         if (turn % 3 == 0 && gameOverReason == null) {
@@ -1369,6 +2346,7 @@ class KapitalEngine(val seed: Long) {
             val breach = (th > 0 && icr < th) || netDebtRatio > 3.5
             if (breach) {
                 covenantBreaches++
+                boardTrust = (boardTrust - 12).coerceAtLeast(0)
                 if (covenantBreaches >= 3) {
                     gameOverReason = "Covenant dilanggar tiga kuartal berturut-turut (ICR ${fmt2(icr)}x). Bank menyatakan technical default dan menyita Pabrik Kalimas."
                 } else if (covenantBreaches == 2) {
@@ -1390,6 +2368,7 @@ class KapitalEngine(val seed: Long) {
                         cash += face * FACTOR_KEEP
                         equity -= face * (1.0 - FACTOR_KEEP)
                         factorProceeds += face * FACTOR_KEEP; factorDiscount += face * (1.0 - FACTOR_KEEP)
+                        factoringUsedCount++
                         lines += ReportLine("Pelunasan paksa dibiayai dengan menjual piutang ${fmt(face)} jt RS (potongan 4%).", Tone.BAD)
                         if (cash < 0.0) gameOverReason = "Kas tidak cukup memenuhi tuntutan pelunasan bank. Perusahaan bangkrut."
                     }
@@ -1403,7 +2382,11 @@ class KapitalEngine(val seed: Long) {
                 }
             } else {
                 covenantBreaches = 0
+                boardTrust = (boardTrust + 4).coerceAtMost(100)
                 lines += ReportLine("Uji covenant lulus: ICR ${fmt2(icr)}x (batas ${fmt2(th)}x).", Tone.GOOD)
+            }
+            if (boardTrust <= 0 && gameOverReason == null) {
+                gameOverReason = "Dewan Direksi kehilangan seluruh kepercayaan atas kepemimpinan Anda dan mengesahkan mosi pemecatan CEO dalam rapat kuartalan."
             }
         }
 
@@ -1449,30 +2432,77 @@ class KapitalEngine(val seed: Long) {
         if (strikeMonthsLeft > 0) strikeMonthsLeft--
         if (breakdownMonthsLeft > 0) breakdownMonthsLeft--
 
-        // ---- 9. Catat dan maju ----
+        // Akhir kampanye 40 tahun (Giliran 480 = Desember 2069/2070)
+        if (turn >= 480 && gameOverReason == null) {
+            isVictory = true
+            val eval = evaluateCampaign()
+            gameOverReason = "KAMPANYE 40 TAHUN SELESAI (2030–2070)! ${eval.summaryText}"
+        }
+
+        // ---- 9. Catat laporan Induk, Konsolidasi Grup (dengan Eliminasi Antar-Entitas & CTA), dan maju ----
         lastIncome = mapOf("revenue" to revenue, "cogs" to cogs, "opex" to opex, "maint" to maint, "dep" to dep,
-            "baddebt" to writeOff, "ebit" to ebit, "interest" to interest, "intinc" to interestIncome, "tax" to tax, "ni" to ni) +
-            detailNow + mapOf("op_proj" to projExp, "op_oneoff" to oneOffNow, "op_loss" to otherLoss, "op_gain" to incomeNow)
+            "baddebt" to writeOff, "ebit" to ebit, "interest" to interest, "intinc" to interestIncome, "tax" to tax, "wht_tax" to whtNow, "ni" to ni) +
+            detailNow + mapOf("op_proj" to projExp, "op_oneoff" to oneOffNow, "op_loss" to otherLoss, "op_gain" to incomeNow, "op_ic_fee" to periodIntercompanyFeeToSubRs)
         run {
-            val cfi = -capex - periodInvestOut + periodInvestIn + divInCash
+            val cfi = -capex - periodSubInvestOutRs - periodInvestOut + periodInvestIn + divInCash + periodSubDivInGrossRs
             val cff = newDebt - principal + rcfFlow - forcedPay + factorProceeds - dividend + periodCureIn
             val net = cash - startCash
-            val eqSum = periodCureIn - periodTradeFees + ni + mtm + divInCash - factorDiscount - eqFx - dividend
+            val eqSum = periodCureIn - periodTradeFees + periodSubDivInGrossRs - periodSubWriteOffRs - periodGoodwillImpairmentRs + ni + mtm + divInCash - factorDiscount - eqFx - dividend
             lastDetail = mapOf(
-                "d_capex_repl" to -replacement, "d_capex_spin" to -capSpin, "d_capex_exp" to -(expCapex + evCapex),
-                "d_stock_buy" to -periodInvestOut, "d_stock_sell" to periodInvestIn, "d_divin" to divInCash, "cfi" to cfi,
+                "d_capex_repl" to -replacement, "d_capex_spin" to -capSpin, "d_capex_exp" to -(expCapex + evCapex + periodSubInvestOutRs),
+                "d_stock_buy" to -periodInvestOut, "d_stock_sell" to periodInvestIn, "d_divin" to (divInCash + periodSubDivInGrossRs), "cfi" to cfi,
                 "d_newdebt" to newDebt, "d_repay" to -principal, "d_rcf" to rcfFlow, "d_forced" to -forcedPay,
                 "d_factor" to factorProceeds, "d_divpaid" to -dividend, "d_cure" to periodCureIn, "cff" to cff,
                 "cfo" to cfo, "net" to net, "d_ni" to ni, "d_dep" to dep, "d_ar" to -dAR, "d_inv" to -dInv, "d_pay" to dPay, "d_resid" to net - (cfo + cfi + cff),
-                "e_open" to periodStartEquity, "e_cure" to periodCureIn, "e_fees" to -periodTradeFees, "e_ni" to ni, "e_mtm" to mtm,
+                "e_open" to periodStartEquity, "e_cure" to periodCureIn, "e_fees" to -periodTradeFees, "e_sub_div" to periodSubDivInGrossRs,
+                "e_impair" to -(periodSubWriteOffRs + periodGoodwillImpairmentRs), "e_ni" to ni, "e_mtm" to mtm,
                 "e_divin" to divInCash, "e_factor" to -factorDiscount, "e_fx" to -eqFx, "e_div" to -dividend, "e_close" to equity,
                 "e_resid" to equity - periodStartEquity - eqSum)
         }
         prevCashFlow = lastCashFlow
         lastCashFlow = mapOf("ni" to ni, "dep" to dep, "wc" to (-dAR - dInv + dPay), "cfo" to cfo,
-            "capex" to -capex, "fin" to newDebt - principal, "stock" to periodInvestIn - periodInvestOut, "div" to lastDividendIncome, "net" to cash - startCash)
+            "capex" to -(capex + periodSubInvestOutRs), "fin" to newDebt - principal, "stock" to periodInvestIn - periodInvestOut, "div" to (lastDividendIncome + periodSubDivInGrossRs), "net" to cash - startCash)
+
+        // Laporan Konsolidasi Grup (Induk + Anak Usaha Aktif, dengan Eliminasi Pendapatan/Beban & Dividen Antar-Entitas)
+        run {
+            val validSubs = subsidiaries.values.filter { it.active && !it.nationalized && it.lastIncomeLocal.isNotEmpty() }
+            fun sumSubInc(key: String): Double =
+                validSubs.sumOf { (it.lastIncomeLocal[key] ?: 0.0) * foreignMeta.getValue(it.spec.countryId).fxToRs }
+            fun sumSubCf(key: String): Double =
+                validSubs.sumOf { (it.lastCashFlowLocal[key] ?: 0.0) * foreignMeta.getValue(it.spec.countryId).fxToRs }
+
+            val icRevElim = periodIntercompanyFeeToSubRs
+            val icDivElim = periodSubDivInGrossRs
+            val consRev = revenue + sumSubInc("revenue") - icRevElim
+            val consCogs = cogs + sumSubInc("cogs")
+            val consOpex = opex + sumSubInc("opex") - icRevElim
+            val consDep = dep + sumSubInc("dep")
+            val consEbit = ebit + sumSubInc("ebit")
+            val consInt = interest + sumSubInc("interest")
+            val consEbt = taxable + sumSubInc("ebt")
+            val consTax = tax + sumSubInc("tax")
+            val consNi = ni + sumSubInc("ni")
+            ctaEquity = computeCtaEquity()
+            lastConsolidatedIncome = mapOf(
+                "revenue" to consRev, "cogs" to consCogs, "opex" to consOpex, "maint" to maint,
+                "dep" to consDep, "baddebt" to writeOff, "ebit" to consEbit, "interest" to consInt,
+                "ebt" to consEbt, "tax" to consTax, "wht_tax" to whtNow, "ni" to consNi,
+                "elim_intercompany_rev" to -icRevElim, "elim_intercompany_div" to -icDivElim
+            )
+            lastConsolidatedBalance = consolidatedBalanceSnapshot()
+            val consCfo = cfo + sumSubCf("cfo")
+            // Eliminasi arus kas suntikan modal induk ke anak usaha & dividen anak usaha ke induk pada level grup
+            val consCfi = (-capex - periodInvestOut + periodInvestIn + divInCash) + sumSubCf("cfi")
+            val consCff = (newDebt - principal + rcfFlow - forcedPay + factorProceeds - dividend + periodCureIn) + sumSubCf("cff") + icDivElim
+            lastConsolidatedCashFlow = mapOf(
+                "cfo" to consCfo, "cfi" to consCfi, "cff" to consCff,
+                "elim_div" to -icDivElim, "net" to (consCfo + consCfi + consCff)
+            )
+        }
+
         periodInvestIn = 0.0; periodInvestOut = 0.0; periodStartCash = cash
         periodCureIn = 0.0; periodTradeFees = 0.0; periodStartEquity = equity
+        periodSubInvestOutRs = 0.0; periodSubDivInGrossRs = 0.0; periodGoodwillImpairmentRs = 0.0
         revenueHist += revenue
         cashHist += cash
         kursHist += kurs
@@ -1485,11 +2515,16 @@ class KapitalEngine(val seed: Long) {
         lastReportTitle = "Laporan akhir bulan · ${dateText(turn)}"
         lastReport = summary + lines
         if (gameOverReason != null) {
-            lastReport = lastReport + ReportLine(gameOverReason!!, Tone.BAD)
-            chronicle += ChronicleItem(turn, "Permainan berakhir", gameOverReason!!, "Lihat post-mortem di laporan bulan terakhir.")
+            val eval = evaluateCampaign()
+            lastReport = lastReport +
+                ReportLine(gameOverReason!!, if (isVictory) Tone.GOOD else Tone.BAD) +
+                ReportLine(eval.summaryText, Tone.INFO)
+            chronicle += ChronicleItem(turn, if (isVictory) "Kampanye Selesai: ${eval.archetypeTitle}" else "Permainan berakhir: ${eval.archetypeTitle}",
+                "$gameOverReason ${eval.summaryText}", "Lihat post-mortem dan evaluasi 5 komponen.")
         }
 
         turn += 1
+        currentEra = max(currentEra, era(turn))
         ap = apMax
         val newLines = mutableListOf<ReportLine>()
         drawEvents(newLines)
@@ -1500,7 +2535,7 @@ class KapitalEngine(val seed: Long) {
     }
 
     // =====================================================================
-    // Memo eksekutif (bisa jujur, bisa menutupi)
+    // Memo eksekutif
     // =====================================================================
     private fun generateMemos(r: Random): List<Memo> {
         val out = mutableListOf<Memo>()
@@ -1529,13 +2564,13 @@ class KapitalEngine(val seed: Long) {
             val aged = stuffedBuckets.filter { turn - it.first >= 3 }.sumOf { it.second }
             out += Memo(cfo.id, cfo.name, cfo.role,
                 if (aged > 500) "Piutang berumur di atas 90 hari kini ${fmt(aged)} jt RS. Runway ${runwayMonths()} bulan; jarak covenant ${covenantDistancePct().toInt()}%."
-                else "Runway ${runwayMonths()} bulan. Jarak ke covenant ${covenantDistancePct().toInt()}%. Saya sarankan menjaga kas.")
+                else "Runway ${runwayMonths()} bulan. Jarak ke covenant ${covenantDistancePct().toInt()}%. Tarif PPh efektif kita ${fmt1(effectiveTaxRate() * 100)}%.")
         }
         val coo = exec("exec_coo")
         if (coo.present) out += Memo(coo.id, coo.name, coo.role,
             if (kickbackActive) "Harga kapas dari pemasok baru sedikit lebih tinggi, tetapi kualitasnya jauh lebih stabil."
             else listOf("Pemasok kapas Tarsis meminta pembayaran lebih cepat karena El Niño.",
-                "Jadwal pengiriman lancar. Proposal pemintalan masih menjadi prioritas saya.").random(r))
+                "Jadwal pengiriman lancar. Proposal pemintalan dan ekspansi lintas batas layak dipertimbangkan.").random(r))
         return out.shuffled(r).take(3)
     }
 
@@ -1605,7 +2640,7 @@ class KapitalEngine(val seed: Long) {
                 piece("PRO_PEMERINTAH", "Persaingan sehat menguntungkan konsumen", "Pejabat memuji harga lebih murah.", 0),
                 piece("OPOSISI", "Perang harga tekan upah pekerja", "Serikat khawatir PHK.", 1),
                 piece("SENSASIONAL", "PESAING BANTING HARGA 50%!", "Pesan dari agen penjualan yang melebih-lebihkan.", 0, true),
-                piece("INDEPENDEN", "Pesaing menurunkan harga rata-rata ${fmt1((1.0 - world.rivalAveragePrice()) * 100)}% untuk merebut pangsa pasar", "Pemantauan harga di 40 toko ritel.", 2)
+                piece("INDEPENDEN", "Pesaing menurunkan harga rata-rata ${fmt1((1.0 - world.rivalAveragePrice()) * 100)}% (${world.learnedPlayerProfile})", "Pemantauan harga di 40 toko ritel.", 2)
             )
             "pemilu" -> listOf(
                 piece("BISNIS", if (electionShock) "Investor asing kurangi obligasi Sundara jelang pemilu" else "Arus modal asing stabil jelang pemilu",
@@ -1662,7 +2697,6 @@ class KapitalEngine(val seed: Long) {
     }
 
     companion object {
-        /** Rasio HPP bahan+energi (dikalibrasi agar margin EBIT ±5%, setara pabrikan tekstil Indonesia). */
         val INVEST = listOf(
             InvestSpec("line", "Tambah lini tenun", "Lini tenun baru menambah kapasitas. Tanpa tambahan permintaan, lini baru menganggur dan hanya menambah biaya.",
                 3600.0, 4, 3, true, "Kapasitas +12%, biaya operasi +70 jt RS per bulan", 3),
@@ -1675,17 +2709,99 @@ class KapitalEngine(val seed: Long) {
             InvestSpec("warehouse", "Gudang dan logistik", "Gudang tambahan dekat pelabuhan.",
                 1500.0, 2, 2, true, "Persediaan −8% dan risiko pengiriman tertahan separuh", 1),
             InvestSpec("export", "Pasar ekspor Aurelia", "Sertifikasi, pameran dagang, dan agen penjualan luar negeri.",
-                1500.0, 6, 3, false, "Permintaan +6% permanen, biaya operasi +40 jt RS per bulan", 1)
+                1500.0, 6, 3, false, "Permintaan +6% permanen, biaya operasi +40 jt RS per bulan", 1),
+            InvestSpec("solar", "PLTS Atap & IPAL Hijau (Transisi Era 4)", "Panel surya kawasan dan daur ulang air limbah untuk sertifikasi ESG penuh dan bebas pajak karbon Halvenia (CBAM).",
+                2600.0, 4, 2, true, "Sertifikasi ESG/IPAL penuh (bebas CBAM Halvenia) & permintaan +3%", 1),
+            InvestSpec("institute", "Institut Kepemimpinan & Suksesi (Warisan Era 5)", "Akademi kaderisasi manajemen dan tata kelola institusi agar konglomerasi tahan melintasi generasi.",
+                2000.0, 4, 2, false, "Kepercayaan Dewan +15 poin & loyalitas seluruh eksekutif naik", 1)
         )
+
+        /** Spesifikasi 4 Anak Usaha Multinasional (Era 2 Ekspansi Lintas Batas — dikalibrasi payback median 3,5–6,5 tahun). */
+        val SUBSIDIARIES = listOf(
+            SubsidiarySpec(
+                countryId = "tarsis",
+                countryName = "Tarsis",
+                currencyCode = "TRS",
+                title = "PT Benang Tarsis Agro (Pabrik Hulu Kapas)",
+                desc = "Mendirikan pabrik pengolahan kapas dan pemintalan di lembah irigasi Tarsis dengan buruh murah.",
+                baseCostRs = 3800.0,
+                buildMonths = 3,
+                apCost = 3,
+                cogsReduction = 0.022,
+                demandBoost = 0.04,
+                workersAdded = 140,
+                benefitText = "HPP −2,2%, kapasitas +6%, permintaan +4%, pembukuan lokal TRS (PPh lokal 20%, pajak dividen 10%)",
+                riskText = "Rentan kekeringan El Niño, kurva belajar 12 bulan, dan gejolak politik Tarsis.",
+                capitalTurnoverAnnual = 1.25,
+                baseLocalCogsRatio = 0.66,
+                fixedOpexRs = 42.0,
+                isFactory = true
+            ),
+            SubsidiarySpec(
+                countryId = "kestrel",
+                countryName = "Kestrel",
+                currencyCode = "KST",
+                title = "Kestrel Precision Weaving Ltd (Pabrik Komponen & Kain Teknis)",
+                desc = "Pabrik patungan di kawasan manufaktur Kestrel untuk mengamankan sensor tenun dan ekspor Asia.",
+                baseCostRs = 4800.0,
+                buildMonths = 4,
+                apCost = 3,
+                cogsReduction = 0.018,
+                demandBoost = 0.05,
+                workersAdded = 110,
+                benefitText = "HPP −1,8%, kapasitas +6%, kebal hold-up suku cadang Kestrel, pembukuan lokal KST (PPh 18%, pajak dividen 8%)",
+                riskText = "Terpapar perang tarif Aurelia–Kestrel, kurva belajar 12 bulan, dan pembatasan ekspor teknologi.",
+                capitalTurnoverAnnual = 1.22,
+                baseLocalCogsRatio = 0.65,
+                fixedOpexRs = 52.0,
+                isFactory = true
+            ),
+            SubsidiarySpec(
+                countryId = "halvenia",
+                countryName = "Halvenia",
+                currencyCode = "HLV",
+                title = "Halvenia Eco-Apparel GmbH (Distribusi & Merek Garmen ESG)",
+                desc = "Cabang distribusi garmen premium di pasar konsumen kaya Halvenia dengan mata uang kuat HLV.",
+                baseCostRs = 3400.0,
+                buildMonths = 3,
+                apCost = 2,
+                cogsReduction = 0.0,
+                demandBoost = 0.05,
+                workersAdded = 45,
+                benefitText = "Permintaan premium +5%, pembukuan mata uang kuat HLV (PPh 26%, pajak dividen 5%)",
+                riskText = "Wajib kepatuhan IPAL/ESG; tanpa IPAL dikenai bea karbon CBAM setiap bulan.",
+                capitalTurnoverAnnual = 1.30,
+                baseLocalCogsRatio = 0.67,
+                fixedOpexRs = 38.0,
+                isFactory = false
+            ),
+            SubsidiarySpec(
+                countryId = "meridia",
+                countryName = "Meridia",
+                currencyCode = "MRD",
+                title = "Meridia Global Treasury & Holding SPV",
+                desc = "Entitas induk perdagangan, kekayaan intelektual, dan pusat kas lepas pantai di surga pajak Meridia.",
+                baseCostRs = 2200.0,
+                buildMonths = 2,
+                apCost = 2,
+                cogsReduction = 0.004,
+                demandBoost = 0.02,
+                workersAdded = 15,
+                benefitText = "PPh badan Meridia hanya 8,5%, menerima royalti/harga transfer antar-entitas & memotong 50% pajak dividen repatriasi",
+                riskText = "Memicu risiko pemeriksaan pajak lintas batas bila memakai Transfer Pricing Agresif.",
+                capitalTurnoverAnnual = 0.95,
+                baseLocalCogsRatio = 0.58,
+                fixedOpexRs = 24.0,
+                isFactory = false
+            )
+        )
+
         const val LOT = 0.1
         const val BROKER_FEE = 0.0015
         const val SELL_TAX = 0.001
-                /** Bagian nilai piutang yang diterima saat factoring (potongan ±4% untuk tenor ±60 hari). */
         const val FACTOR_KEEP = 0.96
-        /** Bagian piutang obral kredit yang akhirnya macet. */
         const val STUFFED_LOSS = 0.45
-        /** Belanja modal penggantian mesin sebagai bagian dari penyusutan. */
-                const val REPLACEMENT_CAPEX = 0.70
+        const val REPLACEMENT_CAPEX = 0.70
 
         private val idLocale: Locale = Locale.forLanguageTag("id-ID")
         val MONTHS = listOf("Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli",
@@ -1703,6 +2819,6 @@ class KapitalEngine(val seed: Long) {
         fun fmt(x: Double): String = String.format(idLocale, "%,.0f", x)
         fun fmt1(x: Double): String = String.format(idLocale, "%.1f", x)
         fun fmt2(x: Double): String = String.format(idLocale, "%.2f", x)
-        fun signed(x: Double): String = (if (x >= 0) "+" else "−") + fmt(kotlin.math.abs(x))
+        fun signed(x: Double): String = (if (x >= 0) "+" else "−") + fmt(abs(x))
     }
 }

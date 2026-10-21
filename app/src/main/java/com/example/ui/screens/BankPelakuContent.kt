@@ -223,7 +223,8 @@ fun InvestTabContent(
     items: List<InvestItem>,
     summary: List<Pair<String, String>>,
     ap: Int,
-    onInvest: (String) -> Unit
+    onInvest: (String) -> Unit,
+    onCorporateAction: (String) -> Unit = {}
 ) {
     Text("Ekspansi dan investasi", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
     Text(
@@ -234,6 +235,37 @@ fun InvestTabContent(
     PanelCard {
         Text("Kondisi kapasitas", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
         summary.forEach { (k, v) -> PairRow(k, v) }
+    }
+    PanelCard {
+        Text("Multinasional dan korporasi", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        Text(
+            "Anak usaha punya pembukuan lokal dan dikonsolidasikan ke laporan grup. Hasil tindakan tampil di Koran Pagi dan laporan keuangan; " +
+                "tindakan yang syaratnya belum terpenuhi (AP, kas, era) ditolak tanpa biaya.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        val actions = listOf(
+            "Bangun anak usaha Tarsis" to "SUB|tarsis",
+            "Bangun anak usaha Kestrel" to "SUB|kestrel",
+            "Bangun anak usaha Halvenia" to "SUB|halvenia",
+            "Bangun anak usaha Meridia" to "SUB|meridia",
+            "Repatriasi dividen Tarsis" to "REP|tarsis",
+            "Repatriasi dividen Kestrel" to "REP|kestrel",
+            "Repatriasi dividen Halvenia" to "REP|halvenia",
+            "Repatriasi dividen Meridia" to "REP|meridia",
+            "Transfer pricing: wajar" to "TPR|WAJAR",
+            "Transfer pricing: optimal" to "TPR|OPTIMAL",
+            "Transfer pricing: agresif (berisiko audit)" to "TPR|AGRESIF",
+            "Forward valas 6 bulan" to "HFX",
+            "Terbitkan obligasi 3.000 jt RS, 36 bulan" to "BND|3000|36",
+            "IPO 20% saham" to "IPO|20|false",
+            "Dirikan bank dan asuransi grup" to "CBK"
+        )
+        actions.forEach { (label, code) ->
+            OutlinedButton(
+                onClick = { onCorporateAction(code) },
+                modifier = Modifier.fillMaxWidth().testTag("corp_$code")
+            ) { Text(label) }
+        }
     }
     items.forEach { inv ->
         PanelCard {

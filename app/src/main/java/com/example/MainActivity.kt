@@ -245,7 +245,8 @@ fun KapitalAppScaffold(
                     onReviewOffer = { viewModel.reviewOffer(it) },
                     onAcceptOffer = { viewModel.acceptOffer(it) },
                     onDeclineOffer = { viewModel.declineOffer(it) },
-                    onInvest = { viewModel.invest(it) }
+                    onInvest = { viewModel.invest(it) },
+                    onCorporateAction = { viewModel.corporateAction(it) }
                 )
             }
 

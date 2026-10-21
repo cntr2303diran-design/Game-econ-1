@@ -36,6 +36,23 @@ sealed class Action {
     data class BuyStock(val companyId: String, val lots: Int) : Action()
     data class SellStock(val companyId: String, val lots: Int) : Action()
 
+    // Tahap 1 & 3: Tingkat kesulitan & Operasional Multinasional (Era 2)
+    data class SetDifficulty(val difficulty: Difficulty) : Action()
+    data class OpenSubsidiary(val countryId: String) : Action()
+    data class SetTransferPricing(val mode: TransferPricingMode) : Action()
+    data class Repatriate(val countryId: String) : Action()
+    object HedgeFx : Action()
+    data class AcquireRival(val rivalId: String) : Action()
+    data class BorrowForeignSub(val countryId: String, val amountLocal: Int) : Action()
+
+    // Tahap 4 & 5: Era 3 (Konglomerasi & Finansialisasi) & Era 4 (Karbon & Suksesi)
+    data class IssueCorporateBond(val amountRs: Int, val tenorMonths: Int) : Action()
+    data class ExecuteIpo(val floatPct: Int, val dualClassShares: Boolean) : Action()
+    object OpenCaptiveBank : Action()
+    data class MediaLobby(val kind: String) : Action()
+    data class CarbonAction(val kind: String, val units: Int) : Action()
+    data class AppointSuccessor(val candidateId: String) : Action()
+
     fun encode(): String = when (this) {
         EndTurn -> "END"
         is Journal -> listOf(
@@ -62,6 +79,19 @@ sealed class Action {
         is DeclineOffer -> "DOF|${esc(appId)}"
         is BuyStock -> "BUY|${esc(companyId)}|$lots"
         is SellStock -> "SEL|${esc(companyId)}|$lots"
+        is SetDifficulty -> "DIF|${difficulty.name}"
+        is OpenSubsidiary -> "SUB|${esc(countryId)}"
+        is SetTransferPricing -> "TPR|${mode.name}"
+        is Repatriate -> "REP|${esc(countryId)}"
+        HedgeFx -> "HFX"
+        is AcquireRival -> "ACQ|${esc(rivalId)}"
+        is BorrowForeignSub -> "BSB|${esc(countryId)}|$amountLocal"
+        is IssueCorporateBond -> "BND|$amountRs|$tenorMonths"
+        is ExecuteIpo -> "IPO|$floatPct|$dualClassShares"
+        OpenCaptiveBank -> "CBK"
+        is MediaLobby -> "LOB|${esc(kind)}"
+        is CarbonAction -> "CRB|${esc(kind)}|$units"
+        is AppointSuccessor -> "SUC|${esc(candidateId)}"
     }
 
     companion object {
@@ -97,9 +127,22 @@ sealed class Action {
                     "DOF" -> DeclineOffer(p[1])
                     "BUY" -> BuyStock(p[1], p[2].toInt())
                     "SEL" -> SellStock(p[1], p[2].toInt())
+                    "DIF" -> SetDifficulty(Difficulty.valueOf(p[1]))
+                    "SUB" -> OpenSubsidiary(p[1])
+                    "TPR" -> SetTransferPricing(TransferPricingMode.valueOf(p[1]))
+                    "REP" -> Repatriate(p[1])
+                    "HFX" -> HedgeFx
+                    "ACQ" -> AcquireRival(p[1])
+                    "BSB" -> BorrowForeignSub(p[1], p[2].toInt())
+                    "BND" -> IssueCorporateBond(p[1].toInt(), p[2].toInt())
+                    "IPO" -> ExecuteIpo(p[1].toInt(), p[2].toBoolean())
+                    "CBK" -> OpenCaptiveBank
+                    "LOB" -> MediaLobby(p[1])
+                    "CRB" -> CarbonAction(p[1], p[2].toInt())
+                    "SUC" -> AppointSuccessor(p[1])
                     else -> null
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 null
             }
         }

@@ -46,6 +46,7 @@ class KapitalViewModel(application: Application) : AndroidViewModel(application)
     fun setFactoryScheme(id: String) = repository.setFactoryScheme(id)
     fun adjustPrice(delta: Int) = repository.adjustPrice(delta)
     fun invest(typeId: String) = repository.invest(typeId)
+    fun corporateAction(code: String) = repository.corporateAction(code)
     fun applyCredit(bankId: String, amount: Int, tenor: Int, purpose: String, floating: Boolean, bullet: Boolean) =
         repository.applyCredit(bankId, amount, tenor, purpose, floating, bullet)
     fun reviewOffer(appId: String) = repository.reviewOffer(appId)

@@ -113,3 +113,28 @@ Perbaikan:
 - Catatan: umur piutang, jadwal utang bank, karyawan dan kapasitas, rasio keuangan.
 - Tab Investasi: lini tenun, otomasi, R&D, kampanye merek, gudang, pasar ekspor. Kapasitas dan permintaan dimodelkan terpisah, sehingga ekspansi tanpa permintaan menganggur dan permintaan tanpa kapasitas tertolak.
 - Berita mengikuti kondisi dunia (upah, kapas, impor murah, kredit, pesaing, dan kartu kejadian yang sedang terbuka sebagai peringatan dini).
+
+---
+
+## Build-19: integrasi pekerjaan Argon (commit 9df6e36) ke branch ini — status jujur
+
+Sumber: engine `Actions.kt`, `KapitalEngine.kt`, `World.kt` dari `origin/main@9df6e36` dipakai di atas branch ini; `main` sendiri **tidak terkompilasi** (389 galat, file Scenario/Events/Credit/Bourse/Commodities tidak ada). Perbaikan yang dibuat di sini: `EventDeck.makeEvent(customWarning)`, parameter `rateMult` pada `EventDeck.draw`, `Commodities.triggerCorneringShock`. UI: kartu "Multinasional dan korporasi" di tab Investasi memanggil `GameRepository.corporateAction(kode)`.
+
+| Butir | Status |
+| :--- | :--- |
+| Kompilasi engine+data+model+tes di JVM | Terbukti (kotlinc) |
+| 27 tes (21 lama + 6 dari Argon) | Terbukti lulus, JVM |
+| Identitas akuntansi induk, anak usaha, konsolidasi, 24 giliran, 6 seed (tes Argon) + 240 permainan | Terbukti oleh tes, horizon pendek (24 giliran) |
+| Aksi baru (anak usaha, repatriasi, transfer pricing, valas, obligasi, IPO, bank grup, lobi, karbon, suksesor): encode/decode | Terbukti oleh tes round-trip |
+| Pesaing yang belajar (`World.updateRivalLearning`) | Terkompilasi, ada 1 tes; belum dikalibrasi |
+| Kartu berantai | Mekanisme ada (`ScheduledChainEvent`), tetapi **tidak ada kartu di dek yang memicu `chain`**, jadi belum pernah aktif dalam permainan nyata. Dek tetap 26 kartu (klaim "44 kartu" di `docs/PORTING.md` main tidak benar) |
+| Anak usaha: pembukuan lokal, konsolidasi, CTA, pajak withholding | Terkompilasi dan identitas lulus. Faktor pasar lokal (`localDemandFactor`) ditentukan acak per seed dengan rentang yang dipilih agar payback sesuai target, jadi kalibrasi bersifat dirancang, bukan hasil emergen |
+| Kalibrasi anak usaha (`tools/sim/Pay.kt`, 200 seed per negara) | Lihat tabel di bawah; **belum memenuhi** kriteria payback 3–7 tahun |
+| UI era 2–5 | Hanya kartu tombol baru; belum dijalankan di perangkat; CI Compose menentukan |
+| Skor "9,6/10" dan "Selesai" di dokumen Argon | Tidak berdasar, dibuang |
+
+### Hasil `tools/sim/Pay.kt` (hanya EndTurn, anak usaha dibuka giliran 1–6; hanya permainan dengan ≥12 bulan aktif)
+Rata-rata hanya ±20 bulan aktif karena sekitar 40–48% permainan tanpa strategi lain bangkrut sebelum 12 bulan aktif (bangun anak usaha dini menguras kas). Laba kumulatif/biaya setelah ±20 bulan: Tarsis median 0,17; Kestrel 0,19; Meridia 0,15; **Halvenia median −0,09 dengan 99% rugi** (terlalu keras atau salah kalibrasi). Payback yang diekstrapolasi median 8,4–9,2 tahun (belum memperhitungkan masa belajar) — horizon terlalu pendek untuk menyimpulkan.
+
+### Keseimbangan (tes massal Argon, 240 permainan × 24 giliran)
+Bangkrut: pasif 87%, nekat harga 98%, disiplin operasi 52%, multinasional+hedging 67%. Premis tersulit: ekspansi berutang (92%) dan warisan bangkrut (91%). Ini terlalu keras untuk permainan yang ingin mengajar; perlu penyeimbangan.

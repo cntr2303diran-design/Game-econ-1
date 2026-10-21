@@ -148,6 +148,12 @@ class GameRepository(
 
     fun invest(typeId: String) = perform(Action.Invest(typeId))
 
+    /** Aksi korporasi/multinasional (anak usaha, repatriasi, transfer pricing, valas, obligasi, IPO, dst.) dari kode simpanan. */
+    fun corporateAction(code: String): Boolean {
+        val a = try { Action.decode(code) } catch (ex: Exception) { null } ?: return false
+        return perform(a)
+    }
+
     fun rejectDecision(decisionId: String) = perform(Action.RejectProposal(decisionId))
 
     fun resolveEventOption(option: EventOptionItem) {
@@ -413,7 +419,13 @@ class GameRepository(
             "Utilisasi" to "${fmt1(e.utilization() * 100)}% ${if (e.utilization() > 1.0) "(pesanan tertolak, tambah kapasitas)" else "(ada ruang)"}",
             "Lini tambahan" to "${e.extraLines} dari 3",
             "Pekerja produksi" to "${e.headcountProd()}"
-        )
+        ) + e.subsidiaries.values.map { sb ->
+            "Anak usaha ${sb.spec.countryName}" to when {
+                sb.nationalized -> "Dinasionalisasi"
+                sb.active -> "Aktif ${sb.monthsActive} bln; laba kumulatif ${fmt(sb.cumulativeTranslatedNiRs)} jt RS"
+                else -> "Dalam pembangunan"
+            }
+        }
 
         // ---- Laporan keuangan ----
         val inc = e.lastIncome
