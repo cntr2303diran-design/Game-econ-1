@@ -12,7 +12,7 @@ fun step(eng: KapitalEngine, t: Int) {
 }
 fun q(l: List<Double>, p: Double) = if (l.isEmpty()) Double.NaN else l.sorted()[((l.size - 1) * p).toInt()]
 fun main() {
-    val H = 12 + 72
+    val H = 300
     for (cid in listOf("control", "tarsis", "kestrel", "halvenia", "halvenia+solar", "meridia")) {
         var alive = 0; var n = 0; var loss = 0; val pb = mutableListOf<Double>(); val roi = mutableListOf<Double>()
         for (seed in 1L..200L) {
@@ -20,12 +20,13 @@ fun main() {
             for (t in 1..H) {
                 if (e.gameOverReason != null) break
                 step(e, t)
-                if (cid != "control" && !opened && t >= 12 && t <= 20) {
+                if (cid != "control" && !opened && e.turn >= 97 && e.turn <= 110) {
                     if (cid == "halvenia+solar") e.apply(Action.Invest("solar"))
                     val c = cid.substringBefore("+")
                     if (e.subsidiaryBlock(c) == null) opened = e.apply(Action.OpenSubsidiary(c))
                 }
                 e.apply(Action.EndTurn)
+                if (e.turn >= 97 + 14 + 72 + 6) break
                 val s = e.subsidiaries[cid.substringBefore("+")]
                 if (s != null && s.monthsActive == 24 && ni24 == 0.0) ni24 = s.cumulativeTranslatedNiRs
             }

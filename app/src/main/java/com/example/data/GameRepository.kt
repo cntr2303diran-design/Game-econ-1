@@ -418,7 +418,11 @@ class GameRepository(
             "Permintaan" to "${fmt1(e.demandIdx() * 100)}% dari basis",
             "Utilisasi" to "${fmt1(e.utilization() * 100)}% ${if (e.utilization() > 1.0) "(pesanan tertolak, tambah kapasitas)" else "(ada ruang)"}",
             "Lini tambahan" to "${e.extraLines} dari 3",
-            "Pekerja produksi" to "${e.headcountProd()}"
+            "Pekerja produksi" to "${e.headcountProd()}",
+            "Era sekarang" to "Era ${KapitalEngine.era(e.turn)}: ${KapitalEngine.ERA_NAMES[KapitalEngine.era(e.turn) - 1]}",
+            "Anak usaha, M&A, transfer pricing" to (e.eraBlock(2) ?: "Terbuka"),
+            "Obligasi, IPO, bank grup, lobi" to (e.eraBlock(3) ?: "Terbuka"),
+            "Karbon dan suksesi CEO" to (e.eraBlock(4) ?: "Terbuka")
         ) + e.subsidiaries.values.map { sb ->
             "Anak usaha ${sb.spec.countryName}" to when {
                 sb.nationalized -> "Dinasionalisasi"
@@ -813,7 +817,7 @@ class GameRepository(
             dateText = dateText(turn),
             turn = turn,
             eraNumber = KapitalEngine.era(turn),
-            eraName = "Era ${KapitalEngine.era(turn)}",
+            eraName = "Era ${KapitalEngine.era(turn)}: ${KapitalEngine.ERA_NAMES[KapitalEngine.era(turn) - 1]}",
             apCurrent = e.ap,
             apMax = e.apMax,
             runwayMonths = e.runwayMonths(),

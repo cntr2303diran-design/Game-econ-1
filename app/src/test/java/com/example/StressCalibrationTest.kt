@@ -46,7 +46,8 @@ class StressCalibrationTest {
     fun identities_hold_100Seeds_60Turns_randomActions() {
         var turns = 0; var worst = 0.0
         for (seed in 1L..100L) {
-            val e = KapitalEngine(seed * 104729L)
+            // Maju dulu ke Era 2 (giliran 100) dengan bot disiplin supaya fitur lintas batas terbuka; lewati bila perusahaan sudah gagal
+            val e = TestBots.playUntil(seed * 104729L, 100) ?: continue
             val r = java.util.Random(seed)
             for (t in 1..60) {
                 if (e.gameOverReason != null) break
@@ -58,8 +59,8 @@ class StressCalibrationTest {
                 turns++
             }
         }
-        println("STRESS: $turns giliran-permainan diperiksa, selisih neraca induk terbesar=$worst")
-        assertTrue(turns > 1500)
+        println("STRESS (mulai Era 2): $turns giliran-permainan diperiksa, selisih neraca induk terbesar=$worst")
+        assertTrue("giliran teruji: $turns", turns > 1500)
     }
 
     @Test

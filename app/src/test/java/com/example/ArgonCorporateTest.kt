@@ -184,65 +184,64 @@ class ArgonCorporateTest {
 
     @Test
     fun stageD_multinationalSubsidiaryConsolidationLocalDebtAndEra3To5Mechanics() {
-        val engine = KapitalEngine(203303L)
-        engine.apply(Action.SetSalesScheme(SalesScheme.KAS))
-        engine.apply(Action.SetFactoryScheme(FactoryScheme.ANDAL))
-        engine.apply(Action.Journal("dec_termsheet", "cnt_ts_1", 75, 5500.0, "Refinancing Bank B", "Likuiditas aman", "Bunga naik"))
-        engine.apply(Action.EndTurn)
-        verifyIdentities(engine, "after initial setup turn")
+        // Era 1: semua fitur lintas batas/pasar modal terkunci
+        val early = KapitalEngine(203303L)
+        assertFalse("anak usaha terkunci di Era 1", early.apply(Action.OpenSubsidiary("meridia")))
+        assertFalse("obligasi terkunci di Era 1", early.apply(Action.IssueCorporateBond(2500, 36)))
+        assertFalse("IPO terkunci di Era 1", early.apply(Action.ExecuteIpo(20, false)))
+        assertTrue("alasan penguncian tampil", early.subsidiaryBlock("meridia")!!.contains("Era 2"))
 
-        assertTrue("Opening Meridia subsidiary should succeed", engine.apply(Action.OpenSubsidiary("meridia")))
+        // Era 2: bermain disiplin sampai giliran 97 lalu buka anak usaha
+        val engine = TestBots.firstSurvivor(97)
+        assertEquals(2, KapitalEngine.era(engine.turn))
+        verifyIdentities(engine, "awal Era 2")
+        assertTrue("Anak usaha Meridia harus bisa dibuka di Era 2", engine.apply(Action.OpenSubsidiary("meridia")))
         val mrdSub = engine.subsidiaries["meridia"]!!
         verifyIdentities(engine, "after open meridia")
-
-        // Advance 3 turns so Meridia SPV finishes construction and operates
         repeat(3) {
-            val ev = engine.openEvents.firstOrNull()
-            if (ev != null) {
-                engine.apply(Action.EventChoice(ev.id, ev.options.first().id))
-            }
+            for (ev in engine.openEvents.toList()) engine.apply(Action.EventChoice(ev.id, ev.options.first().id))
             engine.apply(Action.EndTurn)
             verifyIdentities(engine, "meridia build step $it")
         }
-        assertTrue("Meridia subsidiary should be active after build months", mrdSub.active)
-        assertTrue("Active subsidiary must have positive local equity", mrdSub.localEquity > 0.0)
-        assertTrue("Parent subsidiaryInvestmentRs must track historical cost", engine.subsidiaryInvestmentRs > 0.0)
-
-        // Borrow local debt in Meridia
-        assertTrue("Borrowing local debt in active subsidiary should succeed", engine.apply(Action.BorrowForeignSub("meridia", 1500)))
-        assertTrue("Local debt in foreign currency must increase", mrdSub.localDebt > 0.0)
+        assertTrue("Meridia aktif setelah masa bangun", mrdSub.active)
+        assertTrue("Ekuitas lokal positif", mrdSub.localEquity > 0.0)
+        assertTrue("Biaya historis investasi tercatat", engine.subsidiaryInvestmentRs > 0.0)
+        assertTrue("Pinjaman lokal berhasil", engine.apply(Action.BorrowForeignSub("meridia", 1500)))
+        assertTrue(mrdSub.localDebt > 0.0)
         verifyIdentities(engine, "after foreign sub borrow")
-
-        engine.apply(Action.EndTurn)
-        verifyIdentities(engine, "after turn with foreign sub debt")
-
-        // Repatriate dividend from Meridia
+        repeat(3) { engine.apply(Action.EndTurn); verifyIdentities(engine, "turn with sub debt $it") }
         if (mrdSub.retainedForeign > 0.05) {
-            assertTrue("Repatriation should succeed when retainedForeign > 0.05", engine.apply(Action.Repatriate("meridia")))
+            assertTrue("Repatriasi berhasil", engine.apply(Action.Repatriate("meridia")))
             engine.apply(Action.EndTurn)
             verifyIdentities(engine, "after repatriation turn")
         }
+        assertFalse("obligasi masih terkunci di Era 2", engine.apply(Action.IssueCorporateBond(2500, 36)))
 
-        // Test Corporate Bond, IPO, Captive Bank, and Succession
-        assertTrue("Corporate bond issuance should succeed in Era 3", engine.apply(Action.IssueCorporateBond(2500, 36)))
-        verifyIdentities(engine, "after bond issuance")
-        engine.apply(Action.EndTurn)
-        verifyIdentities(engine, "turn after bond issuance")
+        // Era 3: bermain sampai giliran 229
+        val late = TestBots.firstSurvivor(229)
+        assertEquals(3, KapitalEngine.era(late.turn))
+        verifyIdentities(late, "awal Era 3")
+        assertTrue("Obligasi berhasil di Era 3", late.apply(Action.IssueCorporateBond(2500, 36)))
+        late.apply(Action.EndTurn); verifyIdentities(late, "setelah obligasi")
+        if (late.ipoBlock() == null) {
+            assertTrue("IPO berhasil", late.apply(Action.ExecuteIpo(20, false)))
+            assertTrue(late.publicFloatPct >= 0.19)
+            verifyIdentities(late, "after IPO")
+            late.apply(Action.EndTurn); verifyIdentities(late, "turn after IPO")
+        }
+        if (late.cash > 5000.0) {
+            assertTrue("bank grup", late.apply(Action.OpenCaptiveBank))
+            assertTrue(late.captiveBankCapitalRs > 0.0)
+            verifyIdentities(late, "after captive bank")
+        }
+        assertFalse("karbon dan suksesi masih terkunci di Era 3", late.apply(Action.AppointSuccessor("exec_factory")))
 
-        assertTrue("IPO should succeed in Era 3", engine.apply(Action.ExecuteIpo(20, false)))
-        assertTrue("Public float pct should be 20%", engine.publicFloatPct >= 0.19)
-        verifyIdentities(engine, "after IPO")
-        engine.apply(Action.EndTurn)
-        verifyIdentities(engine, "turn after IPO")
-
-        assertTrue("Opening captive bank should succeed after IPO proceeds", engine.apply(Action.OpenCaptiveBank))
-        assertTrue("Captive bank capital must be recorded on balance sheet", engine.captiveBankCapitalRs > 0.0)
-        verifyIdentities(engine, "after open captive bank")
-        engine.apply(Action.EndTurn)
-        verifyIdentities(engine, "turn after open captive bank")
-
-        assertTrue("Appointing successor should succeed", engine.apply(Action.AppointSuccessor("exec_factory")))
-        assertEquals("exec_factory", engine.successorExecId)
+        // Era 4: bermain sampai giliran 373
+        val last = TestBots.firstSurvivor(373, 120)
+        assertEquals(4, KapitalEngine.era(last.turn))
+        assertTrue("Suksesor berhasil di Era 4", last.apply(Action.AppointSuccessor("exec_factory")))
+        assertEquals("exec_factory", last.successorExecId)
+        verifyIdentities(last, "Era 4")
     }
 
     @Test

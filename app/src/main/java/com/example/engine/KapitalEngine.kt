@@ -995,9 +995,9 @@ class KapitalEngine(val seed: Long) {
                 difficulty = action.difficulty
                 true
             }
-            is Action.OpenSubsidiary -> doOpenSubsidiary(action.countryId)
+            is Action.OpenSubsidiary -> eraBlock(2) == null && doOpenSubsidiary(action.countryId)
             is Action.SetTransferPricing -> {
-                if (action.mode != transferPricingMode && spend(1)) {
+                if (eraBlock(2) == null && action.mode != transferPricingMode && spend(1)) {
                     transferPricingMode = action.mode
                     if (action.mode == TransferPricingMode.AGRESIF) {
                         recordEthicsEvidence("transfer_pricing", 1.5, "exec_cfo", "meridia")
@@ -1022,14 +1022,14 @@ class KapitalEngine(val seed: Long) {
                     true
                 } else false
             }
-            is Action.AcquireRival -> doAcquireRival(action.rivalId)
-            is Action.BorrowForeignSub -> doBorrowForeignSub(action.countryId, action.amountLocal)
-            is Action.IssueCorporateBond -> doIssueCorporateBond(action.amountRs, action.tenorMonths)
-            is Action.ExecuteIpo -> doExecuteIpo(action.floatPct, action.dualClassShares)
-            Action.OpenCaptiveBank -> doOpenCaptiveBank()
-            is Action.MediaLobby -> doMediaLobby(action.kind)
-            is Action.CarbonAction -> doCarbonAction(action.kind, action.units)
-            is Action.AppointSuccessor -> doAppointSuccessor(action.candidateId)
+            is Action.AcquireRival -> eraBlock(2) == null && doAcquireRival(action.rivalId)
+            is Action.BorrowForeignSub -> eraBlock(2) == null && doBorrowForeignSub(action.countryId, action.amountLocal)
+            is Action.IssueCorporateBond -> eraBlock(3) == null && doIssueCorporateBond(action.amountRs, action.tenorMonths)
+            is Action.ExecuteIpo -> eraBlock(3) == null && ipoBlock() == null && doExecuteIpo(action.floatPct, action.dualClassShares)
+            Action.OpenCaptiveBank -> eraBlock(3) == null && doOpenCaptiveBank()
+            is Action.MediaLobby -> eraBlock(3) == null && doMediaLobby(action.kind)
+            is Action.CarbonAction -> eraBlock(4) == null && doCarbonAction(action.kind, action.units)
+            is Action.AppointSuccessor -> eraBlock(4) == null && doAppointSuccessor(action.candidateId)
         }
         if (ok) actionCount++
         return ok
@@ -1042,8 +1042,24 @@ class KapitalEngine(val seed: Long) {
 
     fun subsidiaryCostRs(spec: SubsidiarySpec): Double = spec.baseCostRs * sc.size * costIndex
 
+    /** Fitur terkunci sampai era tertentu (sesuai dokumen desain: Era 2 lintas batas, Era 3 finansialisasi, Era 4 kekaisaran global). */
+    fun eraBlock(minEra: Int): String? {
+        if (era(turn) >= minEra) return null
+        val startTurn = ERA_START_TURNS[minEra - 1]
+        return "Terkunci sampai Era $minEra (${ERA_NAMES[minEra - 1]}), ${dateText(startTurn)}."
+    }
+
+    /** IPO butuh rekam jejak laba (minimal 12 bulan riwayat dan EBIT rata-rata 6 bulan positif). */
+    fun ipoBlock(): String? {
+        if (isPublicCompany) return "Perusahaan sudah tercatat di bursa."
+        if (ebitHist.size < 12 || ebitHist.takeLast(6).average() <= 0.0) return "Bursa menolak: butuh laba operasi positif rata-rata 6 bulan terakhir."
+        return null
+    }
+
     fun subsidiaryBlock(countryId: String): String? {
+        eraBlock(2)?.let { return it }
         val spec = subsidiarySpec(countryId) ?: return "Negara tujuan anak usaha tidak tersedia."
+
         if (subsidiaries.containsKey(countryId)) {
             val st = subsidiaries.getValue(countryId)
             return if (st.nationalized) "Aset di ${spec.countryName} telah dibekukan/dinasionalisasi."
@@ -1072,7 +1088,6 @@ class KapitalEngine(val seed: Long) {
             0.90 + rSub.nextDouble() * 0.28
         }
         subsidiaries[countryId] = sub
-        currentEra = max(currentEra, 2)
         projectsInv += InvestProject("sub_$countryId", turn, spec.buildMonths, totalCost, capex = true)
         chronicle += ChronicleItem(turn, "Pendirian Anak Usaha: ${spec.title}",
             "Investasi lintas negara di ${spec.countryName} (${spec.currencyCode}) senilai ${fmt(totalCost)} jt RS selama ${spec.buildMonths} bulan.",
@@ -1150,6 +1165,7 @@ class KapitalEngine(val seed: Long) {
     }
 
     fun acquireRivalBlock(rivalId: String): String? {
+        eraBlock(2)?.let { return it }
         val rv = world.rivals.firstOrNull { it.id == rivalId } ?: return "Pesaing tidak ditemukan."
         if (rv.active && rv.weakMonths < 3 && turn < sc.turn0 + 18) return "Pesaing masih sehat; tunggu saat mereka tertekan (rugi ≥3 bulan) atau setelah 18 bulan bermain."
         if (ap < 3) return "Butuh 3 AP untuk uji tuntas dan akuisisi."
@@ -1176,7 +1192,6 @@ class KapitalEngine(val seed: Long) {
         extraLines += 1
         demandBoost += rv.share0 * 0.45
         acquiredRivalsCount++
-        currentEra = max(currentEra, 3)
 
         // Uji tuntas tidak pernah 100% sempurna: peluang deterministik menemukan tunggakan perawatan/pajak target
         val rDd = rng(71 + acquiredRivalsCount)
@@ -1204,7 +1219,6 @@ class KapitalEngine(val seed: Long) {
         val fee = amt * 0.012
         pendingBonds += Triple(amt, couponPct, tenorMonths)
         oneOffOpex += fee
-        currentEra = max(currentEra, 3)
         chronicle += ChronicleItem(turn, "Penerbitan Obligasi Korporasi ${fmt(amt)} jt RS",
             "Tenor $tenorMonths bulan (bullet maturity), kupon tetap ${fmt2(couponPct)}%, biaya emisi ${fmt(fee)} jt RS (cair akhir bulan ini).",
             "Pendanaan pasar modal Era 3 → kas masuk jangka panjang dengan pokok jatuh tempo sekaligus.", actionCount)
@@ -1226,7 +1240,6 @@ class KapitalEngine(val seed: Long) {
         cash += netProceeds
         equity += netProceeds
         periodCureIn += netProceeds
-        currentEra = max(currentEra, 3)
         chronicle += ChronicleItem(turn, "IPO di Bursa Efek Sundara ($floatPct% Saham Publik)",
             "Dana bersih IPO ${fmt(netProceeds)} jt RS masuk ke kas dan ekuitas (${if (useDualClass) "Saham Kelas Ganda aktif" else "Satu saham satu suara"}).",
             "IPO Era 3 → modal ekuitas meningkat drastis → kewajiban keterbukaan publik.", actionCount)
@@ -1242,7 +1255,6 @@ class KapitalEngine(val seed: Long) {
         captiveBankCapitalRs = minCapital
         cash -= minCapital
         periodInvestOut += minCapital
-        currentEra = max(currentEra, 3)
         chronicle += ChronicleItem(turn, "Pendirian Unit Jasa Keuangan & Asuransi Grup",
             "Modal inti disetor ${fmt(minCapital)} jt RS (CAR ≥ 12%). Menghasilkan margin bunga bersih namun terpapar risiko kredit saat resesi.",
             "Finansialisasi Era 3 → bank/asuransi internal → pendapatan bunga & risiko likuiditas.", actionCount)
@@ -1307,7 +1319,6 @@ class KapitalEngine(val seed: Long) {
             candidateId.contains("family") -> 0.40 + rSuc.nextDouble() * 0.45
             else -> 0.65 + rSuc.nextDouble() * 0.25
         }
-        currentEra = max(currentEra, 4)
         boardTrust = (boardTrust + 6).coerceAtMost(100)
         chronicle += ChronicleItem(turn, "Penetapan Kandidat Suksesi CEO: $candidateId",
             "Program transisi kepemimpinan dimulai (biaya tata kelola ${fmt(trainingCost)} jt RS).",
@@ -1419,7 +1430,7 @@ class KapitalEngine(val seed: Long) {
             "export" -> { exportOn = true; demandBoost += 0.06 }
             "rnd" -> demandBoost += 0.04
             "brand" -> mods += Mod("rev", 1.03, turn + 11)
-            "solar" -> { esgCompliant = true; demandBoost += 0.03; carbonCredits += 4; currentEra = max(currentEra, 4) }
+            "solar" -> { esgCompliant = true; demandBoost += 0.03; carbonCredits += 4 }
             "institute" -> { boardTrust = (boardTrust + 15).coerceAtMost(100); execs.forEach { it.loyalty = (it.loyalty + 0.08).coerceAtMost(0.98) } }
         }
         lines += ReportLine("Investasi selesai: ${spec.title}. ${spec.benefit}.", Tone.GOOD)
@@ -2531,7 +2542,7 @@ class KapitalEngine(val seed: Long) {
         }
 
         turn += 1
-        currentEra = max(currentEra, era(turn))
+        currentEra = era(turn)
         ap = apMax
         val newLines = mutableListOf<ReportLine>()
         drawEvents(newLines)
@@ -2817,12 +2828,14 @@ class KapitalEngine(val seed: Long) {
             "Agustus", "September", "Oktober", "November", "Desember")
 
         fun dateText(turn: Int): String = "${MONTHS[(turn - 1) % 12]} ${2030 + (turn - 1) / 12}"
+        /** 4 era sesuai dokumen desain: 2030–2037, 2038–2048, 2049–2060, 2061–2070. */
+        val ERA_START_TURNS = listOf(1, 97, 229, 373)
+        val ERA_NAMES = listOf("Bertahan Hidup", "Ekspansi Lintas Batas", "Konglomerasi dan Finansialisasi", "Kekaisaran Global dan Suksesi")
         fun era(turn: Int): Int = when {
             turn <= 96 -> 1
             turn <= 228 -> 2
             turn <= 372 -> 3
-            turn <= 492 -> 4
-            else -> 5
+            else -> 4
         }
 
         fun fmt(x: Double): String = String.format(idLocale, "%,.0f", x)

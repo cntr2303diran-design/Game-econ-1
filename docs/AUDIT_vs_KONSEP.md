@@ -174,3 +174,13 @@ Halvenia tanpa sertifikat ESG sengaja merugi (pungutan CBAM bulanan tetap); itu 
 - 11 `ChainRule` (`EventDeck.chainRules`) memicu kartu lanjutan dengan peluang dan jeda tertentu setelah keputusan tertentu; dievaluasi di `resolveEvent` dengan RNG yang sama dengan hasil kartu, jadi deterministik dan ikut terulang saat memuat simpanan. Penjelasan sebab tampil sebagai peringatan kartu dan catatan kronik ("Krisis Berantai").
 - Bukti (`ChainCardsTest`): semua 40 kartu terbangun valid (peluang hasil berjumlah 1, pilihan bawaan ada); pada 150 permainan × 60 giliran dengan bot yang memilih opsi terakhir, kartu lanjutan benar-benar muncul di 93 permainan.
 - Bukan klaim: 40 kartu masih jauh dari ±600 pada dokumen desain; kualitas dan keseimbangan tiap kartu belum diuji dengan pemain manusia.
+
+---
+
+## Build-22: era dan penguncian fitur (Tahap 2)
+
+- `KapitalEngine.era(turn)` kini 4 era sesuai dokumen desain (sebelumnya 5): Era 1 Bertahan Hidup (giliran 1–96, 2030–2037), Era 2 Ekspansi Lintas Batas (97–228), Era 3 Konglomerasi dan Finansialisasi (229–372), Era 4 Kekaisaran Global dan Suksesi (373–480). `currentEra` sekarang murni mengikuti tanggal; lompatan era semu akibat aksi dihapus.
+- Penguncian fitur (`eraBlock`): anak usaha, pinjaman lokal anak usaha, akuisisi pesaing, dan transfer pricing terkunci sampai Era 2; obligasi, IPO, bank grup, lobi/media sampai Era 3; karbon dan suksesi CEO sampai Era 4. Alasan penguncian (dengan tanggal) tampil di kartu Investasi. IPO juga butuh riwayat ≥12 bulan dengan EBIT rata-rata 6 bulan terakhir positif (`ipoBlock`).
+- Syarat transisi era berbasis kinerja (omzet, ekuitas, jumlah entitas) **belum ada**; transisi murni berdasarkan tanggal. Karena skenario awal dimulai pada giliran 33–75 (2032–2036), Era 1 pendek (22–64 bulan) bagi pemain.
+- Tes: `stageD_...` ditulis ulang agar bermain disiplin sampai tiap era (giliran 97, 229, 373 pada seed yang bertahan) lalu menguji fitur era itu dan memeriksa semua identitas akuntansi; fitur terkunci terbukti ditolak. Uji tekanan identitas kini dimulai di Era 2: 4.076 giliran-permainan, selisih terbesar 3,2e-10.
+- Kalibrasi anak usaha ulang saat dibuka di Era 2 (`tools/sim/Pay2.kt`, 200 seed, dibuka giliran 97–110, diukur 72 bulan): rugi kumulatif Tarsis 4%, Kestrel 13%, Halvenia+IPAL 19%, Meridia 19%, Halvenia tanpa IPAL 34%; payback stabil median 5,5–7,7 tahun (Halvenia tanpa IPAL 11); peluang bertahan induk 142–143/200 vs kontrol 147/200 (membuka anak usaha kini sedikit menurunkan peluang bertahan, bukan menaikkan).
