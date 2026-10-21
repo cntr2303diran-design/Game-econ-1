@@ -46,7 +46,23 @@ jobs:
 
       - name: Uji unit
         continue-on-error: true
-        run: gradle :app:testDebugUnitTest
+        run: |
+          set +e
+          gradle :app:testDebugUnitTest > test-output.txt 2>&1
+          code=$?
+          for f in app/build/test-results/testDebugUnitTest/*.xml; do
+            [ -f "$f" ] || continue
+            python3 - "$f" <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          t = ET.parse(sys.argv[1]).getroot()
+          for tc in t.iter('testcase'):
+              for fail in list(tc.findall('failure')) + list(tc.findall('error')):
+                  msg = (fail.get('message') or '').replace('\n', ' ')[:300]
+                  print(f"::error title=Test gagal::{tc.get('classname')}.{tc.get('name')}: {msg}")
+          PY
+          done
+          if [ $code -ne 0 ]; then grep -E "What went wrong|error:|e: " -A3 test-output.txt | head -20 | sed 's/^/::warning::/'; fi
+          exit $code
 
       - name: Beri nama APK
         run: |
