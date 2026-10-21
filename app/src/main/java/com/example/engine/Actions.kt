@@ -16,7 +16,7 @@ sealed class Action {
         val failure: String
     ) : Action()
     data class RejectProposal(val decisionId: String) : Action()
-    data class UnionOption(val optionId: String) : Action()
+    data class EventChoice(val eventId: String, val optionId: String) : Action()
     data class SetSalesScheme(val scheme: SalesScheme) : Action()
     data class SetFactoryScheme(val scheme: FactoryScheme) : Action()
     data class CrossCheck(val newsId: String) : Action()
@@ -42,7 +42,7 @@ sealed class Action {
             reason, prediction, failure
         ).joinToString("|") { esc(it) }
         is RejectProposal -> "REJ|${esc(decisionId)}"
-        is UnionOption -> "UNI|${esc(optionId)}"
+        is EventChoice -> "EVC|${esc(eventId)}|${esc(optionId)}"
         is SetSalesScheme -> "SAL|${scheme.name}"
         is SetFactoryScheme -> "FAC|${scheme.name}"
         is CrossCheck -> "CHK|${esc(newsId)}"
@@ -76,7 +76,7 @@ sealed class Action {
                     "END" -> EndTurn
                     "JRN" -> Journal(p[1], p[2], p[3].toInt(), p[4].toDouble(), p[5], p[6], p[7])
                     "REJ" -> RejectProposal(p[1])
-                    "UNI" -> UnionOption(p[1])
+                    "EVC" -> EventChoice(p[1], p[2])
                     "SAL" -> SetSalesScheme(SalesScheme.valueOf(p[1]))
                     "FAC" -> SetFactoryScheme(FactoryScheme.valueOf(p[1]))
                     "CHK" -> CrossCheck(p[1])

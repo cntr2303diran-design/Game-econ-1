@@ -39,7 +39,7 @@ fun MarkasScreen(
     gameState: GameState,
     onOpenKoranPagi: () -> Unit,
     onOpenJurnalKeputusan: (Decision) -> Unit,
-    onOpenEventDialog: () -> Unit,
+    onOpenEventDialog: (String) -> Unit,
     onInspectOrigin: (DataOriginInfo) -> Unit,
     onAdvanceTurn: () -> Unit,
     onAdjustPrice: (Int) -> Unit,
@@ -116,7 +116,7 @@ fun MarkasScreen(
                         decisions = gameState.pendingDecisions,
                         onDecisionClick = { decision ->
                             if (decision.opensEventDialog) {
-                                onOpenEventDialog()
+                                onOpenEventDialog(decision.id)
                             } else {
                                 onOpenJurnalKeputusan(decision)
                             }
@@ -195,7 +195,7 @@ fun MarkasScreen(
                     decisions = gameState.pendingDecisions,
                     onDecisionClick = { decision ->
                         if (decision.opensEventDialog) {
-                            onOpenEventDialog()
+                            onOpenEventDialog(decision.id)
                         } else {
                             onOpenJurnalKeputusan(decision)
                         }

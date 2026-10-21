@@ -127,7 +127,7 @@ fun MenuScreen(
             title = { Text("Cara bermain") },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HowLine("Anda CEO PT Benang Sundara pada Maret 2033. Satu giliran = satu bulan.")
+                    HowLine("Anda CEO PT Benang Sundara. Tiap permainan baru dimulai dari premis, tanggal, angka perusahaan, dan kejadian yang berbeda. Satu giliran = satu bulan.")
                     HowLine("Setiap tindakan memakai Attention Points (AP). AP habis tiap bulan; gunakan untuk hal yang paling penting.")
                     HowLine("Tujuan: bertahan, menjaga kas dan covenant bank, lalu bertumbuh lewat ekspansi dan investasi saham.")
                     HowLine("Laba bukan kas. Perhatikan arus kas operasi, piutang, dan persediaan di laporan keuangan.")

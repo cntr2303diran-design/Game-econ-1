@@ -7,6 +7,12 @@ import com.example.model.*
  * Bagian dinamis (Sundara, kurs) ditimpa oleh GameRepository dari mesin simulasi.
  */
 object StaticWorldData {
+    /** Tanggal acuan data statis; diperbarui tiap kali tampilan disusun agar mengikuti tanggal permainan. */
+    private var dNow = "Maret 2033"
+    private var dPrev1 = "Februari 2033"
+    private var dPrev2 = "Januari 2033"
+    fun setDate(now: String, prev1: String, prev2: String) { dNow = now; dPrev1 = prev1; dPrev2 = prev2 }
+
     fun mapPieces(): List<MapPiece> {
         return listOf(
             MapPiece("pc_pabrik_1", MapTokenType.PABRIK, "Pabrik Kalimas", "sundara", 0.56f, 0.72f, "Utilisasi 88% · Listrik rawan padam"),
@@ -42,7 +48,7 @@ object StaticWorldData {
                     title = "Data Makro Aurelia",
                     displayedValue = "Inflasi 2,4–2,8% · Bunga 4,25%",
                     sourceName = "Bank Sentral Federal Aurelia",
-                    dataDate = "Februari 2033 (Tepat waktu)",
+                    dataDate = "${dPrev1} (Tepat waktu)",
                     calculationMethod = "Aturan Taylor Hawkish (α = 1,65 pada deviasi inflasi).",
                     uncertaintyAndBiasNote = "Transparansi statistik sangat tinggi; risiko utama bagi pemain adalah penguatan A$ yang memicu currency mismatch.",
                     confidence = ConfidenceTier.HIGH
@@ -70,7 +76,7 @@ object StaticWorldData {
                     title = "Data Makro Norvaldia",
                     displayedValue = "Inflasi 5,0–6,5% · Ketegangan 66/100",
                     sourceName = "Kementerian Energi Norvaldia",
-                    dataDate = "Januari 2033",
+                    dataDate = "${dPrev2}",
                     calculationMethod = "Neraca perdagangan migas & indeks risiko geopolitik selat.",
                     uncertaintyAndBiasNote = "Data cadangan devisa sering ditutupi saat ketegangan militer meningkat.",
                     confidence = ConfidenceTier.MEDIUM
@@ -98,7 +104,7 @@ object StaticWorldData {
                     title = "Data Makro & Rantai Pasok Kestrel",
                     displayedValue = "PDB 4,9% · Kuasai 80% rantai komponen",
                     sourceName = "Biro Industri Kestrel & Lensa Independen",
-                    dataDate = "Januari 2033",
+                    dataDate = "${dPrev2}",
                     calculationMethod = "Matriks Input-Output Leontief x = (I - A)^-1 d.",
                     uncertaintyAndBiasNote = "Angka pertumbuhan resmi sangat mulus; risiko sebenarnya ada pada penahanan kiriman (opportunistic hold-up) oleh pemasok saat kelangkaan.",
                     confidence = ConfidenceTier.MEDIUM
@@ -126,7 +132,7 @@ object StaticWorldData {
                     title = "Data Makro & ESG Halvenia",
                     displayedValue = "Inflasi 2,0–2,3% · Pajak Karbon Tinggi",
                     sourceName = "Komisi Statistik Halvenia",
-                    dataDate = "Februari 2033",
+                    dataDate = "${dPrev1}",
                     calculationMethod = "Audit karbon lintas batas (CBAM) & indeks demografi lansia.",
                     uncertaintyAndBiasNote = "Data sangat akurat. Jika pemasok Tier-2 Anda memakai buruh anak atau melanggar emisi, Halvenia memboikot merek Anda seketika.",
                     confidence = ConfidenceTier.HIGH
@@ -154,7 +160,7 @@ object StaticWorldData {
                     title = "Data Keuangan Meridia",
                     displayedValue = "Pajak 8,5% · Rasio Properti/Pendapatan 15,6x",
                     sourceName = "Otoritas Moneter Meridia",
-                    dataDate = "Februari 2033",
+                    dataDate = "${dPrev1}",
                     calculationMethod = "Survei perbankan lepas pantai & valuasi properti komersial.",
                     uncertaintyAndBiasNote = "Banyak perusahaan AI menyembunyikan utang macet lewat SPV cangkang di Meridia.",
                     confidence = ConfidenceTier.MEDIUM
@@ -182,7 +188,7 @@ object StaticWorldData {
                     title = "Data Makro Sundara",
                     displayedValue = "Inflasi 7–9% · Bunga 8,25% · Pemilu 9 bln lagi",
                     sourceName = "Biro Statistik & Bank Sentral Sundara",
-                    dataDate = "Data Januari 2033 (Terlambat 2 bulan)",
+                    dataDate = "Data ${dPrev2} (Terlambat 2 bulan)",
                     calculationMethod = "Aturan Taylor dengan bias politik menjelang pemilu presiden.",
                     uncertaintyAndBiasNote = "PERINGATAN SIKLUS POLITIK: Presiden menekan bank sentral menahan bunga dan mengobral subsidi jelang pemilu; berisiko memicu lonjakan inflasi 12 bulan setelah pemilu.",
                     confidence = ConfidenceTier.LOW
@@ -210,7 +216,7 @@ object StaticWorldData {
                     title = "Data Komoditas & Demografi Tarsis",
                     displayedValue = "Inflasi 6,8–8,4% · Risiko Iklim 72/100",
                     sourceName = "Kementerian Pertanian Tarsis",
-                    dataDate = "Januari 2033",
+                    dataDate = "${dPrev2}",
                     calculationMethod = "Indeks cadangan air irigasi lembah kapas & sensus angkatan kerja muda.",
                     uncertaintyAndBiasNote = "Gagal panen di Tarsis memicu rantai: harga beras naik → tuntutan upah Sundara naik → bunga bank sentral naik.",
                     confidence = ConfidenceTier.LOW
@@ -238,7 +244,7 @@ object StaticWorldData {
                     title = "Data Risiko & Sanksi Velmora",
                     displayedValue = "Ketegangan 76/100 · Sanksi Ekonomi Aktif",
                     sourceName = "Intelijen Risiko Politik & Lensa Independen",
-                    dataDate = "Februari 2033",
+                    dataDate = "${dPrev1}",
                     calculationMethod = "Skor eskalasi sanksi Aurelia–Velmora.",
                     uncertaintyAndBiasNote = "Angka ekonomi resmi Velmora dimanipulasi rezim. Bahaya utama bagi pemain adalah sanksi menular lewat pemasok Tier-2 di Kestrel.",
                     confidence = ConfidenceTier.LOW
@@ -264,7 +270,7 @@ object StaticWorldData {
                     title = "Harga Spot & Futures Kapas",
                     displayedValue = "1.850 A$/ton (+4,2%)",
                     sourceName = "Bursa Komoditas Tarsis–Sundara",
-                    dataDate = "1 Maret 2033",
+                    dataDate = "1 ${dNow}",
                     calculationMethod = "Terbentuk dari buku pesanan pelaku pasar, cadangan air irigasi Tarsis, dan stok gudang global.",
                     uncertaintyAndBiasNote = "Gejala El Niño di Tarsis melebarkan pita proyeksi FanChart ke atas dalam 6 bulan ke depan.",
                     confidence = ConfidenceTier.HIGH
@@ -285,7 +291,7 @@ object StaticWorldData {
                     title = "Harga Minyak Mentah Boreal",
                     displayedValue = "84,5 A$/bbl (+6,8%)",
                     sourceName = "Bursa Energi Norvaldia–Halvenia",
-                    dataDate = "1 Maret 2033",
+                    dataDate = "1 ${dNow}",
                     calculationMethod = "Harga kesetimbangan order book energi + premi risiko Selat Norvaldia.",
                     uncertaintyAndBiasNote = "Rantai transmisi: Minyak naik → inflasi Sundara naik 3 bln lagi → Bank Sentral menaikkan bunga → cicilan mengambang Bank B naik.",
                     confidence = ConfidenceTier.HIGH
@@ -306,7 +312,7 @@ object StaticWorldData {
                     title = "Harga Baja & Komponen Kestrel",
                     displayedValue = "760 A$/ton (+5,5%)",
                     sourceName = "Indeks Manufaktur Kestrel",
-                    dataDate = "Februari 2033",
+                    dataDate = "${dPrev1}",
                     calculationMethod = "Matriks Leontief x = (I - A)^-1 d; kenaikan harga baja langsung menaikkan anggaran konstruksi Pabrik Pemintalan.",
                     uncertaintyAndBiasNote = "Pembatasan ekspor logam langka Kestrel memicu kelangkaan baja presisi.",
                     confidence = ConfidenceTier.MEDIUM
@@ -327,7 +333,7 @@ object StaticWorldData {
                     title = "Nilai Tukar RS terhadap A$",
                     displayedValue = "15.450 RS per 1 A$ (Melemah 2,3%)",
                     sourceName = "Pasar Valas Antarbank Sundara",
-                    dataDate = "1 Maret 2033",
+                    dataDate = "1 ${dNow}",
                     calculationMethod = "Dipengaruhi selisih suku bunga riil, defisit neraca perdagangan, cadangan devisa, dan risiko pemilu Sundara.",
                     uncertaintyAndBiasNote = "Waspadai currency mismatch jika mengambil pinjaman dalam mata uang A$ sementara pendapatan dalam RS.",
                     confidence = ConfidenceTier.HIGH
@@ -371,7 +377,7 @@ object StaticWorldData {
                     title = "Analisis Kestrel Loom & Fiber (KLFC)",
                     displayedValue = "38,4 A$ (+3,1%) · M-Score Aman",
                     sourceName = "Bursa Efek Kestrel",
-                    dataDate = "Februari 2033",
+                    dataDate = "${dPrev1}",
                     calculationMethod = "Valuasi buku pesanan 5.000 agen investor institusional.",
                     uncertaintyAndBiasNote = "Arketipe Perampas Harga: sedang mengintai jadwal jatuh tempo utang Bank B Anda untuk memicu perang harga.",
                     confidence = ConfidenceTier.HIGH
@@ -413,41 +419,6 @@ object StaticWorldData {
                 escalationStage = "Normal & Terbuka (Skor <30)",
                 businessEffect = "Pelayaran kapas lancar, namun sensitif terhadap larangan ekspor beras saat El Niño.",
                 tone = SemanticTone.GOOD_GREEN
-            )
-        )
-    }
-
-    fun unionEvent(): EventDialogModel {
-        return EventDialogModel(
-            id = "evt_union_ultimatum",
-            title = "Ultimatum Serikat Pekerja Tekstil Kalimas",
-            contextDescription = "Harga beras yang melonjak akibat cuaca ekstrem di Tarsis memicu keresahan 340 pekerja PT Benang Sundara. Pengurus serikat memberikan tenggat 2 giliran sebelum menggelar mogok massal tepat saat pabrik mengejar target pengiriman ritel.",
-            earlyWarningNote = "Mimbar Rakyat (Januari 2033) telah memberitakan lonjakan harga beras 14% di kawasan buruh Kalimas.",
-            options = listOf(
-                EventOptionItem(
-                    id = "opt_union_1",
-                    title = "Setujui kenaikan upah pokok 8% + tunjangan beras",
-                    apCost = 1,
-                    impactEstimate = "Biaya operasi naik 180 jt RS/bulan, risiko mogok batal, moral pekerja pulih",
-                    advisorAttribution = "menurut Direktur Operasi",
-                    tone = SemanticTone.GOOD_GREEN
-                ),
-                EventOptionItem(
-                    id = "opt_union_2",
-                    title = "Tawarkan bagi hasil kuartalan berbasis penurunan tingkat cacat kain",
-                    apCost = 2,
-                    impactEstimate = "Kas keluar awal hanya 60 jt RS/bulan, kualitas kain naik, namun serikat masih skeptis",
-                    advisorAttribution = "menurut Direktur Operasi",
-                    tone = SemanticTone.PRIMARY_BLUE
-                ),
-                EventOptionItem(
-                    id = "opt_union_3",
-                    title = "Tolak tuntutan & sewa tenaga kontrak luar untuk berjaga-jaga",
-                    apCost = 1,
-                    impactEstimate = "Hemat kas bulan ini, tetapi risiko mogok dan kerusakan mesin naik tajam",
-                    advisorAttribution = "menurut Direktur Operasi",
-                    tone = SemanticTone.DANGER_RED
-                )
             )
         )
     }

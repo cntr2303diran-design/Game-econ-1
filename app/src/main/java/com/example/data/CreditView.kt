@@ -218,17 +218,19 @@ internal object CreditView {
             advice = "Dual sourcing dan kontrak berjangka menurunkan daya tawar mereka.",
             tone = SemanticTone.WARNING_YELLOW
         )
+        val unionEv = e.openEvents.firstOrNull { it.templateId == "union" }
         out += ActorItem(
             id = "act_serikat", group = "Pekerja", name = "Serikat Pekerja Tekstil Kalimas", role = "Serikat pekerja",
-            goal = "Upah riil dan keamanan kerja bagi 340 pekerja.",
+            goal = "Upah riil dan keamanan kerja bagi ${e.sc.workers} pekerja.",
             lastAction = when {
                 e.strikeMonthsLeft > 0 -> "Sedang mogok (${e.strikeMonthsLeft} bulan lagi)."
-                e.unionResolved -> "Tuntutan terakhir sudah diselesaikan."
-                else -> "Menuntut kenaikan upah mengikuti harga beras; tenggat ${dateText(e.unionDeadlineTurn)}."
+                unionEv != null -> "Menuntut kenaikan upah; tenggat ${dateText(unionEv.deadlineTurn)}."
+                e.inflationAnnual > 6.0 -> "Tenang untuk saat ini, tetapi inflasi ${f1(e.inflationAnnual)}% menggerus upah riil dan tuntutan baru mungkin datang."
+                else -> "Tidak ada tuntutan aktif."
             },
             signals = listOf("Inflasi ${f1(e.inflationAnnual)}% per tahun", "Pengangguran ${f1(e.world.unemployment)}% (makin tinggi, daya tawar serikat turun)"),
             advice = "Tuntutan yang diabaikan saat inflasi tinggi berujung mogok tepat ketika kontrak pengiriman berjalan.",
-            tone = if (e.strikeMonthsLeft > 0) SemanticTone.DANGER_RED else SemanticTone.WARNING_YELLOW
+            tone = if (e.strikeMonthsLeft > 0) SemanticTone.DANGER_RED else if (unionEv != null) SemanticTone.WARNING_YELLOW else SemanticTone.NEUTRAL_GRAY
         )
         // ---- Negara dan pasar ----
         out += ActorItem(

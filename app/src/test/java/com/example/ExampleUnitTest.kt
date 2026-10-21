@@ -27,14 +27,48 @@ class ExampleUnitTest {
     @Test
     fun initialState_matchesStartingScenario() {
         val state = GameRepository(null, 1L).gameState.value
-        assertEquals("Maret 2033", state.dateText)
-        assertEquals(39, state.turn)
+        val e = KapitalEngine(1L)
+        assertEquals(KapitalEngine.dateText(e.sc.turn0), state.dateText)
+        assertEquals(e.sc.turn0, state.turn)
         assertEquals(4, state.apCurrent)
         assertEquals(7, state.apMax)
         assertEquals(4, state.markasIndicators.size)
-        assertEquals(3, state.pendingDecisions.size)
+        assertEquals(2 + e.openEvents.size, state.pendingDecisions.size)
         assertEquals(5, state.morningPaperEdition.size)
         assertEquals(8, state.countries.size)
+    }
+
+    @Test
+    fun everyNewGameStartsDifferently() {
+        val starts = (1L..30L).map { KapitalEngine(it) }
+        assertTrue("premis harus beragam", starts.map { it.sc.id }.toSet().size >= 5)
+        assertTrue("tanggal mulai harus beragam", starts.map { it.sc.turn0 }.toSet().size >= 15)
+        assertTrue("kas awal harus beragam", starts.map { it.cash.toInt() }.toSet().size >= 28)
+        assertTrue("nama eksekutif harus beragam", starts.map { it.execs[0].name }.toSet().size >= 4)
+        for (e in starts) assertTrue("neraca awal seimbang", abs(e.totalAssets() - e.totalLiabilities() - e.equity) < 1.0)
+    }
+
+    @Test
+    fun eventsDifferBetweenGames_andEventChoicesReplay() {
+        val seen = HashSet<String>()
+        for (seed in 1L..25L) {
+            val e = KapitalEngine(seed)
+            repeat(40) {
+                for (ev in e.openEvents.toList()) { seen += ev.templateId; e.apply(Action.EventChoice(ev.id, ev.options.first { it.id != "z" }.id)) }
+                e.apply(Action.EndTurn)
+                if (e.gameOverReason != null) return@repeat
+            }
+        }
+        assertTrue("minimal 15 jenis kartu muncul: ${seen.size}", seen.size >= 15)
+        val a = Action.EventChoice("evt_1_2_union", "a")
+        assertEquals(a, Action.decode(a.encode()))
+        // permainan tersimpan harus memainkan ulang dunia yang sama
+        val store = MemoryStore()
+        val r = GameRepository(store, 21L)
+        repeat(8) { r.advanceTurn() }
+        val r2 = GameRepository(store)
+        assertEquals(r.gameState.value.turn, r2.gameState.value.turn)
+        assertEquals(r.gameState.value.pendingDecisions.map { it.id }, r2.gameState.value.pendingDecisions.map { it.id })
     }
 
     @Test
@@ -44,17 +78,17 @@ class ExampleUnitTest {
         assertEquals(1, e.ap)
         assertFalse(e.apply(Action.Journal("dec_termsheet", "cnt_ts_1", 60, 5000.0, "a", "b", "c"))) // butuh 2 AP
         assertFalse(e.apply(Action.Journal("dec_pemintalan", "", 60, 5000.0, "a", "b", "c"))) // sudah diputuskan
-        assertFalse(e.apply(Action.SetSalesScheme(SalesScheme.OMZET))) // skema sama
+        assertFalse(e.apply(Action.SetSalesScheme(e.salesScheme))) // skema sama
         assertTrue(e.pendingDecisions().none { it.id == "dec_pemintalan" })
     }
 
     @Test
     fun balanceSheetAlwaysBalances() {
         val e = KapitalEngine(7L)
-        e.apply(Action.UnionOption("opt_union_1"))
         e.apply(Action.Journal("dec_termsheet", "cnt_ts_2", 70, 5000.0, "a", "b", "c"))
         repeat(60) {
-            if (e.turn == 41) {
+            for (ev in e.openEvents.toList()) e.apply(Action.EventChoice(ev.id, ev.options.first { it.id != "z" }.id))
+            if (e.turn == e.sc.turn0 + 2) {
                 e.apply(Action.SetSalesScheme(SalesScheme.KAS))
                 e.apply(Action.SetFactoryScheme(FactoryScheme.ANDAL))
             }
@@ -69,7 +103,10 @@ class ExampleUnitTest {
     fun saveAndReload_reproducesSameWorld() {
         val store = MemoryStore()
         val a = GameRepository(store, 11L)
-        a.resolveEventOption(a.gameState.value.activeEventDialog.options[0])
+        a.gameState.value.pendingDecisions.firstOrNull { it.opensEventDialog }?.let { d ->
+            a.openEventDialog(true, d.id)
+            a.resolveEventOption(a.gameState.value.activeEventDialog.options[0])
+        }
         repeat(5) { a.advanceTurn() }
         val b = GameRepository(store)
         assertEquals(a.gameState.value.turn, b.gameState.value.turn)
@@ -77,11 +114,13 @@ class ExampleUnitTest {
     }
 
     @Test
-    fun ignoringUnion_leadsToStrike() {
-        val e = KapitalEngine(5L)
-        e.apply(Action.EndTurn)
-        e.apply(Action.EndTurn)
-        assertTrue(e.chronicle.any { it.title.contains("Mogok") })
+    fun ignoringEvent_appliesDefaultOutcomeAtDeadline() {
+        val e = KapitalEngine((1L..40L).first { KapitalEngine(it).openEvents.any { ev -> ev.templateId == "union" } })
+        assertTrue(e.openEvents.any { it.templateId == "union" })
+        repeat(3) { e.apply(Action.EndTurn) }
+        assertTrue(e.openEvents.none { it.templateId == "union" })
+        assertTrue(e.chronicle.any { it.description.contains("Tenggat lewat") })
+        assertTrue("upah naik setelah tuntutan diabaikan", e.wageAddOn > 0.0)
     }
 
     @Test

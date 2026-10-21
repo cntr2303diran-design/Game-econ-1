@@ -364,6 +364,7 @@ data class GameState(
 
     // Kartu Event Dialog & Bottom Sheet Asal Data
     val activeEventDialog: EventDialogModel,
+    val eventOutcomeText: String? = null,
     val showEventDialog: Boolean = false,
     val inspectedDataOrigin: DataOriginInfo? = null,
     val selectedCountryForSheet: Country? = null

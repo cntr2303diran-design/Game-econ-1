@@ -209,7 +209,7 @@ fun KapitalAppScaffold(
                     onOpenJurnalKeputusan = { decision ->
                         navController.navigate("jurnal_keputusan/${decision.id}")
                     },
-                    onOpenEventDialog = { viewModel.openEventDialog(true) },
+                    onOpenEventDialog = { id -> viewModel.openEventDialog(true, id) },
                     onInspectOrigin = { viewModel.inspectDataOrigin(it) },
                     onAdvanceTurn = { viewModel.advanceTurn() },
                     onAdjustPrice = { viewModel.adjustPrice(it) },
@@ -342,6 +342,16 @@ fun KapitalAppScaffold(
                 onDismiss = { viewModel.openEventDialog(false) },
                 onSelectOption = { viewModel.resolveEventOption(it) },
                 apCurrent = gameState.apCurrent
+            )
+        }
+
+        // Hasil keputusan kartu kejadian
+        gameState.eventOutcomeText?.let { txt ->
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { viewModel.clearEventOutcome() },
+                title = { androidx.compose.material3.Text("Hasil keputusan") },
+                text = { androidx.compose.material3.Text(txt) },
+                confirmButton = { androidx.compose.material3.Button(onClick = { viewModel.clearEventOutcome() }) { androidx.compose.material3.Text("Mengerti") } }
             )
         }
 

@@ -30,6 +30,8 @@ private data class UiFlags(
     val isDarkTheme: Boolean? = null,
     val activeMapLayer: MapLayerFilter = MapLayerFilter.PELAYARAN,
     val showEventDialog: Boolean = false,
+    val activeEventId: String? = null,
+    val eventOutcome: String? = null,
     val showMonthlyReport: Boolean = false,
     val inspectedOrigin: DataOriginInfo? = null,
     val selectedCountry: Country? = null,
@@ -96,7 +98,8 @@ class GameRepository(
     fun setMapLayer(layer: MapLayerFilter) = setUi { it.copy(activeMapLayer = layer) }
     fun selectCountryForBottomSheet(country: Country?) = setUi { it.copy(selectedCountry = country) }
     fun inspectDataOrigin(origin: DataOriginInfo?) = setUi { it.copy(inspectedOrigin = origin) }
-    fun openEventDialog(show: Boolean) = setUi { it.copy(showEventDialog = show) }
+    fun openEventDialog(show: Boolean, id: String? = null) = setUi { it.copy(showEventDialog = show, activeEventId = if (show) id else null) }
+    fun clearEventOutcome() = setUi { it.copy(eventOutcome = null) }
     fun dismissMonthlyReport() = setUi { it.copy(showMonthlyReport = false) }
     fun showMonthlyReport() = setUi { it.copy(showMonthlyReport = true) }
     fun clearCounterfactual() = setUi { it.copy(counterfactualText = null) }
@@ -146,8 +149,12 @@ class GameRepository(
     fun rejectDecision(decisionId: String) = perform(Action.RejectProposal(decisionId))
 
     fun resolveEventOption(option: EventOptionItem) {
-        ui = ui.copy(showEventDialog = false)
-        perform(Action.UnionOption(option.id))
+        val id = ui.activeEventId ?: engine.openEvents.firstOrNull()?.id ?: return
+        ui = ui.copy(showEventDialog = false, activeEventId = null)
+        if (perform(Action.EventChoice(id, option.id))) {
+            ui = ui.copy(eventOutcome = engine.lastEventResult)
+            publish()
+        }
     }
 
     fun advanceTurn() {
@@ -178,7 +185,7 @@ class GameRepository(
         val skipped = Action.decode(log.getOrNull(actionIndex) ?: "")
         val label = when (skipped) {
             is Action.Journal -> "tanpa keputusan \"${skipped.decisionId.removePrefix("dec_")}\""
-            is Action.UnionOption -> "tanpa respons Anda atas tuntutan serikat"
+            is Action.EventChoice -> "tanpa pilihan Anda pada salah satu kartu kejadian"
             is Action.RejectProposal -> "tanpa menolak proposal pemintalan (proposal dibiarkan menggantung)"
             else -> "tanpa tindakan tersebut"
         }
@@ -220,6 +227,7 @@ class GameRepository(
         val turn = e.turn
         val closed = dateText(turn - 1)
         val prevClosed = dateText(turn - 2)
+        StaticWorldData.setDate(dateText(turn), closed, prevClosed)
 
         // ---- Covenant ----
         val th = e.covenantThreshold()
@@ -294,7 +302,7 @@ class GameRepository(
                 tone = tone(d.tone), assetSharePct = d.assetSharePct, defaultContextNote = d.context,
                 opensEventDialog = d.isEvent,
                 options = if (d.id == "dec_termsheet") listOf(
-                    "cnt_ts_1" to "Bank Pembangunan Sundara · bunga tetap 10,75% · cicilan 48 bulan",
+                    "cnt_ts_1" to "Bank Pembangunan Sundara · ${fmt(e.termSheetAmount())} jt RS · bunga tetap ${fmt2(e.termSheetFixedRate())}% · cicilan 48 bulan",
                     "cnt_ts_2" to "Aurelia Global CitiTrust · 5,2% dalam A$ · bullet 36 bulan"
                 ) else emptyList(),
                 canReject = d.id == "dec_pemintalan"
@@ -521,13 +529,13 @@ class GameRepository(
             SemanticTone.WARNING_YELLOW, originInfo = covOrigin, actions = reviewAction("cnt_bank_b"))
         if (e.termSheetChosen == null && bankB != null) {
             contracts += ContractItem("cnt_ts_1", "Term sheet #1", "Bank Pembangunan Sundara", "Sundara",
-                "25.000 jt RS (bunga tetap 10,75%)", "Tenor 48 bulan · cicilan merata ±521 jt RS/bulan",
+                "${fmt(e.termSheetAmount())} jt RS (bunga tetap ${fmt2(e.termSheetFixedRate())}%)", "Tenor 48 bulan · cicilan merata ±${fmt(e.termSheetAmount() / 48.0)} jt RS/bulan",
                 "ICR ≥ 1,5x · agunan pabrik dengan haircut 25%.",
-                if ("cnt_ts_1" in e.reviewedContracts) "Aman dari kurs dan kenaikan bunga, tetapi cicilan pokok menyedot sekitar 6.250 jt RS kas per tahun." else notReviewed,
+                if ("cnt_ts_1" in e.reviewedContracts) "Aman dari kurs dan kenaikan bunga, tetapi cicilan pokok menyedot sekitar ${fmt(e.termSheetAmount() / 4.0)} jt RS kas per tahun." else notReviewed,
                 SemanticTone.PRIMARY_BLUE, originInfo = covOrigin,
                 actions = reviewAction("cnt_ts_1") + ContractActionItem("choose", "Pilih lewat jurnal keputusan (2 AP)", e.ap >= 2))
             contracts += ContractItem("cnt_ts_2", "Term sheet #2", "Aurelia Global CitiTrust", "Aurelia",
-                "≈${fmt2(24000.0 / e.kurs)} juta A$ (≈24.000 jt RS, bunga 5,2%)", "Tenor 36 bulan · bullet (pokok di akhir)",
+                "≈${fmt2(e.termSheetAudAmountRs() / e.kurs)} juta A$ (≈${fmt(e.termSheetAudAmountRs())} jt RS, bunga 5,2%)", "Tenor 36 bulan · bullet (pokok di akhir)",
                 "ICR ≥ 1,75x · klausul Material Adverse Change (MAC).",
                 if ("cnt_ts_2" in e.reviewedContracts) "JEBAKAN: utang dalam A$. Jika Rial anjlok, klausul MAC mengizinkan bank menaikkan bunga ke 9,2% dan menagih 30% pokok dalam 3 bulan." else notReviewed,
                 SemanticTone.PRIMARY_BLUE, originInfo = covOrigin,
@@ -543,7 +551,7 @@ class GameRepository(
                 SemanticTone.NEUTRAL_GRAY, originInfo = covOrigin)
         }
         contracts += ContractItem("cnt_sup_kestrel", "Pemasok Tier-2", "Kestrel Precision Loom Parts", "Kestrel",
-            "Suku cadang dan sensor tenun (±1.800 jt RS/tahun)",
+            "Suku cadang dan sensor tenun (±${fmt(1800.0 * e.sc.size)} jt RS/tahun)",
             if (e.dualSourcing) "Dual sourcing aktif (HPP +1,2%)" else "Just-in-time · tanpa denda keterlambatan",
             "Memasok 80% kebutuhan sensor dan jarum mesin tenun Kalimas.",
             if ("cnt_sup_kestrel" in e.reviewedContracts) "Pemasok diam-diam memakai magnet dari Velmora (terkena sanksi Aurelia) dan bisa menahan kiriman saat kelangkaan untuk dijual ke pasar spot." else notReviewed,
@@ -552,7 +560,7 @@ class GameRepository(
                 if (e.dualSourcing) emptyList() else listOf(ContractActionItem("dual", "Aktifkan dual sourcing (1 AP, HPP +1,2%)", e.ap >= 1)))
 
         if (e.covenantBreaches >= 1 && !e.cureUsed) contracts += ContractItem("cnt_cure", "Hak equity cure", "Pemegang saham", "Sundara",
-            "Suntikan ekuitas ${fmt(KapitalEngine.EQUITY_CURE)} jt RS (sekali seumur permainan)",
+            "Suntikan ekuitas ${fmt(e.sc.equityCure)} jt RS (sekali seumur permainan)",
             "Berlaku selama ada pelanggaran covenant aktif",
             "Menambah kas dan menurunkan hitungan pelanggaran satu tingkat. Tidak memperbaiki ICR.",
             "Menunda masalah, bukan menyelesaikannya: jika laba operasi tidak pulih, pelanggaran terulang.",
@@ -663,7 +671,7 @@ class GameRepository(
             "Menaikkan harga membuat Anda kehilangan pangsa karena pesaing tidak ikut naik."
 
         return GameState(
-            hasSavedGame = log.isNotEmpty() || e.turn > 39,
+            hasSavedGame = log.isNotEmpty() || e.turn > e.sc.turn0,
             companyEquityText = "${fmt(e.equity)} jt RS",
             rivals = rivalItems,
             actionPoints = e.ap,
@@ -729,7 +737,13 @@ class GameRepository(
             evaluatedJournals = evaluated.size,
             detectedBiases = biases,
             worldChronicles = chronicles,
-            activeEventDialog = StaticWorldData.unionEvent(),
+            activeEventDialog = run {
+                val ev = e.openEvents.firstOrNull { it.id == ui.activeEventId } ?: e.openEvents.firstOrNull()
+                if (ev == null) EventDialogModel("none", "Tidak ada kartu aktif", "Tidak ada kejadian yang menunggu keputusan.", "", emptyList())
+                else EventDialogModel(ev.id, ev.title, ev.body, ev.warning,
+                    ev.options.filter { it.id != "z" }.map { EventOptionItem(it.id, it.title, it.apCost, it.impact, it.advisor, tone(it.tone)) })
+            },
+            eventOutcomeText = ui.eventOutcome,
             showEventDialog = ui.showEventDialog,
             inspectedDataOrigin = ui.inspectedOrigin,
             selectedCountryForSheet = ui.selectedCountry

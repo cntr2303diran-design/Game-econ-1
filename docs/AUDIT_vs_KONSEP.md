@@ -94,3 +94,13 @@ Urutan yang saya sarankan (dari yang paling memengaruhi pembelajaran):
 - Negara, bank, dan perusahaan di game fiktif; angka terkalibrasi ke pola ekonomi nyata (Taylor, PPP, AR(1) komoditas, kurva Phillips), bukan data nyata. Jangan dijadikan dasar keputusan investasi sungguhan.
 - Skor kredit, haircut agunan, dan perilaku bankir adalah model sederhana dari praktik umum; bank sungguhan memakai model dan kebijakan internal yang berbeda.
 - Pembelajaran bisnis multinasional yang sebenarnya butuh Era 2 (lintas negara). Belum ada di build ini.
+
+## Pembaruan: setiap permainan berbeda (build-15)
+
+Masalah: alur cerita masih tertanam di kode (tanggal Maret 2033, serikat selalu menuntut, pinjaman Bank B selalu jatuh tempo bulan ke-45), sehingga tujuh permainan terasa sama.
+
+Perbaikan:
+- `Scenario.kt`: tiap seed membangkitkan premis (warisan bangkrut, pelanggan tunggal, mesin tua, ekspansi berutang, pasar lesu, sengketa serikat), tanggal mulai, ukuran usaha, kas, piutang, utang, bunga awal, inflasi, kurs, nama eksekutif, jadwal pemilu, dan jatuh tempo Bank B.
+- `Events.kt`: dek 26 kartu keputusan (serikat, pembajakan eksekutif, kecelakaan kerja, upah minimum, termin pelanggan, peritel bangkrut, tren motif, batch cacat, pemasok kapas, kenaikan suku cadang, pelabuhan, listrik, banjir, ransomware, audit pajak, inspeksi limbah, insentif, anti-dumping, kredit mengetat, dividen khusus, mesin bekas, kecurangan internal, pemberitaan, kartel, suap izin, pesaing baru) dan 6 pemberitahuan. Peluang tiap kartu bergantung pada kondisi dunia (inflasi, pengangguran, bunga, umur piutang, perawatan mesin, riwayat etika).
+- Setiap pilihan berisiko (hasil acak deterministik dari seed), kartu yang dibiarkan sampai tenggat memakai hasil bawaan yang biasanya terburuk, dan jalan pintas (suap, kartel) menambah beban etika yang bisa meledak menjadi skandal.
+- Simpanan lama tidak kompatibel: skenario dibangkitkan dari seed, sehingga permainan lama harus dimulai ulang.
