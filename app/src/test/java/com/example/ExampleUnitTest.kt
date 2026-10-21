@@ -3,6 +3,9 @@ package com.example
 import com.example.data.GameRepository
 import com.example.data.SaveStore
 import com.example.engine.Action
+import com.example.engine.AppStatus
+import com.example.engine.CreditDesk
+import com.example.engine.CreditMetrics
 import com.example.engine.FactoryScheme
 import com.example.engine.KapitalEngine
 import com.example.engine.SalesScheme
@@ -190,5 +193,56 @@ class ExampleUnitTest {
         assertTrue(e.bourse.companies.all { it.quarters.isNotEmpty() })
         assertTrue(e.apply(Action.SellStock("sx_mitra", 2)))
         assertTrue(e.holdings.isEmpty())
+    }
+
+    @Test
+    fun credit_applicationTakesTimeAndCanBeAcceptedOrRefused() {
+        val enc = Action.ApplyCredit("bk_niaga", 6000, 36, "EKSPANSI", true, false)
+        assertEquals(enc, Action.decode(enc.encode()))
+        assertEquals(Action.AcceptOffer("app_1"), Action.decode(Action.AcceptOffer("app_1").encode()))
+        val e = KapitalEngine(3L)
+        assertFalse("jumlah terlalu kecil", e.apply(Action.ApplyCredit("bk_niaga", 100, 36, "MODAL_KERJA", true, false)))
+        assertTrue(e.apply(Action.ApplyCredit("bk_niaga", 6000, 36, "EKSPANSI", true, false)))
+        assertFalse("satu pengajuan aktif per bank", e.apply(Action.ApplyCredit("bk_niaga", 2000, 12, "MODAL_KERJA", true, false)))
+        val app = e.credit.applications.first()
+        assertEquals("belum ada keputusan di giliran yang sama", AppStatus.PROCESSING, app.status)
+        e.apply(Action.EndTurn)
+        assertEquals(AppStatus.PROCESSING, app.status)
+        assertTrue("tidak ada dana cair tanpa persetujuan", e.loans.none { it.id.startsWith("cr_") })
+        e.apply(Action.EndTurn)
+        assertEquals(AppStatus.OFFER, app.status)
+        assertNotNull(app.offer)
+        assertFalse("tidak bisa menjawab penawaran yang tidak ada", e.apply(Action.AcceptOffer("app_99")))
+        assertTrue(e.apply(Action.AcceptOffer(app.id)))
+        e.apply(Action.EndTurn)
+        assertEquals(AppStatus.DISBURSED, app.status)
+        assertTrue(e.loans.any { it.id == "cr_${app.id}" && it.balance > 0.0 })
+        assertTrue("neraca seimbang", abs(e.totalAssets() - e.totalLiabilities() - e.equity) < 1e-6)
+    }
+
+    @Test
+    fun credit_stressedBorrowerIsRejectedAndOversizedLoanIsCut() {
+        val desk = CreditDesk()
+        val bad = CreditMetrics(2000.0, 8000.0, 6000.0, 42000.0, 2000.0, 30000.0, 40000.0, 5000.0, 1, 95.0, 8.0, 8.5, 1.5, 3.0, true)
+        for (b in desk.banks.filter { it.id != "bk_dana" }) {
+            assertTrue("${b.id} harus menolak", desk.score(b, bad, 9800.0, 13.0, 41, 0.0).total < b.minScore)
+        }
+        val e = KapitalEngine(3L)
+        assertTrue(e.apply(Action.ApplyCredit("bk_niaga", 40000, 60, "EKSPANSI", true, false)))
+        repeat(2) { e.apply(Action.EndTurn) }
+        val a = e.credit.applications.first()
+        assertTrue("plafon 40.000 jt tidak mungkin disetujui penuh", a.status == AppStatus.REJECTED || (a.offer?.cut == true))
+    }
+
+    @Test
+    fun credit_savedGameReplaysSameBankDecisions() {
+        var saved: String? = null
+        val store = object : SaveStore { override fun read() = saved; override fun write(text: String) { saved = text } }
+        val r = GameRepository(store, 42L)
+        r.applyCredit("bk_niaga", 5000, 36, "MODAL_KERJA", true, false)
+        r.advanceTurn(); r.advanceTurn()
+        val before = r.gameState.value.credit.applications.map { it.statusLabel + it.stageText }
+        val r2 = GameRepository(store)
+        assertEquals(before, r2.gameState.value.credit.applications.map { it.statusLabel + it.stageText })
     }
 }

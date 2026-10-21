@@ -78,7 +78,18 @@ class Loan(
     val amortStartTurn: Int,
     var maturityTurn: Int,
     var floatingSpreadPct: Double?,
-    val covenantIcr: Double
+    val covenantIcr: Double,
+    val bankId: String = "",
+    var macClause: Boolean = false,
+    var stepUpTurn: Int = -1,
+    var stepUpPct: Double = 0.0,
+    var dividendLock: Boolean = false,
+    var callable: Boolean = false,
+    var inceptionPolicy: Double = 0.0,
+    var inceptionEbit12: Double = 0.0,
+    var macTriggered: Boolean = false,
+    var callNoticeTurn: Int = -1,
+    var bullet: Boolean = false
 )
 
 class ExecState(
@@ -124,6 +135,8 @@ class KapitalEngine(val seed: Long) {
     // ---------- Makro ----------
     val world = World()
     val bourse = Bourse()
+    val credit = CreditDesk()
+    private val policyHist = mutableListOf(6.5, 6.5, 6.5, 6.5, 6.5, 6.5)
     /** Kepemilikan saham dalam lot (1 lot = 100 ribu lembar), biaya perolehan total (jt RS). */
     val holdings = LinkedHashMap<String, Int>()
     val costBasis = HashMap<String, Double>()
@@ -463,9 +476,9 @@ class KapitalEngine(val seed: Long) {
         }
         if (spinningDecision == null && gameOverReason == null) {
             list += PendingDecision("dec_pemintalan", "Proposal pabrik pemintalan",
-                "Integrasi hulu benang di Kalimas · 14.000 jt RS, 70% dibiayai kredit investasi",
+                "Integrasi hulu benang di Kalimas · 14.000 jt RS; pembiayaan harus Anda cari sendiri (kas atau kredit bank)",
                 3, "3 AP", Tone.INFO, (14000.0 / assets * 100).toInt(),
-                "Direktur Operasi mengusulkan lini pemintalan sendiri agar tidak bergantung pada benang impor. Proyek sekitar 15 bulan; biaya benang turun setelah beroperasi.",
+                "Direktur Operasi mengusulkan lini pemintalan sendiri agar tidak bergantung pada benang impor. Proyek sekitar 15 bulan; biaya benang turun setelah beroperasi. Tidak ada pembiayaan otomatis: ajukan kredit di layar Bank (tujuan: Proyek pabrik pemintalan) atau tanggung dari kas. Bank akan menilai kelayakan Anda dan bisa menolak.",
                 false)
         }
         return list
@@ -541,6 +554,19 @@ class KapitalEngine(val seed: Long) {
             }
             is Action.Confront -> doConfront(action.execId)
             is Action.Fire -> doFire(action.execId)
+            is Action.ApplyCredit -> doApplyCredit(action)
+            is Action.ReviewOffer -> {
+                val a = credit.app(action.appId)
+                if (a != null && a.status == AppStatus.OFFER && !a.reviewed && spend(1)) { a.reviewed = true; oneOffOpex += 50.0; true } else false
+            }
+            is Action.AcceptOffer -> {
+                val a = credit.app(action.appId)
+                if (a != null && a.status == AppStatus.OFFER && spend(1)) { a.status = AppStatus.ACCEPTED; a.disburseTurn = turn; a.stageText = "Diterima; dana cair akhir bulan ini."; true } else false
+            }
+            is Action.DeclineOffer -> {
+                val a = credit.app(action.appId)
+                if (a != null && a.status == AppStatus.OFFER) { a.status = AppStatus.DECLINED; a.stageText = "Anda menolak penawaran."; credit.gainRelationship(a.bankId, -1.0); true } else false
+            }
             is Action.BuyStock -> doBuy(action.companyId, action.lots)
             is Action.SellStock -> doSell(action.companyId, action.lots)
             is Action.AdjustPrice -> {
@@ -550,6 +576,37 @@ class KapitalEngine(val seed: Long) {
         }
         if (ok) actionCount++
         return ok
+    }
+
+    private fun doApplyCredit(a: Action.ApplyCredit): Boolean {
+        val purpose = Purpose.entries.firstOrNull { it.name == a.purpose } ?: return false
+        if (a.amount < 500 || a.amount > 60000) return false
+        if (credit.bank(a.bankId) == null) return false
+        if (ap < 2) return false
+        val app = credit.submit(a.bankId, a.amount.toDouble(), a.tenor, purpose, a.floating, a.bullet, turn) ?: return false
+        ap -= 2
+        oneOffOpex += 30.0
+        return true
+    }
+
+    fun creditMetrics(amount: Double = 0.0): CreditMetrics {
+        val e12 = ebitHist.takeLast(12); val i12 = interestHist.takeLast(12)
+        val ebit12 = e12.sum() * 12.0 / e12.size
+        val int12 = i12.sum() * 12.0 / i12.size
+        val dep12 = fixedAssets * 0.0081 * 12.0
+        var due = payables
+        for (l in loans) if (l.balance > 0.5) {
+            val bal = loanBalanceRs(l)
+            due += if (l.maturityTurn <= turn + 12) bal else min(bal, 12.0 * l.amortPerMonth * (if (l.currencyAud) kurs else 1.0))
+        }
+        val coll = 0.55 * fixedAssets * (if (deferredMonths >= 3) 0.9 else 1.0) + 0.70 * normalAR + 0.50 * inventory + 0.50 * portfolioValue()
+        val kd = if (kursHist.size >= 6) (kurs / kursHist[kursHist.size - 6] - 1.0) * 100.0 else 0.0
+        val pd = policyRate - policyHist.first()
+        return CreditMetrics(ebit12, ebit12 + dep12, int12, totalDebt(), cash, cash + totalAR() + inventory, due,
+            max(0.0, coll - totalDebt()), covenantBreaches, dso(), world.unemployment, policyRate, pd, kd, deferredMonths >= 3,
+            max(1000.0, (lastIncome["cogs"] ?: 9900.0) + (lastIncome["opex"] ?: 2300.0)),
+            loans.filter { it.balance > 0.5 }.sumOf { 12.0 * it.amortPerMonth * (if (it.currencyAud) kurs else 1.0) },
+            fixedAssets * 0.0081 * 12.0 * REPLACEMENT_CAPEX)
     }
 
     private fun doBuy(id: String, lots: Int): Boolean {
@@ -601,8 +658,6 @@ class KapitalEngine(val seed: Long) {
                 spinningDecision = "approved"
                 spinningStartTurn = turn + 1
                 spinningDelayed = Random(seed + 501).nextDouble() < 0.4
-                loans += Loan("kredit_investasi", "Bank Pembangunan (kredit investasi)", 0.0, 14.0, false,
-                    9800.0 / 60.0, turn + 13, turn + 73, null, 1.8)
                 title = "Persetujuan pabrik pemintalan"
             }
             "dec_termsheet" -> {
@@ -798,6 +853,7 @@ class KapitalEngine(val seed: Long) {
         }
         inflationAnnual = out.inflationAnnual
         policyRate = out.policyRate
+        policyHist += policyRate; if (policyHist.size > 6) policyHist.removeAt(0)
         trendMonths++
         val monthlyInfl = (inflationAnnual / 12.0) / 100.0
         priceIndex *= 1.0 + monthlyInfl
@@ -927,8 +983,6 @@ class KapitalEngine(val seed: Long) {
                     "Investasi hulu → benang sendiri → rasio HPP turun.")
             }
             spinningSpent += capex
-            val inv = loans.firstOrNull { it.id == "kredit_investasi" }
-            if (inv != null) { inv.balance += capex * 0.7; newDebt += capex * 0.7 }
         }
         val replacement = dep * REPLACEMENT_CAPEX
         capex += replacement
@@ -949,6 +1003,60 @@ class KapitalEngine(val seed: Long) {
                 if (turn >= electionTurn && electionShock && macDemandTurn < 0) { /* guncangan sudah lewat */ }
             }
             if (bankB != null) { principal += payoff; bankB.balance = 0.0 }
+        }
+        // Meja kredit: keputusan bank, pencairan, dan efek klausul
+        run {
+            credit.process(turn, policyRate, { _, amt -> creditMetrics(amt) }, rng(50)).forEach { lines += ReportLine(it.first, it.second) }
+            for (a in credit.applications) {
+                if (a.status != AppStatus.ACCEPTED || a.disburseTurn > turn) continue
+                val b = credit.bank(a.bankId) ?: continue
+                val o = a.offer ?: continue
+                val aud = b.foreign
+                val bal = if (aud) o.amount / kurs else o.amount
+                val amort = if (o.bullet) 0.0 else bal / max(1, o.tenor - o.graceMonths)
+                val e12 = ebitHist.takeLast(12).let { it.sum() * 12.0 / it.size }
+                loans += Loan("cr_${a.id}", "${b.name} (${a.purpose.label})", bal, o.ratePct, aud, amort, turn + 1 + o.graceMonths,
+                    turn + o.tenor, o.spreadPct, o.covenantIcr, b.id, o.macClause, if (o.stepUpPct > 0) turn + 12 else -1, o.stepUpPct,
+                    o.dividendLock, o.callable, policyRate, e12, false, -1, o.bullet)
+                newDebt += o.amount
+                oneOffOpex += o.amount * o.feePct / 100.0
+                credit.gainRelationship(b.id, 3.0)
+                a.status = AppStatus.DISBURSED
+                lines += ReportLine("Kredit ${b.name} ${fmt(o.amount)} jt RS cair (${a.purpose.label}). Biaya provisi ${fmt(o.amount * o.feePct / 100.0)} jt RS.", Tone.GOOD)
+                chronicle += ChronicleItem(turn, "Kredit baru dari ${b.name}", "${fmt(o.amount)} jt RS, tenor ${o.tenor} bulan, bunga ${fmt2(o.ratePct)}%.",
+                    "Pengajuan → analisis bank → penawaran → persetujuan Anda → pencairan.")
+            }
+            for (l in loans) {
+                if (l.balance <= 0.5 || !l.id.startsWith("cr_")) continue
+                val rsFactor = if (l.currencyAud) kurs else 1.0
+                if (l.stepUpTurn == turn) {
+                    if (l.floatingSpreadPct != null) l.floatingSpreadPct = l.floatingSpreadPct!! + l.stepUpPct else l.annualRatePct += l.stepUpPct
+                    lines += ReportLine("Bunga promosi ${l.lender} berakhir: bunga naik ${fmt2(l.stepUpPct)} poin.", Tone.WARN)
+                }
+                if (l.macClause && !l.macTriggered) {
+                    val ebit3 = ebitHist.takeLast(3).sum() * 4.0
+                    if (policyRate - l.inceptionPolicy >= 2.0 || (turn >= l.amortStartTurn - 6 && ebit3 < 0.6 * l.inceptionEbit12)) {
+                        l.macTriggered = true
+                        val pay = l.balance * (if (l.currencyAud) 0.30 else 0.20)
+                        l.balance -= pay; principal += pay * rsFactor
+                        lines += ReportLine("${l.lender} menggunakan klausul MAC: pelunasan paksa ${fmt(pay * rsFactor)} jt RS karena suku bunga atau kinerja memburuk.", Tone.BAD)
+                    }
+                }
+                if (l.callable) {
+                    val stress = world.unemployment > 7.5 || policyRate - l.inceptionPolicy >= 2.5
+                    if (stress && l.callNoticeTurn < 0 && rng(51).nextDouble() < 0.35) {
+                        l.callNoticeTurn = turn + 2
+                        lines += ReportLine("${l.lender} memberi pemberitahuan: seluruh pinjaman akan ditarik dalam 2 giliran.", Tone.BAD)
+                    } else if (l.callNoticeTurn == turn) {
+                        val pay = l.balance; l.balance = 0.0; principal += pay * rsFactor
+                        lines += ReportLine("${l.lender} menarik seluruh pinjaman: ${fmt(pay * rsFactor)} jt RS harus dibayar sekarang.", Tone.BAD)
+                    }
+                }
+                if (l.bullet && l.maturityTurn == turn && l.balance > 0.5) {
+                    val pay = l.balance; l.balance = 0.0; principal += pay * rsFactor
+                    lines += ReportLine("Pokok bullet ${l.lender} jatuh tempo dan dilunasi: ${fmt(pay * rsFactor)} jt RS.", Tone.WARN)
+                }
+            }
         }
         // Tuntutan MAC Aurelia
         if (macDemandTurn == turn) {
@@ -992,7 +1100,7 @@ class KapitalEngine(val seed: Long) {
         // ---- 5b. Dividen: pemegang saham menarik kas berlebih tiap Desember ----
         var dividend = 0.0
         val cashFloor = 36000.0 * costIndex
-        if ((turn + 1) % 12 == 0 && covenantBreaches == 0 && cash + (ni + dep) > cashFloor && gameOverReason == null) {
+        if ((turn + 1) % 12 == 0 && covenantBreaches == 0 && loans.none { it.dividendLock && it.balance > 0.5 } && cash + (ni + dep) > cashFloor && gameOverReason == null) {
             dividend = 0.5 * (cash + ni + dep - cashFloor)
             equity -= dividend
             lines += ReportLine("RUPS menetapkan dividen ${fmt(dividend)} jt RS (50% kas di atas cadangan ${fmt(cashFloor)} jt RS). Kas berlebih tidak boleh menganggur selamanya.", Tone.INFO)

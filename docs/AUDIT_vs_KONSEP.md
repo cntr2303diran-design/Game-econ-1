@@ -1,0 +1,96 @@
+# Audit KAPITAL: kondisi game saat ini dibanding Dokumen Desain Induk Terpadu
+
+Tanggal audit: 21 Oktober 2026 (build setelah penambahan Bursa dan Meja Kredit).
+Dasar: PDF "KAPITAL: Dokumen Desain Induk Terpadu" (36 halaman) dibandingkan dengan kode di repo.
+
+## Kesimpulan jujur
+
+Game saat ini adalah **simulasi satu perusahaan di satu negara dengan dunia yang hidup sebagian**, bukan simulasi dunia penuh seperti di dokumen.
+Yang sungguh-sungguh disimulasikan: rumah tangga, pasar tenaga kerja, bank sentral (aturan Taylor), inflasi, kurs, tiga komoditas, empat pesaing, tujuh emiten bursa, dan kini proses kredit bank.
+Yang masih berupa skenario tertulis (skrip): tuntutan serikat, term sheet refinancing, proyek pemintalan, guncangan pemilu, dan kebanyakan perilaku eksekutif.
+Skala dokumen (207.000 agen, 8+16 negara, 40 subsektor, 600+ kartu event, 480 giliran) belum tercapai; angka sebenarnya ada di tabel di bawah.
+Dokumen menargetkan "10/10 realistis"; saya menilai kondisi sekarang sekitar 4 dari 10 terhadap dokumen tersebut. Ini bukan pembelajaran bisnis multinasional yang utuh, tetapi fondasi untuk Era 1 (bertahan hidup).
+
+## Perbandingan per bagian dokumen
+
+| # | Bagian dokumen | Target dokumen | Kondisi sekarang | Status |
+|---|---|---|---|---|
+| 3 | Loop giliran, Poin Perhatian | 5 AP, eksekutif menambah AP, krisis mengunci AP | AP ada (maks 4 + eksekutif), aksi berbiaya AP | Sebagian |
+| 3 | Briefing koran, rumor, rilis data terlambat | 5 media, rumor, data terlambat dan direvisi | Koran dan rumor ada; rilis data tidak terlambat/direvisi; berita kurang informatif | Sebagian |
+| 3 | Riset berbayar, intelijen | Beli riset dengan margin error | Tidak ada | Belum |
+| 3 | Rapat dewan kuartalan | Anggota dewan AI bertanya tajam | Tidak ada | Belum |
+| 4 | Dunia | 8 negara inti + 16 sekunder | 8 negara statis + 7 ekonomi asing dinamis (inflasi, kurs), tanpa 16 sekunder | Sebagian |
+| 4 | Peta dan papan | Petak wilayah, selat, risiko iklim | Layar Peta dengan lapisan; tidak ada petak bidak | Sebagian |
+| 5 | Agen | 207.000 | 50.000 rumah tangga + 4 pesaing + 7 emiten + 4 bank + 4 eksekutif + 1 bank sentral | Sebagian |
+| 5 | Pembentukan harga dari buku pesanan | Harga dari order agen | Harga pesaing dari fungsi reaksi; harga saham dari nilai wajar + sentimen, bukan buku pesanan | Sebagian |
+| 5 | Uang tertutup (stock-flow) | Tiap satuan tercatat | Neraca perusahaan pemain selalu seimbang (diuji 20 seed); sistem perbankan agregat belum tercatat | Sebagian |
+| 5 | Determinisme dan replay | Seed + keputusan sama = dunia sama | Ada, termasuk "Bagaimana Jika" | Ya |
+| 6 | Bot eksekutif egois | Manipulasi KPI, sembunyikan masalah, kickback | Tiga perilaku ada (obral kredit, tunda perawatan, kickback), dengan audit dan konfrontasi | Ya (terbatas) |
+| 6 | Bot pesaing AI | 4 arketipe, belajar dari pemain, koalisi | Hanya reaksi harga (menyamai potongan) dan dumping importir; tidak belajar, tidak ada pembajakan staf, korner, lobi | Sebagian kecil |
+| 6 | Bot bankir | Jebakan term sheet, dumping klien busuk | **Baru**: 4 bankir bernama dengan kepentingan, jebakan klausul, penolakan | Ya (baru) |
+| 6 | Bot pemasok | Hold-up opportunistik | Satu kejadian hold-up; dual sourcing sebagai pertahanan | Sebagian |
+| 6 | Bot investor aktivis | Greenmail, bear raid | Tidak ada; investor hanya membentuk harga saham | Belum |
+| 6 | Bot politisi | Siklus politik, pemerasan regulasi | Hanya guncangan pemilu dan sanksi | Sebagian kecil |
+| 6 | Rumah tangga dan serikat | Kepanikan kawanan, mogok | Mogok serikat ada (satu skrip); bank run tidak ada | Sebagian |
+| 7 | Bank sentral | Aturan Taylor + bias politik, QE, forward guidance | Taylor + depresiasi kurs; tanpa bias politik, QE, pidato | Sebagian |
+| 7 | Fiskal, kurva imbal hasil, peringkat negara | Defisit, spiral utang, peringkat | Tidak ada | Belum |
+| 7 | Siklus bisnis endogen | Resesi dari perilaku agen | Ada (kesenjangan output dari rumah tangga) | Ya |
+| 7 | Kurs | Selisih bunga, neraca dagang, risiko politik | Paritas daya beli + premi risiko; tanpa neraca dagang | Sebagian |
+| 8 | Skor ketegangan dan tangga eskalasi | 0-100 per pasangan, 6 anak tangga | Data statis di layar Dunia, tidak bergerak oleh perilaku | Belum |
+| 8 | Matriks Leontief, rantai pasok Tier-3, sanksi berlapis | 40 subsektor | Tidak ada; hanya kapas, minyak, baja sebagai biaya | Belum |
+| 8 | Pemilu, donasi, blok dagang | Pemilu per negara | Satu pemilu Sundara tertulis | Sebagian kecil |
+| 9 | Tiga laporan keuangan, jebakan akrual, CCC | Lengkap, tak bisa disunting | Laba rugi, neraca, arus kas ada tetapi **kurang rinci** (belum ada rincian gaji, perubahan ekuitas, catatan); angka arus kas pendanaan belum menjumlah ke perubahan kas | Sebagian (perbaikan sedang berjalan) |
+| 9 | Utang teknis perawatan | Peluang rusak naik eksponensial | Ada (naik linear per bulan tertunda) | Ya |
+| 9 | SDM, R&D, logistik | Karyawan kunci, riset, gudang, armada | Hanya eksekutif dan serikat; tidak ada R&D, gudang, armada | Sebagian kecil |
+| 10 | Akuntansi forensik | 6 teknik, M-score, uji tuntas, auditor | Channel stuffing dan tunda perawatan ada; tidak ada SPV, window dressing, M-score | Sebagian kecil |
+| 11 | Birokrasi kredit | Credit memo, haircut, term sheet, covenant, 1-3 giliran | **Baru**: pengajuan bebas, 1-3 giliran, haircut agunan, skor internal, tolak/potong/syarat, klausul tersembunyi, biro kredit, hubungan bank | Ya (baru, belum penuh) |
+| 11 | Instrumen non-bank | L/C, factoring, sale-leaseback, asuransi | Factoring otomatis dan pinjaman daring ada; L/C, leaseback, asuransi tidak ada | Sebagian |
+| 11 | Mendirikan bank sendiri | Era 3 | Tidak ada | Belum (memang Era 3) |
+| 12 | Saham, obligasi, IPO, M&A | Bursa, IPO, M&A, LBO, distressed debt | **Baru**: 7 emiten dengan laporan triwulan, beli/jual, dividen. Belum ada obligasi, IPO, M&A, short | Sebagian |
+| 12 | Derivatif | Futures, forward, swap, opsi, CDS | Hanya lindung nilai kapas 6 bulan | Sebagian kecil |
+| 13 | Segmen konsumen, tren, merek | 5 segmen, kurva adopsi, pemasaran | Tidak ada; permintaan agregat satu produk | Belum |
+| 14 | Informasi tidak sempurna | Label keyakinan, bias per sumber, noise per kesulitan | Label keyakinan dan cross-check ada; noise per kesulitan tidak ada (tidak ada tingkat kesulitan) | Sebagian |
+| 15 | Event dari kondisi dunia | 600+ kartu, berantai | Sekitar 15 jenis kejadian dengan peluang dari kondisi; sebagian berantai | Sebagian kecil |
+| 16 | Hukum, etika, skor rahasia | Skor etik, skandal tertunda, antimonopoli, ESG | Tidak ada skor etik dan skandal tertunda | Belum |
+| 17 | Sistem jangka panjang | Demografi, iklim, teknologi, politik dalam, narasi | Tidak ada | Belum |
+| 18 | Pengasah otak | Jurnal, Brier, pasar prediksi, detektor bias, post-mortem, counterfactual, rapat dewan | Jurnal, skor Brier, kronik/post-mortem, counterfactual ada; pasar prediksi, detektor bias, rapat dewan tidak ada | Sebagian |
+| 19 | Kampanye 40 tahun, 4 era, kondisi menang | 480 giliran; skor akhir 5 komponen | Hanya Era 1; skenario mulai Maret 2033, bukan 2030; tidak ada skor akhir | Sebagian kecil |
+| 19 | Tingkat kesulitan | 4 level | Satu level | Belum |
+| 20 | Peran alternatif, multiplayer | CEO, gubernur, menteri, manajer dana | Hanya CEO | Belum |
+| 21 | Save, UI, skala | 5 slot autosave, ironman, <3 detik | Autosave satu slot, seed deterministik; proses giliran jauh di bawah 3 detik | Sebagian |
+
+## Mengapa "pinjaman selalu langsung acc"
+
+Penyebab teknis (sudah diperbaiki di build ini):
+1. Kredit investasi 9.800 jt RS untuk pabrik pemintalan dibuat otomatis begitu keputusan disetujui, tanpa penilaian bank.
+2. Dua term sheet refinancing adalah skrip tetap: tidak ada kemungkinan ditolak.
+3. Tidak ada menu untuk mengajukan utang bebas, jadi pemain hanya melihat skrip yang selalu disetujui.
+
+Perbaikan:
+- Pengajuan bebas ke 4 bank (jumlah, tenor, tujuan, bunga tetap/mengambang, cicilan/bullet).
+- Skor kredit internal (ICR, DSCR, utang bersih/EBITDA, likuiditas, agunan setelah haircut, rekam jejak) ditambah hubungan bank, biro kredit, kondisi makro, dan insentif bankir.
+- Keputusan setelah 1-3 giliran: tolak, potong plafon, atau setujui dengan syarat. Ada klausul tersembunyi (MAC, bunga promosi yang naik, pembatasan dividen, ditarik mendadak) yang hanya terbaca lewat tinjauan hukum.
+- Proyek pemintalan tidak lagi dibiayai otomatis.
+
+## Mengapa "bot tidak jelas"
+
+Sebelumnya bot hanya muncul sebagai teks acak di laporan bulanan. Sekarang tab **Pelaku** (menu Perusahaan) menampilkan tiap pelaku: apa yang ia incar, apa yang terakhir ia lakukan, tanda yang bisa dibaca pemain, dan cara menghadapinya.
+Cakupan: 4 eksekutif, 4 bankir, 4 pesaing, pelanggan (Mahkota), pemasok (Kestrel), serikat, bank sentral, investor bursa.
+
+## Hal yang BELUM dibuat dan perlu dikerjakan agar mendekati "super realistis"
+
+Urutan yang saya sarankan (dari yang paling memengaruhi pembelajaran):
+1. Laporan keuangan rinci (gaji, perubahan ekuitas, catatan), arus kas yang menjumlah ke perubahan kas. (sedang dikerjakan)
+2. Ekspansi dan investasi bebas: pabrik baru, kapasitas, otomasi, R&D, gudang, ekspor ke negara lain (Era 2).
+3. Konflik dinamis: serikat, pemasok, pelanggan, pemerintah yang bereaksi pada krisis, bukan satu skrip.
+4. Berita informatif: sumber, bias, dan data makro yang terlambat dan direvisi.
+5. Pesaing yang belajar dan menyerang kelemahan pemain (utang tinggi, satu pemasok).
+6. Skor etik tersembunyi, skandal tertunda, antimonopoli.
+7. Era 2: ekspor-impor, L/C, kurs dan lindung nilai (forward, swap), pabrik di negara lain, transfer pricing, pajak lintas negara.
+8. Tingkat kesulitan, skor akhir, kondisi menang/kalah, peran lain.
+
+## Batasan yang harus dipahami
+
+- Negara, bank, dan perusahaan di game fiktif; angka terkalibrasi ke pola ekonomi nyata (Taylor, PPP, AR(1) komoditas, kurva Phillips), bukan data nyata. Jangan dijadikan dasar keputusan investasi sungguhan.
+- Skor kredit, haircut agunan, dan perilaku bankir adalah model sederhana dari praktik umum; bank sungguhan memakai model dan kebijakan internal yang berbeda.
+- Pembelajaran bisnis multinasional yang sebenarnya butuh Era 2 (lintas negara). Belum ada di build ini.

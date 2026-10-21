@@ -41,9 +41,13 @@ fun PerusahaanScreen(
     onConfront: (String) -> Unit,
     onFire: (String) -> Unit,
     onContractAction: (contractId: String, actionId: String) -> Unit,
+    onApplyCredit: (String, Int, Int, String, Boolean, Boolean) -> Unit = { _, _, _, _, _, _ -> },
+    onReviewOffer: (String) -> Unit = {},
+    onAcceptOffer: (String) -> Unit = {},
+    onDeclineOffer: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val subTabs = listOf("Laporan keuangan", "Organisasi", "Proyek", "Kontrak")
+    val subTabs = listOf("Laporan keuangan", "Organisasi", "Proyek", "Kontrak", "Bank", "Pelaku")
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -112,6 +116,15 @@ fun PerusahaanScreen(
                         onInspectOrigin = onInspectOrigin,
                         onContractAction = onContractAction
                     )
+                    4 -> BankTabContent(
+                        credit = gameState.credit,
+                        ap = gameState.actionPoints,
+                        onApply = onApplyCredit,
+                        onReview = onReviewOffer,
+                        onAccept = onAcceptOffer,
+                        onDecline = onDeclineOffer
+                    )
+                    5 -> PelakuTabContent(gameState.actors)
                 }
             }
         }

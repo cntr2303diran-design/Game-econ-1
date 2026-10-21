@@ -28,6 +28,10 @@ sealed class Action {
     data class Confront(val execId: String) : Action()
     data class Fire(val execId: String) : Action()
     data class AdjustPrice(val deltaPct: Int) : Action()
+    data class ApplyCredit(val bankId: String, val amount: Int, val tenor: Int, val purpose: String, val floating: Boolean, val bullet: Boolean) : Action()
+    data class ReviewOffer(val appId: String) : Action()
+    data class AcceptOffer(val appId: String) : Action()
+    data class DeclineOffer(val appId: String) : Action()
     data class BuyStock(val companyId: String, val lots: Int) : Action()
     data class SellStock(val companyId: String, val lots: Int) : Action()
 
@@ -50,6 +54,10 @@ sealed class Action {
         is Confront -> "CON|${esc(execId)}"
         is Fire -> "FIR|${esc(execId)}"
         is AdjustPrice -> "PRC|$deltaPct"
+        is ApplyCredit -> "APL|${esc(bankId)}|$amount|$tenor|${esc(purpose)}|$floating|$bullet"
+        is ReviewOffer -> "ROF|${esc(appId)}"
+        is AcceptOffer -> "AOF|${esc(appId)}"
+        is DeclineOffer -> "DOF|${esc(appId)}"
         is BuyStock -> "BUY|${esc(companyId)}|$lots"
         is SellStock -> "SEL|${esc(companyId)}|$lots"
     }
@@ -80,6 +88,10 @@ sealed class Action {
                     "CON" -> Confront(p[1])
                     "FIR" -> Fire(p[1])
                     "PRC" -> AdjustPrice(p[1].toInt())
+                    "APL" -> ApplyCredit(p[1], p[2].toInt(), p[3].toInt(), p[4], p[5].toBoolean(), p[6].toBoolean())
+                    "ROF" -> ReviewOffer(p[1])
+                    "AOF" -> AcceptOffer(p[1])
+                    "DOF" -> DeclineOffer(p[1])
                     "BUY" -> BuyStock(p[1], p[2].toInt())
                     "SEL" -> SellStock(p[1], p[2].toInt())
                     else -> null

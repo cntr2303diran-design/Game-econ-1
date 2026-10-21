@@ -240,7 +240,11 @@ fun KapitalAppScaffold(
                     onContractAction = { contractId, actionId ->
                         if (actionId == "choose") navController.navigate("jurnal_keputusan/dec_termsheet?option=$contractId")
                         else viewModel.contractAction(contractId, actionId)
-                    }
+                    },
+                    onApplyCredit = { b, a, t, p, f, bl -> viewModel.applyCredit(b, a, t, p, f, bl) },
+                    onReviewOffer = { viewModel.reviewOffer(it) },
+                    onAcceptOffer = { viewModel.acceptOffer(it) },
+                    onDeclineOffer = { viewModel.declineOffer(it) }
                 )
             }
 

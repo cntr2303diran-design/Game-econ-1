@@ -306,6 +306,8 @@ data class GameState(
     val rivals: List<RivalItem> = emptyList(),
     val bourse: BourseState = BourseState(),
     val actionPoints: Int = 0,
+    val credit: CreditViewState = CreditViewState(),
+    val actors: List<ActorItem> = emptyList(),
     val playerShareText: String = "",
     val unemploymentText: String = "",
     val marketNote: String = "",
@@ -406,4 +408,86 @@ data class BourseState(
     val dividendText: String = "",
     val stocks: List<StockItem> = emptyList(),
     val headlines: List<String> = emptyList()
+)
+
+/** Meja kredit dan pelaku. */
+data class BankItem(
+    val id: String,
+    val name: String,
+    val banker: String,
+    val bankerRole: String,
+    val style: String,
+    val incentive: String,
+    val tell: String,
+    val tellKnown: Boolean,
+    val relationText: String,
+    val relationTone: SemanticTone,
+    val rateText: String,
+    val speedText: String,
+    val maxTenor: Int,
+    val maxAmountText: String,
+    val foreign: Boolean,
+    val canApply: Boolean,
+    val blockReason: String
+)
+
+data class OfferItem(
+    val amountText: String,
+    val rateText: String,
+    val tenorText: String,
+    val feeText: String,
+    val covenantText: String,
+    val structureText: String,
+    val extraTerms: List<String>,
+    val hiddenTerms: List<String>,
+    val hiddenKnown: Boolean,
+    val validText: String
+)
+
+data class CreditAppItem(
+    val id: String,
+    val bankName: String,
+    val banker: String,
+    val amountText: String,
+    val purposeText: String,
+    val statusLabel: String,
+    val statusTone: SemanticTone,
+    val stageText: String,
+    val offer: OfferItem?,
+    val officialReason: String,
+    val informalNote: String,
+    val canReview: Boolean,
+    val canAccept: Boolean,
+    val canDecline: Boolean
+)
+
+data class LoanItem(
+    val lender: String,
+    val balanceText: String,
+    val rateText: String,
+    val maturityText: String,
+    val repaymentText: String,
+    val covenantText: String,
+    val flags: List<String>
+)
+
+data class CreditViewState(
+    val ratios: List<Pair<String, String>> = emptyList(),
+    val collateral: List<Pair<String, String>> = emptyList(),
+    val banks: List<BankItem> = emptyList(),
+    val applications: List<CreditAppItem> = emptyList(),
+    val loans: List<LoanItem> = emptyList(),
+    val note: String = ""
+)
+
+data class ActorItem(
+    val id: String,
+    val group: String,
+    val name: String,
+    val role: String,
+    val goal: String,
+    val lastAction: String,
+    val signals: List<String>,
+    val advice: String,
+    val tone: SemanticTone
 )
