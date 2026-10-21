@@ -152,8 +152,8 @@ private fun KronikDuniaActionBanner(
             Button(
                 onClick = onOpenKronikDunia,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = KapitalSemanticColors.blue,
-                    contentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 shape = RoundedCornerShape(6.dp),
                 modifier = Modifier

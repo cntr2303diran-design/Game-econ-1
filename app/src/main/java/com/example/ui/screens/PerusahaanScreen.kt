@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.model.*
 import com.example.ui.components.InspectableNumberText
@@ -34,8 +35,12 @@ import com.example.ui.theme.MonoFontFamily
 fun PerusahaanScreen(
     gameState: GameState,
     onInspectOrigin: (DataOriginInfo) -> Unit,
-    onChangeIncentiveScheme: (String) -> Unit,
-    onExecuteContractAction: (String) -> Unit,
+    onSetSalesScheme: (String) -> Unit,
+    onSetFactoryScheme: (String) -> Unit,
+    onAudit: (String) -> Unit,
+    onConfront: (String) -> Unit,
+    onFire: (String) -> Unit,
+    onContractAction: (contractId: String, actionId: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val subTabs = listOf("Laporan keuangan", "Organisasi", "Proyek", "Kontrak")
@@ -90,17 +95,22 @@ fun PerusahaanScreen(
                         gameState = gameState,
                         isLandscapeWide = isLandscapeWide,
                         onInspectOrigin = onInspectOrigin,
-                        onChangeIncentiveScheme = onChangeIncentiveScheme
+                        onSetSalesScheme = onSetSalesScheme,
+                        onSetFactoryScheme = onSetFactoryScheme,
+                        onAudit = onAudit,
+                        onConfront = onConfront,
+                        onFire = onFire
                     )
                     2 -> ProyekGanttTabContent(
+                        title = gameState.ganttTitle,
+                        totalMonths = gameState.ganttTotalMonths,
                         tasks = gameState.ganttTasks
                     )
                     3 -> KontrakTabContent(
                         contracts = gameState.contracts,
-                        apCurrent = gameState.apCurrent,
                         isLandscapeWide = isLandscapeWide,
                         onInspectOrigin = onInspectOrigin,
-                        onExecuteContractAction = onExecuteContractAction
+                        onContractAction = onContractAction
                     )
                 }
             }
@@ -114,30 +124,33 @@ private fun LaporanKeuanganTabContent(
     isLandscapeWide: Boolean,
     onInspectOrigin: (DataOriginInfo) -> Unit
 ) {
-    // Jebakan Akrual Callout
-    Surface(
-        color = KapitalSemanticColors.yellowContainer,
-        shape = RoundedCornerShape(6.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, KapitalSemanticColors.yellow.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+    // Peringatan jebakan akrual (hanya muncul bila laba positif tetapi arus kas operasi negatif)
+    val accrual = gameState.accrualWarning
+    if (accrual != null) {
+        Surface(
+            color = KapitalSemanticColors.yellowContainer,
+            shape = RoundedCornerShape(6.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, KapitalSemanticColors.yellow.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
         ) {
-            Icon(
-                imageVector = Icons.Outlined.WarningAmber,
-                contentDescription = null,
-                tint = KapitalSemanticColors.yellow,
-                modifier = Modifier.size(20.dp)
-            )
-            Text(
-                text = "Peringatan Jebakan Akrual: Laba Bersih positif (+710 jt RS), namun Arus Kas Operasi negatif (-780 jt RS) karena penjualan kredit tertahan di piutang ritel. Ketuk angka mana pun untuk melihat Asal data.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.WarningAmber,
+                    contentDescription = null,
+                    tint = KapitalSemanticColors.yellow,
+                    modifier = Modifier.size(20.dp)
+                )
+                Text(
+                    text = accrual,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
         }
     }
 
@@ -151,14 +164,14 @@ private fun LaporanKeuanganTabContent(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 FinancialStatementTableCard(
-                    title = "1. Laporan Laba Rugi (Akrual)",
-                    subtitle = "Dalam juta Rupiah Sundara (jt RS) · Maret 2033",
+                    title = "1. Laporan laba rugi (akrual)",
+                    subtitle = "Dalam juta Rial Sundara (jt RS) · ${gameState.periodLabel}",
                     rows = gameState.incomeStatementRows,
                     onInspectOrigin = onInspectOrigin
                 )
                 FinancialStatementTableCard(
-                    title = "3. Laporan Arus Kas (Riil)",
-                    subtitle = "Rekonsiliasi Laba Bersih terhadap Kas Bank",
+                    title = "3. Laporan arus kas",
+                    subtitle = "Rekonsiliasi laba bersih terhadap kas bank · ${gameState.periodLabel}",
                     rows = gameState.cashFlowRows,
                     onInspectOrigin = onInspectOrigin
                 )
@@ -168,8 +181,8 @@ private fun LaporanKeuanganTabContent(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 FinancialStatementTableCard(
-                    title = "2. Neraca (Stock-Flow Consistent)",
-                    subtitle = "Aset == Liabilitas + Ekuitas (118.560 jt RS)",
+                    title = "2. Neraca",
+                    subtitle = "Posisi akhir ${gameState.periodLabel} · aset = liabilitas + ekuitas",
                     rows = gameState.balanceSheetRows,
                     onInspectOrigin = onInspectOrigin
                 )
@@ -177,20 +190,20 @@ private fun LaporanKeuanganTabContent(
         }
     } else {
         FinancialStatementTableCard(
-            title = "1. Laporan Laba Rugi (Akrual)",
-            subtitle = "Dalam juta Rupiah Sundara (jt RS) · Maret 2033",
+            title = "1. Laporan laba rugi (akrual)",
+            subtitle = "Dalam juta Rial Sundara (jt RS) · ${gameState.periodLabel}",
             rows = gameState.incomeStatementRows,
             onInspectOrigin = onInspectOrigin
         )
         FinancialStatementTableCard(
-            title = "2. Neraca (Stock-Flow Consistent)",
-            subtitle = "Aset == Liabilitas + Ekuitas (118.560 jt RS)",
+            title = "2. Neraca",
+            subtitle = "Posisi akhir ${gameState.periodLabel} · aset = liabilitas + ekuitas",
             rows = gameState.balanceSheetRows,
             onInspectOrigin = onInspectOrigin
         )
         FinancialStatementTableCard(
-            title = "3. Laporan Arus Kas (Riil)",
-            subtitle = "Rekonsiliasi Laba Bersih terhadap Kas Bank",
+            title = "3. Laporan arus kas",
+            subtitle = "Rekonsiliasi laba bersih terhadap kas bank · ${gameState.periodLabel}",
             rows = gameState.cashFlowRows,
             onInspectOrigin = onInspectOrigin
         )
@@ -202,7 +215,9 @@ private fun FinancialStatementTableCard(
     title: String,
     subtitle: String,
     rows: List<FinancialRowItem>,
-    onInspectOrigin: (DataOriginInfo) -> Unit
+    onInspectOrigin: (DataOriginInfo) -> Unit,
+    currentLabel: String = "Bulan ini",
+    priorLabel: String = "Bulan lalu"
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
@@ -234,21 +249,25 @@ private fun FinancialStatementTableCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Pos Akuntansi",
+                    text = "Pos",
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1.3f)
+                    modifier = Modifier.weight(1f)
                 )
                 Text(
-                    text = "Maret 2033",
+                    text = currentLabel,
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(96.dp),
+                    textAlign = TextAlign.End
                 )
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Bulan Lalu",
+                    text = priorLabel,
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(96.dp),
+                    textAlign = TextAlign.End
                 )
             }
 
@@ -289,7 +308,8 @@ private fun FinancialStatementTableCard(
                             ),
                             onInspectOrigin = onInspectOrigin,
                             tone = row.tone,
-                            isBold = row.isHeaderOrTotal
+                            isBold = row.isHeaderOrTotal,
+                            modifier = Modifier.width(96.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         InspectableNumberText(
@@ -300,7 +320,8 @@ private fun FinancialStatementTableCard(
                             ),
                             onInspectOrigin = onInspectOrigin,
                             tone = SemanticTone.NEUTRAL_GRAY,
-                            isBold = false
+                            isBold = false,
+                            modifier = Modifier.width(96.dp)
                         )
                     }
                     HorizontalDivider(color = KapitalSemanticColors.border.copy(alpha = 0.5f))
@@ -310,15 +331,53 @@ private fun FinancialStatementTableCard(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SchemeSelector(
+    title: String,
+    note: String,
+    options: List<Pair<String, String>>,
+    selectedId: String,
+    apCurrent: Int,
+    onSelect: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(text = title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+        Text(text = note, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            options.forEach { (id, label) ->
+                val selected = id == selectedId
+                FilterChip(
+                    selected = selected,
+                    enabled = selected || apCurrent >= 1,
+                    onClick = { if (!selected) onSelect(id) },
+                    label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = KapitalSemanticColors.blueContainer,
+                        selectedLabelColor = KapitalSemanticColors.blue
+                    ),
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun OrganisasiTabContent(
     gameState: GameState,
     isLandscapeWide: Boolean,
     onInspectOrigin: (DataOriginInfo) -> Unit,
-    onChangeIncentiveScheme: (String) -> Unit
+    onSetSalesScheme: (String) -> Unit,
+    onSetFactoryScheme: (String) -> Unit,
+    onAudit: (String) -> Unit,
+    onConfront: (String) -> Unit,
+    onFire: (String) -> Unit
 ) {
-    // Panel Desain Insentif Eksekutif (Fitur PDF Bagian 12)
     Surface(
         color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(6.dp),
@@ -328,44 +387,34 @@ private fun OrganisasiTabContent(
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "Desain Insentif Eksekutif & Tata Kelola (1 AP)",
+                text = "Desain insentif (1 AP per perubahan)",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = "Skema aktif: ${gameState.activeIncentiveScheme}. Di KAPITAL, bawahan memiliki agenda pribadi (U(a) = Σ w_k G_k(a) - λ P C) dan tidak memiliki bar loyalitas pasti.",
+                text = "Insentif membentuk perilaku siapa pun yang menduduki jabatan, termasuk penggantinya. Tidak ada angka loyalitas pasti; perilaku sebenarnya hanya terlihat lewat audit.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-
-            val schemes = listOf(
-                "Bonus berbasis omzet (Rawan obral kredit)",
-                "Bonus berbasis kas tertagih + clawback 3 tahun",
-                "KPI penghematan biaya & audit perawatan"
+            SchemeSelector(
+                title = "Direktur Penjualan",
+                note = "Bonus omzet mendorong penjualan kredit ke peritel rapuh.",
+                options = gameState.salesSchemeOptions,
+                selectedId = gameState.salesSchemeLabel,
+                apCurrent = gameState.apCurrent,
+                onSelect = onSetSalesScheme
             )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                schemes.forEach { scheme ->
-                    val selected = gameState.activeIncentiveScheme == scheme
-                    FilterChip(
-                        selected = selected,
-                        onClick = { onChangeIncentiveScheme(scheme) },
-                        label = { Text(scheme, style = MaterialTheme.typography.labelSmall) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = KapitalSemanticColors.blueContainer,
-                            selectedLabelColor = KapitalSemanticColors.blue
-                        ),
-                        modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                    )
-                }
-            }
+            SchemeSelector(
+                title = "Kepala Pabrik",
+                note = "KPI penghematan biaya menggoda untuk menunda perawatan.",
+                options = gameState.factorySchemeOptions,
+                selectedId = gameState.factorySchemeLabel,
+                apCurrent = gameState.apCurrent,
+                onSelect = onSetFactoryScheme
+            )
         }
     }
 
@@ -379,6 +428,9 @@ private fun OrganisasiTabContent(
                 ExecutiveProfileCard(
                     executive = exec,
                     onInspectOrigin = onInspectOrigin,
+                    onAudit = { onAudit(exec.id) },
+                    onConfront = { onConfront(exec.id) },
+                    onFire = { onFire(exec.id) },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -394,10 +446,14 @@ private fun OrganisasiTabContent(
 private fun ExecutiveProfileCard(
     executive: Executive,
     onInspectOrigin: (DataOriginInfo) -> Unit,
+    onAudit: () -> Unit,
+    onConfront: () -> Unit,
+    onFire: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val badgeColor = semanticToneColor(executive.loyaltyTone)
     val badgeBg = semanticToneContainerColor(executive.loyaltyTone)
+    var confirmFire by remember { mutableStateOf(false) }
 
     Surface(
         color = MaterialTheme.colorScheme.surface,
@@ -405,10 +461,6 @@ private fun ExecutiveProfileCard(
         modifier = modifier
             .clip(RoundedCornerShape(6.dp))
             .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
-            .combinedClickable(
-                onClick = { onInspectOrigin(executive.originInfo) },
-                onLongClick = { onInspectOrigin(executive.originInfo) }
-            )
             .testTag("executive_card_${executive.id}")
     ) {
         Column(
@@ -417,9 +469,12 @@ private fun ExecutiveProfileCard(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.combinedClickable(
+                    onClick = { onInspectOrigin(executive.originInfo) },
+                    onLongClick = { onInspectOrigin(executive.originInfo) }
+                )
             ) {
-                // Foto Inisial
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
@@ -437,7 +492,6 @@ private fun ExecutiveProfileCard(
                         color = badgeColor
                     )
                 }
-
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = executive.name,
@@ -450,7 +504,6 @@ private fun ExecutiveProfileCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-
                 Icon(
                     imageVector = Icons.Outlined.Info,
                     contentDescription = "Asal data penilaian eksekutif",
@@ -459,68 +512,104 @@ private fun ExecutiveProfileCard(
                 )
             }
 
-            // Loyalitas dan Ambisi tampil sebagai perkiraan ("Tinggi?", "Rendah?"), bukan angka pasti
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Surface(
-                    color = badgeBg,
-                    shape = RoundedCornerShape(4.dp),
-                    modifier = Modifier.weight(1f)
+            if (executive.present) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Column(modifier = Modifier.padding(8.dp)) {
-                        Text(
-                            text = "Perkiraan Loyalitas",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = executive.loyaltyEstimate,
-                            style = MaterialTheme.typography.titleMedium.copy(fontFamily = MonoFontFamily),
-                            color = badgeColor
-                        )
+                    Surface(color = badgeBg, shape = RoundedCornerShape(4.dp), modifier = Modifier.weight(1f)) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Text("Perkiraan loyalitas", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(executive.loyaltyEstimate, style = MaterialTheme.typography.titleMedium.copy(fontFamily = MonoFontFamily), color = badgeColor)
+                        }
+                    }
+                    Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(4.dp), modifier = Modifier.weight(1f)) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Text("Perkiraan ambisi", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(executive.ambitionEstimate, style = MaterialTheme.typography.titleMedium.copy(fontFamily = MonoFontFamily), color = MaterialTheme.colorScheme.onSurface)
+                        }
                     }
                 }
 
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(4.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(modifier = Modifier.padding(8.dp)) {
-                        Text(
-                            text = "Perkiraan Ambisi",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = executive.ambitionEstimate,
-                            style = MaterialTheme.typography.titleMedium.copy(fontFamily = MonoFontFamily),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
+                Text(
+                    text = "Insentif: ${executive.incentiveScheme}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = executive.signalNote,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             Text(
-                text = "Keahlian: ${executive.skillEstimate} · ${executive.horizonNote}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurface
+                text = executive.auditStatus,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = if (executive.auditStatus.contains("indikasi")) KapitalSemanticColors.red else KapitalSemanticColors.blue
             )
+            if (executive.lastOutcome.isNotBlank()) {
+                Text(
+                    text = executive.lastOutcome,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
 
-            Text(
-                text = executive.suspectedBehaviorNote,
-                style = MaterialTheme.typography.bodySmall,
-                color = if (executive.loyaltyTone == SemanticTone.DANGER_RED) KapitalSemanticColors.red
-                else MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (executive.present) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = onAudit,
+                        enabled = executive.canAudit,
+                        shape = RoundedCornerShape(6.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp)
+                            .testTag("audit_${executive.id}")
+                    ) { Text("Audit (2 AP)", style = MaterialTheme.typography.labelMedium) }
+                    OutlinedButton(
+                        onClick = onConfront,
+                        enabled = executive.canConfront,
+                        shape = RoundedCornerShape(6.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp)
+                    ) { Text("Konfrontasi (1)", style = MaterialTheme.typography.labelMedium) }
+                    OutlinedButton(
+                        onClick = { confirmFire = true },
+                        enabled = executive.canFire,
+                        shape = RoundedCornerShape(6.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp)
+                    ) { Text("Pecat (1)", style = MaterialTheme.typography.labelMedium) }
+                }
+            }
         }
+    }
+
+    if (confirmFire) {
+        AlertDialog(
+            onDismissRequest = { confirmFire = false },
+            title = { Text("Pecat ${executive.name}?") },
+            text = { Text("Pesangon 300 jt RS, posisi kosong 3 giliran, dan AP maksimum turun 1 selama kosong. Pengganti tetap mengikuti skema insentif yang berlaku.") },
+            confirmButton = {
+                TextButton(onClick = { confirmFire = false; onFire() }) { Text("Pecat") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmFire = false }) { Text("Batal") }
+            }
+        )
     }
 }
 
 @Composable
 private fun ProyekGanttTabContent(
+    title: String,
+    totalMonths: Int,
     tasks: List<GanttTask>
 ) {
     val totalBudget = tasks.sumOf { it.budgetRsMillion }
@@ -537,50 +626,41 @@ private fun ProyekGanttTabContent(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "Jadwal Gantt: Pabrik pemintalan",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Integrasi hulu benang Kalimas · Garis waktu 12 bulan konstruksi",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "Anggaran: $totalBudget jt RS",
-                        style = MaterialTheme.typography.labelLarge.copy(fontFamily = MonoFontFamily),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Realisasi: $totalRealized jt RS",
-                        style = MaterialTheme.typography.labelMedium.copy(fontFamily = MonoFontFamily),
-                        color = KapitalSemanticColors.blue
-                    )
-                }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (tasks.isEmpty()) {
+                Text(
+                    text = "Setujui proposal pabrik pemintalan di Markas untuk memulai proyek. Jadwal, anggaran, dan realisasinya akan muncul di sini.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                return@Column
             }
+            Text(
+                text = "Anggaran ${"%,d".format(totalBudget).replace(',', '.')} jt RS · realisasi ${"%,d".format(totalRealized).replace(',', '.')} jt RS",
+                style = MaterialTheme.typography.labelLarge.copy(fontFamily = MonoFontFamily),
+                color = MaterialTheme.colorScheme.onSurface
+            )
 
-            // Month Ruler 1..12
+            // Penggaris bulan memakai bobot yang sama dengan sel batang agar sejajar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp))
-                    .padding(vertical = 4.dp, horizontal = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                for (m in 1..12) {
+                for (m in 1..totalMonths) {
                     Text(
-                        text = "B$m",
+                        text = if (m == 1 || m % 3 == 0) "$m" else "",
                         style = MaterialTheme.typography.labelSmall.copy(fontFamily = MonoFontFamily),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
@@ -596,7 +676,6 @@ private fun ProyekGanttTabContent(
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
@@ -612,7 +691,6 @@ private fun ProyekGanttTabContent(
                         )
                     }
 
-                    // 12-Month Gantt Bar Grid
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -621,7 +699,7 @@ private fun ProyekGanttTabContent(
                             .background(MaterialTheme.colorScheme.surfaceVariant),
                         horizontalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        for (m in 1..12) {
+                        for (m in 1..totalMonths) {
                             val inWindow = m >= task.startMonth && m < (task.startMonth + task.durationMonths)
                             val isDoneMonth = inWindow && (m - task.startMonth) < task.progressMonth
                             val cellColor = when {
@@ -638,22 +716,11 @@ private fun ProyekGanttTabContent(
                         }
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "Anggaran: ${task.budgetRsMillion} jt RS vs Realisasi: ${task.realizedRsMillion} jt RS",
-                            style = MaterialTheme.typography.labelSmall.copy(fontFamily = MonoFontFamily),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Bulan ${task.startMonth}–${task.startMonth + task.durationMonths - 1}",
-                            style = MaterialTheme.typography.labelSmall.copy(fontFamily = MonoFontFamily),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
+                    Text(
+                        text = "Anggaran ${task.budgetRsMillion} jt RS · realisasi ${task.realizedRsMillion} jt RS · bulan ${task.startMonth}–${task.startMonth + task.durationMonths - 1}",
+                        style = MaterialTheme.typography.labelSmall.copy(fontFamily = MonoFontFamily),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                     Text(
                         text = task.noteFromStaff,
                         style = MaterialTheme.typography.bodySmall,
@@ -668,10 +735,9 @@ private fun ProyekGanttTabContent(
 @Composable
 private fun KontrakTabContent(
     contracts: List<ContractItem>,
-    apCurrent: Int,
     isLandscapeWide: Boolean,
     onInspectOrigin: (DataOriginInfo) -> Unit,
-    onExecuteContractAction: (String) -> Unit
+    onContractAction: (contractId: String, actionId: String) -> Unit
 ) {
     val rows = if (isLandscapeWide) contracts.chunked(2) else contracts.chunked(1)
     rows.forEach { pair ->
@@ -682,9 +748,8 @@ private fun KontrakTabContent(
             pair.forEach { item ->
                 ContractCardItem(
                     contract = item,
-                    apCurrent = apCurrent,
                     onInspectOrigin = onInspectOrigin,
-                    onExecuteAction = { onExecuteContractAction(item.id) },
+                    onAction = { actionId -> onContractAction(item.id, actionId) },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -699,9 +764,8 @@ private fun KontrakTabContent(
 @Composable
 private fun ContractCardItem(
     contract: ContractItem,
-    apCurrent: Int,
     onInspectOrigin: (DataOriginInfo) -> Unit,
-    onExecuteAction: () -> Unit,
+    onAction: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val toneCol = semanticToneColor(contract.tone)
@@ -724,13 +788,9 @@ private fun ContractCardItem(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(
-                    color = toneBg,
-                    shape = RoundedCornerShape(4.dp)
-                ) {
+                Surface(color = toneBg, shape = RoundedCornerShape(4.dp)) {
                     Text(
                         text = contract.category,
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
@@ -738,6 +798,7 @@ private fun ContractCardItem(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                 }
+                Spacer(modifier = Modifier.weight(1f))
                 Text(
                     text = contract.countryName,
                     style = MaterialTheme.typography.labelSmall,
@@ -745,26 +806,11 @@ private fun ContractCardItem(
                 )
             }
 
+            Text(text = contract.counterparty, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
+            Text(text = contract.valueText, style = MaterialTheme.typography.titleMedium.copy(fontFamily = MonoFontFamily), color = toneCol)
+            Text(text = contract.maturityOrTenor, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
-                text = contract.counterparty,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Text(
-                text = contract.valueText,
-                style = MaterialTheme.typography.titleMedium.copy(fontFamily = MonoFontFamily),
-                color = toneCol
-            )
-
-            Text(
-                text = contract.maturityOrTenor,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Text(
-                text = "Klausul & Covenant: ${contract.covenantOrClause}",
+                text = "Klausul dan covenant: ${contract.covenantOrClause}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -777,25 +823,38 @@ private fun ContractCardItem(
                 Text(
                     text = contract.hiddenRiskNote,
                     style = MaterialTheme.typography.bodySmall,
-                    color = toneCol,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(8.dp)
                 )
             }
 
-            Button(
-                onClick = onExecuteAction,
-                enabled = contract.apCostToAct > 0 && apCurrent >= contract.apCostToAct,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = KapitalSemanticColors.blue,
-                    contentColor = Color.White
-                ),
-                shape = RoundedCornerShape(6.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp)
-                    .testTag("contract_action_${contract.id}")
-            ) {
-                Text(contract.actionLabel)
+            contract.actions.forEach { action ->
+                val primary = action.id == "choose"
+                if (primary) {
+                    Button(
+                        onClick = { onAction(action.id) },
+                        enabled = action.enabled,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                            .testTag("contract_${contract.id}_${action.id}")
+                    ) { Text(action.label) }
+                } else {
+                    OutlinedButton(
+                        onClick = { onAction(action.id) },
+                        enabled = action.enabled,
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                            .testTag("contract_${contract.id}_${action.id}")
+                    ) { Text(action.label) }
+                }
             }
         }
     }

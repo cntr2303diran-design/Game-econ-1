@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,14 +15,14 @@ import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material.icons.filled.HomeWork
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.outlined.Apartment
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.HomeWork
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Public
-import androidx.compose.material.icons.outlined.ShowChart
+import androidx.compose.material.icons.automirrored.outlined.ShowChart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -43,6 +44,7 @@ import androidx.navigation.navArgument
 import com.example.model.GameState
 import com.example.ui.components.DataOriginBottomSheet
 import com.example.ui.components.EventCardDialogModal
+import com.example.ui.components.MonthlyReportDialog
 import com.example.ui.screens.*
 import com.example.ui.theme.KapitalSemanticColors
 import com.example.ui.theme.MonoFontFamily
@@ -55,7 +57,7 @@ const val ROUTE_PERUSAHAAN = "perusahaan"
 const val ROUTE_PASAR = "pasar"
 const val ROUTE_DUNIA = "dunia"
 const val ROUTE_KORAN_PAGI = "koran_pagi"
-const val ROUTE_JURNAL_KEPUTUSAN = "jurnal_keputusan/{decisionId}"
+const val ROUTE_JURNAL_KEPUTUSAN = "jurnal_keputusan/{decisionId}?option={option}"
 const val ROUTE_KRONIK_DUNIA = "kronik_dunia"
 
 data class BottomNavTab(
@@ -72,8 +74,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             val viewModel: KapitalViewModel = viewModel()
             val gameState by viewModel.gameState.collectAsStateWithLifecycle()
+            val dark = gameState.isDarkTheme ?: isSystemInDarkTheme()
 
-            MyApplicationTheme(darkTheme = gameState.isDarkTheme) {
+            MyApplicationTheme(darkTheme = dark) {
                 KapitalAppScaffold(
                     gameState = gameState,
                     viewModel = viewModel
@@ -97,7 +100,7 @@ fun KapitalAppScaffold(
             BottomNavTab(ROUTE_MARKAS, "Markas", Icons.Filled.HomeWork, Icons.Outlined.HomeWork),
             BottomNavTab(ROUTE_PETA, "Peta", Icons.Filled.Map, Icons.Outlined.Map),
             BottomNavTab(ROUTE_PERUSAHAAN, "Perusahaan", Icons.Filled.Apartment, Icons.Outlined.Apartment),
-            BottomNavTab(ROUTE_PASAR, "Pasar", Icons.Filled.ShowChart, Icons.Outlined.ShowChart),
+            BottomNavTab(ROUTE_PASAR, "Pasar", Icons.AutoMirrored.Filled.ShowChart, Icons.AutoMirrored.Outlined.ShowChart),
             BottomNavTab(ROUTE_DUNIA, "Dunia", Icons.Filled.Public, Icons.Outlined.Public)
         )
     }
@@ -111,8 +114,8 @@ fun KapitalAppScaffold(
             if (isMainTabRoute) {
                 KapitalTopTurnBar(
                     gameState = gameState,
-                    onToggleTheme = { viewModel.toggleTheme() },
-                    onSwitchRole = { viewModel.switchRole(it) }
+                    isDark = KapitalSemanticColors.isDark,
+                    onToggleTheme = { viewModel.toggleTheme(it) }
                 )
             }
         },
@@ -181,7 +184,11 @@ fun KapitalAppScaffold(
                     },
                     onOpenEventDialog = { viewModel.openEventDialog(true) },
                     onInspectOrigin = { viewModel.inspectDataOrigin(it) },
-                    onAdvanceTurn = { viewModel.advanceTurn() }
+                    onAdvanceTurn = { viewModel.advanceTurn() },
+                    onAdjustPrice = { viewModel.adjustPrice(it) },
+                    onShowLastReport = { viewModel.showMonthlyReport() },
+                    onNewGame = { viewModel.newGame() },
+                    onOpenChronicle = { navController.navigate(ROUTE_KRONIK_DUNIA) }
                 )
             }
 
@@ -198,8 +205,15 @@ fun KapitalAppScaffold(
                 PerusahaanScreen(
                     gameState = gameState,
                     onInspectOrigin = { viewModel.inspectDataOrigin(it) },
-                    onChangeIncentiveScheme = { viewModel.changeIncentiveScheme(it) },
-                    onExecuteContractAction = { viewModel.executeContractAction(it) }
+                    onSetSalesScheme = { viewModel.setSalesScheme(it) },
+                    onSetFactoryScheme = { viewModel.setFactoryScheme(it) },
+                    onAudit = { viewModel.auditExecutive(it) },
+                    onConfront = { viewModel.confrontExecutive(it) },
+                    onFire = { viewModel.fireExecutive(it) },
+                    onContractAction = { contractId, actionId ->
+                        if (actionId == "choose") navController.navigate("jurnal_keputusan/dec_termsheet?option=$contractId")
+                        else viewModel.contractAction(contractId, actionId)
+                    }
                 )
             }
 
@@ -229,32 +243,54 @@ fun KapitalAppScaffold(
 
             composable(
                 route = ROUTE_JURNAL_KEPUTUSAN,
-                arguments = listOf(navArgument("decisionId") { type = NavType.StringType })
-            ) { backStackEntry ->
-                val decId = backStackEntry.arguments?.getString("decisionId") ?: "dec_pemintalan"
-                val decision = gameState.pendingDecisions.firstOrNull { it.id == decId }
-                    ?: gameState.pendingDecisions.first()
-
-                JurnalKeputusanScreen(
-                    decision = decision,
-                    onBack = { navController.popBackStack() },
-                    onExecuteDecision = { reason, prediction, conf, failure ->
-                        viewModel.submitDecisionJournal(
-                            decisionId = decision.id,
-                            strategicReason = reason,
-                            numericPrediction = prediction,
-                            confidencePct = conf,
-                            failureScenario = failure
-                        )
-                        navController.popBackStack()
-                    }
+                arguments = listOf(
+                    navArgument("decisionId") { type = NavType.StringType },
+                    navArgument("option") { type = NavType.StringType; defaultValue = "" }
                 )
+            ) { backStackEntry ->
+                val decId = backStackEntry.arguments?.getString("decisionId") ?: ""
+                val preselect = backStackEntry.arguments?.getString("option") ?: ""
+                val decision = gameState.pendingDecisions.firstOrNull { it.id == decId }
+
+                if (decision == null) {
+                    // Keputusan sudah dieksekusi atau tidak lagi tersedia: kembali ke layar sebelumnya.
+                    LaunchedEffect(decId) { navController.popBackStack() }
+                } else {
+                    JurnalKeputusanScreen(
+                        decision = decision,
+                        apCurrent = gameState.apCurrent,
+                        currentCashText = gameState.markasIndicators.firstOrNull()?.valueText ?: "",
+                        preselectedOption = preselect,
+                        onBack = { navController.popBackStack() },
+                        onReject = {
+                            viewModel.rejectDecision(decision.id)
+                            navController.popBackStack()
+                        },
+                        onExecuteDecision = { optionId, reason, prediction, conf, predictedCash, failure ->
+                            val ok = viewModel.submitDecisionJournal(
+                                decisionId = decision.id,
+                                optionId = optionId,
+                                strategicReason = reason,
+                                numericPrediction = prediction,
+                                confidencePct = conf,
+                                predictedCash = predictedCash,
+                                failureScenario = failure
+                            )
+                            if (ok) navController.popBackStack()
+                        }
+                    )
+                }
             }
 
             composable(ROUTE_KRONIK_DUNIA) {
                 KronikDuniaScreen(
                     chronicles = gameState.worldChronicles,
-                    onBack = { navController.popBackStack() }
+                    counterfactualText = gameState.counterfactualText,
+                    onRunCounterfactual = { viewModel.runCounterfactual(it) },
+                    onBack = {
+                        viewModel.clearCounterfactual()
+                        navController.popBackStack()
+                    }
                 )
             }
         }
@@ -264,7 +300,17 @@ fun KapitalAppScaffold(
             EventCardDialogModal(
                 eventDialog = gameState.activeEventDialog,
                 onDismiss = { viewModel.openEventDialog(false) },
-                onSelectOption = { viewModel.resolveEventOption(it) }
+                onSelectOption = { viewModel.resolveEventOption(it) },
+                apCurrent = gameState.apCurrent
+            )
+        }
+
+        // Laporan akhir bulan setelah "Akhiri giliran"
+        if (gameState.showMonthlyReport) {
+            MonthlyReportDialog(
+                title = gameState.monthlyReportTitle,
+                lines = gameState.monthlyReportLines,
+                onDismiss = { viewModel.dismissMonthlyReport() }
             )
         }
 
@@ -280,75 +326,44 @@ fun KapitalAppScaffold(
 }
 
 /**
- * Bilah atas sesuai spesifikasi:
- * Kiri: "Maret 2033", di bawahnya "Giliran 39 · Era 1".
- * Kanan: chip "AP 4/7" dan chip "Runway 5 bln", serta tombol mode Terang/Gelap.
+ * Bilah atas: tanggal dan giliran di kiri (mengambil sisa lebar), chip AP, runway, dan tombol tema di kanan.
  */
 @Composable
 fun KapitalTopTurnBar(
     gameState: GameState,
-    onToggleTheme: () -> Unit,
-    onSwitchRole: (String) -> Unit
+    isDark: Boolean,
+    onToggleTheme: (Boolean) -> Unit
 ) {
-    var showRoleMenu by remember { mutableStateOf(false) }
-    val roles = listOf(
-        "CEO PT Benang Sundara",
-        "Gubernur Bank Sentral",
-        "Menteri Keuangan",
-        "Kepala Bappenas"
-    )
-
     Surface(
         color = MaterialTheme.colorScheme.surface,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column {
+        Column(modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Kiri: "Maret 2033", di bawahnya "Giliran 39 · Era 1"
-                Column(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable { showRoleMenu = true }
-                ) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = gameState.dateText,
                         style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1
                     )
                     Text(
-                        text = "Giliran ${gameState.turn} · Era ${gameState.eraNumber} · ${gameState.activeRole}",
+                        text = "Giliran ${gameState.turn} · Era ${gameState.eraNumber}",
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
                     )
-
-                    DropdownMenu(
-                        expanded = showRoleMenu,
-                        onDismissRequest = { showRoleMenu = false }
-                    ) {
-                        roles.forEach { role ->
-                            DropdownMenuItem(
-                                text = { Text(role) },
-                                onClick = {
-                                    onSwitchRole(role)
-                                    showRoleMenu = false
-                                }
-                            )
-                        }
-                    }
                 }
 
-                // Kanan: chip "AP 4/7" dan chip "Runway 5 bln" + Tombol Mode Terang/Gelap
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    // Chip AP 4/7
                     Surface(
                         color = KapitalSemanticColors.blueContainer,
                         shape = RoundedCornerShape(6.dp),
@@ -363,11 +378,11 @@ fun KapitalTopTurnBar(
                                 fontWeight = FontWeight.Bold
                             ),
                             color = KapitalSemanticColors.blue,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            maxLines = 1,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
                         )
                     }
 
-                    // Chip Runway 5 bln
                     val runwayIsDanger = gameState.runwayMonths <= 5
                     val runwayFg = if (runwayIsDanger) KapitalSemanticColors.red else KapitalSemanticColors.green
                     val runwayBg = if (runwayIsDanger) KapitalSemanticColors.redContainer else KapitalSemanticColors.greenContainer
@@ -380,25 +395,26 @@ fun KapitalTopTurnBar(
                             .testTag("chip_runway")
                     ) {
                         Text(
-                            text = "Runway ${gameState.runwayMonths} bln",
+                            text = if (gameState.runwayMonths >= 99) "Kas stabil" else "Runway ${gameState.runwayMonths} bln",
                             style = MaterialTheme.typography.labelLarge.copy(
                                 fontFamily = MonoFontFamily,
                                 fontWeight = FontWeight.Bold
                             ),
                             color = runwayFg,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            maxLines = 1,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
                         )
                     }
 
                     IconButton(
-                        onClick = onToggleTheme,
+                        onClick = { onToggleTheme(isDark) },
                         modifier = Modifier
                             .size(48.dp)
                             .testTag("toggle_theme_button")
                     ) {
                         Icon(
-                            imageVector = if (gameState.isDarkTheme) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
-                            contentDescription = "Ganti Mode Terang / Gelap",
+                            imageVector = if (isDark) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
+                            contentDescription = "Ganti mode terang atau gelap",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }

@@ -1,49 +1,72 @@
 package com.example.viewmodel
 
-import androidx.lifecycle.ViewModel
-import com.example.data.FakeGameRepository
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import com.example.data.GameRepository
+import com.example.data.SaveStore
 import com.example.model.*
 import kotlinx.coroutines.flow.StateFlow
+import java.io.File
 
-class KapitalViewModel(
-    private val repository: FakeGameRepository = FakeGameRepository()
-) : ViewModel() {
+/** Menyimpan permainan ke file internal aplikasi (seed + log tindakan). */
+class FileSaveStore(private val file: File) : SaveStore {
+    override fun read(): String? = try {
+        if (file.exists()) file.readText() else null
+    } catch (e: Exception) {
+        null
+    }
+
+    override fun write(text: String) {
+        try {
+            val tmp = File(file.parentFile, file.name + ".tmp")
+            tmp.writeText(text)
+            if (!tmp.renameTo(file)) {
+                file.writeText(text)
+                tmp.delete()
+            }
+        } catch (e: Exception) {
+            // Penyimpanan gagal tidak boleh menghentikan permainan.
+        }
+    }
+}
+
+class KapitalViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val repository = GameRepository(FileSaveStore(File(application.filesDir, "kapital_save.txt")))
 
     val gameState: StateFlow<GameState> = repository.gameState
 
-    fun toggleTheme() = repository.toggleTheme()
-
+    fun toggleTheme(currentlyDark: Boolean) = repository.toggleTheme(currentlyDark)
     fun setMapLayer(layer: MapLayerFilter) = repository.setMapLayer(layer)
-
     fun selectCountryForBottomSheet(country: Country?) = repository.selectCountryForBottomSheet(country)
-
     fun inspectDataOrigin(origin: DataOriginInfo?) = repository.inspectDataOrigin(origin)
-
     fun openEventDialog(show: Boolean) = repository.openEventDialog(show)
-
-    fun switchRole(roleName: String) = repository.switchRole(roleName)
-
-    fun changeIncentiveScheme(schemeName: String) = repository.changeIncentiveScheme(schemeName)
-
+    fun setSalesScheme(id: String) = repository.setSalesScheme(id)
+    fun setFactoryScheme(id: String) = repository.setFactoryScheme(id)
+    fun adjustPrice(delta: Int) = repository.adjustPrice(delta)
     fun crossCheckNewsItem(newsId: String) = repository.crossCheckNewsItem(newsId)
+    fun auditExecutive(id: String) = repository.auditExecutive(id)
+    fun confrontExecutive(id: String) = repository.confrontExecutive(id)
+    fun fireExecutive(id: String) = repository.fireExecutive(id)
+    fun contractAction(contractId: String, actionId: String) = repository.contractAction(contractId, actionId)
+    fun resolveEventOption(option: EventOptionItem) = repository.resolveEventOption(option)
+    fun advanceTurn() = repository.advanceTurn()
+    fun dismissMonthlyReport() = repository.dismissMonthlyReport()
+    fun showMonthlyReport() = repository.showMonthlyReport()
+    fun newGame() = repository.newGame()
+    fun runCounterfactual(actionIndex: Int) = repository.runCounterfactual(actionIndex)
+    fun clearCounterfactual() = repository.clearCounterfactual()
+    fun rejectDecision(decisionId: String) = repository.rejectDecision(decisionId)
 
     fun submitDecisionJournal(
         decisionId: String,
+        optionId: String,
         strategicReason: String,
         numericPrediction: String,
         confidencePct: Int,
+        predictedCash: Double,
         failureScenario: String
-    ) = repository.submitDecisionJournal(
-        decisionId = decisionId,
-        strategicReason = strategicReason,
-        numericPrediction = numericPrediction,
-        confidencePct = confidencePct,
-        failureScenario = failureScenario
+    ): Boolean = repository.submitDecisionJournal(
+        decisionId, optionId, strategicReason, numericPrediction, confidencePct, predictedCash, failureScenario
     )
-
-    fun resolveEventOption(option: EventOptionItem) = repository.resolveEventOption(option)
-
-    fun executeContractAction(contractId: String) = repository.executeContractAction(contractId)
-
-    fun advanceTurn() = repository.advanceTurn()
 }

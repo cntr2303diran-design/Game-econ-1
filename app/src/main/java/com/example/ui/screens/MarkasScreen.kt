@@ -38,8 +38,13 @@ fun MarkasScreen(
     onOpenEventDialog: () -> Unit,
     onInspectOrigin: (DataOriginInfo) -> Unit,
     onAdvanceTurn: () -> Unit,
+    onAdjustPrice: (Int) -> Unit,
+    onShowLastReport: () -> Unit,
+    onNewGame: () -> Unit,
+    onOpenChronicle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val gameOver = gameState.gameOverReason
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isLandscapeWide = maxWidth >= 700.dp
         val scrollState = rememberScrollState()
@@ -57,7 +62,18 @@ fun MarkasScreen(
                     modifier = Modifier.weight(1.05f),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    if (gameOver != null) {
+                        GameOverPanel(
+                            reason = gameOver,
+                            turn = gameState.turn,
+                            dateText = gameState.dateText,
+                            onNewGame = onNewGame,
+                            onOpenChronicle = onOpenChronicle
+                        )
+                    }
+
                     CovenantWarningBanner(
+                        tone = gameState.covenantTone,
                         title = gameState.covenantWarningTitle,
                         subtitle = gameState.covenantWarningSubtitle,
                         originInfo = gameState.covenantOrigin,
@@ -75,6 +91,15 @@ fun MarkasScreen(
                     MarkasIndicatorsGrid(
                         indicators = gameState.markasIndicators,
                         onInspectOrigin = onInspectOrigin
+                    )
+
+                    ExecutiveMemosCard(memos = gameState.memos)
+
+                    PriceLeverCard(
+                        priceAdjPct = gameState.priceAdjPct,
+                        apCurrent = gameState.apCurrent,
+                        enabled = gameOver == null,
+                        onAdjustPrice = onAdjustPrice
                     )
                 }
 
@@ -94,24 +119,27 @@ fun MarkasScreen(
                     )
 
                     FanChart(
-                        title = "Proyeksi Kas & Ketidakpastian (FanChart)",
-                        subtitle = "Pita keyakinan 50% & 90% dalam 6 giliran ke depan",
+                        title = "Proyeksi kas dan ketidakpastian",
+                        subtitle = "Pita 50% dan 90% untuk 6 giliran ke depan · garis merah = kas nol",
                         historyPoints = gameState.cashHistoryPoints,
                         medianFuturePoints = gameState.cashFanMedianPoints,
                         spread50Points = gameState.cashFanBand50Points,
                         spread90Points = gameState.cashFanBand90Points,
-                        unitLabel = "juta RS"
+                        unitLabel = "juta RS",
+                        dangerLevel = 0f
                     )
 
                     CognitiveCalibrationCard(
+                        evaluatedCount = gameState.evaluatedJournals,
                         brierScore = gameState.brierScore,
                         biases = gameState.detectedBiases,
                         completedJournals = gameState.completedJournals
                     )
 
                     EndTurnPrimaryButton(
-                        turn = gameState.turn,
-                        onAdvanceTurn = onAdvanceTurn
+                        enabled = gameOver == null,
+                        onAdvanceTurn = onAdvanceTurn,
+                        onShowLastReport = onShowLastReport
                     )
                 }
             }
@@ -124,7 +152,18 @@ fun MarkasScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                if (gameOver != null) {
+                    GameOverPanel(
+                        reason = gameOver,
+                        turn = gameState.turn,
+                        dateText = gameState.dateText,
+                        onNewGame = onNewGame,
+                        onOpenChronicle = onOpenChronicle
+                    )
+                }
+
                 CovenantWarningBanner(
+                    tone = gameState.covenantTone,
                     title = gameState.covenantWarningTitle,
                     subtitle = gameState.covenantWarningSubtitle,
                     originInfo = gameState.covenantOrigin,
@@ -144,6 +183,8 @@ fun MarkasScreen(
                     onInspectOrigin = onInspectOrigin
                 )
 
+                ExecutiveMemosCard(memos = gameState.memos)
+
                 PendingDecisionsSection(
                     decisions = gameState.pendingDecisions,
                     onDecisionClick = { decision ->
@@ -155,25 +196,35 @@ fun MarkasScreen(
                     }
                 )
 
+                PriceLeverCard(
+                    priceAdjPct = gameState.priceAdjPct,
+                    apCurrent = gameState.apCurrent,
+                    enabled = gameOver == null,
+                    onAdjustPrice = onAdjustPrice
+                )
+
                 FanChart(
-                    title = "Proyeksi Kas & Ketidakpastian (FanChart)",
-                    subtitle = "Pita keyakinan 50% & 90% dalam 6 giliran ke depan",
+                    title = "Proyeksi kas dan ketidakpastian",
+                    subtitle = "Pita 50% dan 90% untuk 6 giliran ke depan · garis merah = kas nol",
                     historyPoints = gameState.cashHistoryPoints,
                     medianFuturePoints = gameState.cashFanMedianPoints,
                     spread50Points = gameState.cashFanBand50Points,
                     spread90Points = gameState.cashFanBand90Points,
-                    unitLabel = "juta RS"
+                    unitLabel = "juta RS",
+                    dangerLevel = 0f
                 )
 
                 CognitiveCalibrationCard(
+                    evaluatedCount = gameState.evaluatedJournals,
                     brierScore = gameState.brierScore,
                     biases = gameState.detectedBiases,
                     completedJournals = gameState.completedJournals
                 )
 
                 EndTurnPrimaryButton(
-                    turn = gameState.turn,
-                    onAdvanceTurn = onAdvanceTurn
+                    enabled = gameOver == null,
+                    onAdvanceTurn = onAdvanceTurn,
+                    onShowLastReport = onShowLastReport
                 )
             }
         }
@@ -183,18 +234,20 @@ fun MarkasScreen(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun CovenantWarningBanner(
+    tone: SemanticTone,
     title: String,
     subtitle: String,
     originInfo: DataOriginInfo,
     onInspectOrigin: (DataOriginInfo) -> Unit
 ) {
+    val fg = semanticToneColor(tone)
     Surface(
-        color = KapitalSemanticColors.yellowContainer,
+        color = semanticToneContainerColor(tone),
         shape = RoundedCornerShape(6.dp),
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(6.dp))
-            .border(1.dp, KapitalSemanticColors.yellow.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
+            .border(1.dp, fg.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
             .combinedClickable(
                 onClick = { onInspectOrigin(originInfo) },
                 onLongClick = { onInspectOrigin(originInfo) }
@@ -212,14 +265,14 @@ private fun CovenantWarningBanner(
             Icon(
                 imageVector = Icons.Outlined.WarningAmber,
                 contentDescription = "Peringatan Covenant",
-                tint = KapitalSemanticColors.yellow,
+                tint = fg,
                 modifier = Modifier.size(22.dp)
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = KapitalSemanticColors.yellow
+                    color = fg
                 )
                 Text(
                     text = subtitle,
@@ -230,7 +283,7 @@ private fun CovenantWarningBanner(
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = "Asal data covenant",
-                tint = KapitalSemanticColors.yellow,
+                tint = fg,
                 modifier = Modifier.size(18.dp)
             )
         }
@@ -266,6 +319,7 @@ private fun MorningPaperPreviewCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
+                    modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
@@ -301,7 +355,8 @@ private fun MorningPaperPreviewCard(
                 Text(
                     text = footer,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
                 )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -336,9 +391,10 @@ private fun MarkasIndicatorsGrid(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Indikator Utama",
+                text = "Indikator utama",
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
             )
             Text(
                 text = "Ketuk / tahan angka untuk Asal data",
@@ -389,11 +445,20 @@ private fun PendingDecisionsSection(
             Text(
                 text = "Menunggu keputusan",
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
             )
             Text(
-                text = "Wajib Jurnal Keputusan / Respons Krisis",
+                text = "Keputusan besar wajib jurnal",
                 style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        if (decisions.isEmpty()) {
+            Text(
+                text = "Tidak ada keputusan mendesak. Gunakan AP untuk audit, tinjauan kontrak, atau periksa silang berita.",
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -478,6 +543,7 @@ private fun PendingDecisionsSection(
 
 @Composable
 private fun CognitiveCalibrationCard(
+    evaluatedCount: Int,
     brierScore: Double,
     biases: List<String>,
     completedJournals: List<CompletedJournalEntry>
@@ -499,21 +565,27 @@ private fun CognitiveCalibrationCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Kalibrasi Kognitif & Jurnal Hipotesis",
+                    text = "Kalibrasi dan jurnal",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
                 )
+                val brierTone = when {
+                    brierScore <= 0.15 -> SemanticTone.GOOD_GREEN
+                    brierScore <= 0.25 -> SemanticTone.WARNING_YELLOW
+                    else -> SemanticTone.DANGER_RED
+                }
                 Surface(
-                    color = KapitalSemanticColors.greenContainer,
+                    color = semanticToneContainerColor(brierTone),
                     shape = RoundedCornerShape(4.dp)
                 ) {
                     Text(
-                        text = "Brier Score: ${String.format("%.2f", brierScore)}",
+                        text = "Brier ${String.format(java.util.Locale.forLanguageTag("id-ID"), "%.2f", brierScore)} · $evaluatedCount dinilai",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontFamily = MonoFontFamily,
                             fontWeight = FontWeight.Bold
                         ),
-                        color = KapitalSemanticColors.green,
+                        color = semanticToneColor(brierTone),
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                 }
@@ -542,24 +614,125 @@ private fun CognitiveCalibrationCard(
 
 @Composable
 private fun EndTurnPrimaryButton(
-    turn: Int,
-    onAdvanceTurn: () -> Unit
+    enabled: Boolean,
+    onAdvanceTurn: () -> Unit,
+    onShowLastReport: () -> Unit
 ) {
-    Button(
-        onClick = onAdvanceTurn,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = KapitalSemanticColors.blue,
-            contentColor = Color.White
-        ),
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Button(
+            onClick = onAdvanceTurn,
+            enabled = enabled,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ),
+            shape = RoundedCornerShape(6.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 52.dp)
+                .testTag("end_turn_button")
+        ) {
+            Text(
+                text = "Akhiri giliran",
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+            )
+        }
+        TextButton(
+            onClick = onShowLastReport,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+        ) {
+            Text("Lihat laporan bulan lalu")
+        }
+    }
+}
+
+@Composable
+private fun ExecutiveMemosCard(memos: List<MemoItem>) {
+    if (memos.isEmpty()) return
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(6.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 52.dp)
-            .testTag("end_turn_button")
+            .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
     ) {
-        Text(
-            text = "Akhiri giliran",
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-        )
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "Memo eksekutif",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            memos.forEach { memo ->
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = "${memo.from} · ${memo.role}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "\u201C${memo.text}\u201D",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = NotoSerifFontFamily),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+            Text(
+                text = "Memo mencerminkan kepentingan penulisnya. Cocokkan dengan data sebelum percaya.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun PriceLeverCard(
+    priceAdjPct: Int,
+    apCurrent: Int,
+    enabled: Boolean,
+    onAdjustPrice: (Int) -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(6.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Harga jual: ${if (priceAdjPct >= 0) "+" else ""}$priceAdjPct% dari harga pasar",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Harga naik = margin naik, volume turun. 1 AP per perubahan.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            OutlinedButton(
+                onClick = { onAdjustPrice(-3) },
+                enabled = enabled && apCurrent >= 1 && priceAdjPct > -15,
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier.heightIn(min = 48.dp)
+            ) { Text("−3%") }
+            OutlinedButton(
+                onClick = { onAdjustPrice(3) },
+                enabled = enabled && apCurrent >= 1 && priceAdjPct < 15,
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier.heightIn(min = 48.dp)
+            ) { Text("+3%") }
+        }
     }
 }

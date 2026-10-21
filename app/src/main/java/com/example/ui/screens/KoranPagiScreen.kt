@@ -12,7 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.FactCheck
+import androidx.compose.material.icons.automirrored.outlined.FactCheck
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -63,7 +63,10 @@ fun KoranPagiScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         IconButton(
                             onClick = onBack,
                             modifier = Modifier
@@ -75,14 +78,14 @@ fun KoranPagiScreen(
                                 contentDescription = "Kembali ke Markas"
                             )
                         }
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Koran Pagi · 5 Sudut Pandang Media",
+                                text = "Koran pagi · 5 sudut pandang",
                                 style = MaterialTheme.typography.titleLarge,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Geser horizontal untuk membandingkan bias pemberitaan atas peristiwa yang sama",
+                                text = "Geser untuk membandingkan peristiwa yang sama",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -171,9 +174,9 @@ fun KoranPagiScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "${news.mediaSlant.outletName} · Lini ${news.mediaSlant.slantLabel}",
+                                    text = "${news.mediaSlant.outletName} · ${news.mediaSlant.slantLabel}",
                                     style = MaterialTheme.typography.titleMedium,
                                     color = KapitalSemanticColors.blue
                                 )
@@ -260,8 +263,8 @@ fun KoranPagiScreen(
                                 onClick = { onCrossCheckNews(news.id) },
                                 enabled = !news.crossChecked && gameState.apCurrent >= 1,
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = KapitalSemanticColors.blue,
-                                    contentColor = Color.White
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
                                 ),
                                 shape = RoundedCornerShape(6.dp),
                                 modifier = Modifier
@@ -269,9 +272,9 @@ fun KoranPagiScreen(
                                     .heightIn(min = 48.dp)
                                     .testTag("crosscheck_news_${news.id}")
                             ) {
-                                Icon(Icons.Outlined.FactCheck, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Icon(Icons.AutoMirrored.Outlined.FactCheck, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text(if (news.crossChecked) "Telah Diperiksa Silang" else "Periksa Silang (1 AP)")
+                                Text(if (news.crossChecked) "Sudah diperiksa silang" else "Periksa silang (1 AP)")
                             }
                         }
                     }
@@ -290,7 +293,7 @@ fun KoranPagiScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "Ringkasan 5 Media atas Peristiwa Logam Langka Kestrel:",
+                            text = "Topik yang sama di 5 media",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )

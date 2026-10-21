@@ -24,11 +24,13 @@ import com.example.ui.theme.MonoFontFamily
 @Composable
 fun KronikDuniaScreen(
     chronicles: List<ChronicleEntry>,
+    counterfactualText: String?,
+    onRunCounterfactual: (Int) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     BackHandler(onBack = onBack)
-    var counterfactualResult by remember { mutableStateOf<String?>(null) }
+    val counterfactualResult = counterfactualText
 
     Column(
         modifier = modifier
@@ -57,14 +59,14 @@ fun KronikDuniaScreen(
                             contentDescription = "Kembali"
                         )
                     }
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Kronik Dunia & Pohon Sebab-Akibat",
+                            text = "Kronik dunia",
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Rekam jejak deterministik 2030–2070 & Simulasi Ulang 'Bagaimana Jika'",
+                            text = "Rantai sebab-akibat · \"Bagaimana Jika\" untuk keputusan ≥12 giliran lalu",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -99,7 +101,7 @@ fun KronikDuniaScreen(
                             color = KapitalSemanticColors.blue
                         )
                         Text(
-                            text = counterfactualResult!!,
+                            text = counterfactualResult,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -164,18 +166,23 @@ fun KronikDuniaScreen(
                             )
                         }
 
-                        if (entry.canReplayCounterfactual) {
+                        val idx = entry.actionIndex
+                        if (entry.canReplayCounterfactual && idx != null) {
                             OutlinedButton(
-                                onClick = {
-                                    counterfactualResult = "Pada Giliran ${entry.turn} (${entry.dateLabel}): Seandainya Anda mengambil lindung nilai kurs RS/A$ dan menghentikan obral kredit ritel 6 bulan lebih awal, saldo kas Maret 2033 diproyeksikan menjadi 8.950 jt RS (+2.750 jt RS lebih tinggi) dan jarak ke covenant Bank B aman di 24%."
-                                },
+                                onClick = { onRunCounterfactual(idx) },
                                 shape = RoundedCornerShape(6.dp),
                                 modifier = Modifier.defaultMinSize(minHeight = 48.dp)
                             ) {
                                 Icon(Icons.Outlined.Replay, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Simulasi 'Bagaimana Jika' dari Titik Ini")
+                                Text("Bagaimana jika tidak dilakukan?")
                             }
+                        } else if (idx != null) {
+                            Text(
+                                text = "\"Bagaimana Jika\" tersedia 12 giliran setelah keputusan.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }

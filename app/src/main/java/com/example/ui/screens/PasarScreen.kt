@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,7 +32,7 @@ fun PasarScreen(
     onInspectOrigin: (DataOriginInfo) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var selectedInstrumentId by remember {
+    var selectedInstrumentId by rememberSaveable {
         mutableStateOf(gameState.marketInstruments.firstOrNull()?.id ?: "mkt_kapas")
     }
     val selectedInstrument = gameState.marketInstruments.firstOrNull { it.id == selectedInstrumentId }
@@ -54,7 +55,7 @@ fun PasarScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        text = "Komoditas, Kurs RS/A$, & Saham (Ketuk untuk grafik FanChart; tahan untuk Asal data)",
+                        text = "Komoditas, kurs, dan saham (ketuk untuk grafik, tahan untuk asal data)",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )

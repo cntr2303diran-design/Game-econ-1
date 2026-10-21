@@ -79,8 +79,16 @@ data class Decision(
     val assetSharePct: Int,
     val defaultContextNote: String,
     val isCompleted: Boolean = false,
-    val opensEventDialog: Boolean = false
+    val opensEventDialog: Boolean = false,
+    val options: List<Pair<String, String>> = emptyList(), // (id, label) untuk keputusan pilihan
+    val canReject: Boolean = false
 )
+
+data class MemoItem(val from: String, val role: String, val text: String)
+
+data class ReportLineItem(val text: String, val tone: SemanticTone)
+
+data class ContractActionItem(val id: String, val label: String, val enabled: Boolean)
 
 data class CompletedJournalEntry(
     val id: String,
@@ -107,7 +115,14 @@ data class Executive(
     val incentiveScheme: String,
     val suspectedBehaviorNote: String,
     val loyaltyTone: SemanticTone,
-    val originInfo: DataOriginInfo
+    val originInfo: DataOriginInfo,
+    val present: Boolean = true,
+    val signalNote: String = "",
+    val auditStatus: String = "",
+    val canAudit: Boolean = false,
+    val canConfront: Boolean = false,
+    val canFire: Boolean = false,
+    val lastOutcome: String = ""
 )
 
 enum class MapTokenType(val label: String) {
@@ -181,7 +196,8 @@ data class ContractItem(
     val tone: SemanticTone,
     val apCostToAct: Int = 2,
     val actionLabel: String = "Negosiasi / Tinjau",
-    val originInfo: DataOriginInfo
+    val originInfo: DataOriginInfo,
+    val actions: List<ContractActionItem> = emptyList()
 )
 
 data class MarketInstrument(
@@ -242,7 +258,8 @@ data class ChronicleEntry(
     val title: String,
     val description: String,
     val causalChain: String,
-    val canReplayCounterfactual: Boolean = true
+    val canReplayCounterfactual: Boolean = false,
+    val actionIndex: Int? = null
 )
 
 data class GameState(
@@ -255,7 +272,25 @@ data class GameState(
     val apMax: Int = 7,
     val runwayMonths: Int = 5,
     val activeRole: String = "CEO PT Benang Sundara",
-    val isDarkTheme: Boolean = false,
+    val isDarkTheme: Boolean? = null, // null = ikuti setelan HP
+    val seed: Long = 0L,
+    val covenantTone: SemanticTone = SemanticTone.WARNING_YELLOW,
+    val memos: List<MemoItem> = emptyList(),
+    val monthlyReportTitle: String = "",
+    val monthlyReportLines: List<ReportLineItem> = emptyList(),
+    val showMonthlyReport: Boolean = false,
+    val gameOverReason: String? = null,
+    val salesSchemeLabel: String = "",
+    val factorySchemeLabel: String = "",
+    val salesSchemeOptions: List<Pair<String, String>> = emptyList(),
+    val factorySchemeOptions: List<Pair<String, String>> = emptyList(),
+    val priceAdjPct: Int = 0,
+    val counterfactualText: String? = null,
+    val ganttTitle: String = "",
+    val ganttTotalMonths: Int = 12,
+    val periodLabel: String = "",
+    val prevPeriodLabel: String = "",
+    val accrualWarning: String? = null,
 
     // Peringatan Covenant di Markas
     val covenantWarningTitle: String = "Jarak ke covenant 6%",
@@ -295,7 +330,6 @@ data class GameState(
     val balanceSheetRows: List<FinancialRowItem>,
     val cashFlowRows: List<FinancialRowItem>,
     val executives: List<Executive>,
-    val activeIncentiveScheme: String = "Bonus berbasis omzet (Rawan obral kredit)",
     val ganttTasks: List<GanttTask>,
     val contracts: List<ContractItem>,
 
@@ -304,6 +338,7 @@ data class GameState(
 
     // Fitur PDF: Skor Kalibrasi Brier, Bias Kognitif, & Kronik Dunia
     val brierScore: Double = 0.16,
+    val evaluatedJournals: Int = 0,
     val detectedBiases: List<String>,
     val worldChronicles: List<ChronicleEntry>,
 

@@ -557,6 +557,7 @@ private fun CountrySummaryBottomSheetContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
             .padding(bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -566,7 +567,7 @@ private fun CountrySummaryBottomSheetContent(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "${country.name} (${country.currencyCode})",
                     style = MaterialTheme.typography.headlineMedium,
@@ -660,8 +661,8 @@ private fun CountrySummaryBottomSheetContent(
             Button(
                 onClick = onDismiss,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = KapitalSemanticColors.blue,
-                    contentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 shape = RoundedCornerShape(6.dp),
                 modifier = Modifier
