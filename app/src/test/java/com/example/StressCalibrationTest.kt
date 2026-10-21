@@ -117,3 +117,28 @@ class ChainCardsTest {
         assertTrue("kartu lanjutan harus benar-benar muncul", seenFollowUp >= 20)
     }
 }
+
+class EraCrisisTest {
+    @Test
+    fun oneCrisisPerEra2to4_withinEraBounds_andDeterministic() {
+        for (seed in 1L..50L) {
+            val a = KapitalEngine(seed * 31L).crisisPlans()
+            val b = KapitalEngine(seed * 31L).crisisPlans()
+            assertEquals(3, a.size)
+            for ((i, p) in a.withIndex()) {
+                val era = i + 2
+                assertEquals(era, p.era)
+                assertTrue("mulai di era $era", KapitalEngine.era(p.start) == era && KapitalEngine.era(p.start + p.months) >= era)
+                assertEquals(p.start, b[i].start)
+            }
+        }
+    }
+
+    @Test
+    fun crisesAppearInChronicleWhenReached() {
+        val e = TestBots.firstSurvivor(300, 80)
+        val plans = e.crisisPlans()
+        assertTrue("Krisis Era 2 tercatat", e.chronicle.any { it.title == plans[0].title })
+        assertTrue("Krisis Era 3 belum dimulai bila giliran < start", e.turn < plans[1].start || e.chronicle.any { it.title == plans[1].title })
+    }
+}

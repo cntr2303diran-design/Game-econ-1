@@ -184,3 +184,17 @@ Halvenia tanpa sertifikat ESG sengaja merugi (pungutan CBAM bulanan tetap); itu 
 - Syarat transisi era berbasis kinerja (omzet, ekuitas, jumlah entitas) **belum ada**; transisi murni berdasarkan tanggal. Karena skenario awal dimulai pada giliran 33–75 (2032–2036), Era 1 pendek (22–64 bulan) bagi pemain.
 - Tes: `stageD_...` ditulis ulang agar bermain disiplin sampai tiap era (giliran 97, 229, 373 pada seed yang bertahan) lalu menguji fitur era itu dan memeriksa semua identitas akuntansi; fitur terkunci terbukti ditolak. Uji tekanan identitas kini dimulai di Era 2: 4.076 giliran-permainan, selisih terbesar 3,2e-10.
 - Kalibrasi anak usaha ulang saat dibuka di Era 2 (`tools/sim/Pay2.kt`, 200 seed, dibuka giliran 97–110, diukur 72 bulan): rugi kumulatif Tarsis 4%, Kestrel 13%, Halvenia+IPAL 19%, Meridia 19%, Halvenia tanpa IPAL 34%; payback stabil median 5,5–7,7 tahun (Halvenia tanpa IPAL 11); peluang bertahan induk 142–143/200 vs kontrol 147/200 (membuka anak usaha kini sedikit menurunkan peluang bertahan, bukan menaikkan).
+
+---
+
+## Build-23: krisis makro per era dan uji 480 giliran
+
+**Temuan** (`tools/sim/Long.kt`, 40 seed, bot disiplin sampai giliran 481): sebelum perubahan, bot yang melewati Era 1 hampir pasti menyelesaikan kampanye (29/40 selesai; seluruh 11 kegagalan terjadi di Era 1) dan ekuitas naik terus tanpa hambatan: Era 2–4 tidak punya tekanan, bertentangan dengan dokumen desain ("tekanan krisis naik tiap era").
+
+**Perubahan** (`KapitalEngine.crisisPlans`): satu krisis makro deterministik dari seed di tiap Era 2–4 dengan sinyal dini 3 bulan sebelumnya: Resesi Global (Era 2, ±9 bulan), Krisis Keuangan (Era 3, 12 bulan; kredit mengering, Rial melemah), Guncangan Energi dan Disrupsi Teknologi (Era 4, 14 bulan; lonjakan harga kapas/energi). Efek: guncangan permintaan bulanan, `creditShock`, pelemahan kurs, dan guncangan komoditas; dicatat di laporan dan kronik. Kekuatan efek adalah angka perkiraan yang disetel lewat simulasi, bukan data riil.
+
+**Hasil setelah penyetelan** (40 seed, bot disiplin tanpa persiapan khusus): gagal di Era 1: 11; Era 2: 0; Era 3: 4; Era 4: 10; selesai: 15/40. Waktu `EndTurn` giliran >290 di JVM: median 0,5 ms, p95 1,0 ms, maks ±10 ms (n≈3.700); belum diukur di perangkat Android. Tidak ada NaN.
+
+**Keterbatasan:** (1) Bot tidak mempersiapkan krisis, jadi ini batas bawah untuk pemain yang cermat; keseimbangan sebenarnya hanya bisa dinilai dengan pemain manusia. (2) Krisis Era 2 belum menimbulkan kegagalan sama sekali pada bot (terlalu ringan atau bot terlalu sehat saat itu). (3) Sinyal dini baru berupa satu baris laporan, belum kartu atau koran. (4) Dampak ke bursa saham dan portofolio pemain belum dimodelkan.
+
+Tes baru: `EraCrisisTest` (satu krisis per era, dalam batas era, deterministik; krisis tercatat di kronik).

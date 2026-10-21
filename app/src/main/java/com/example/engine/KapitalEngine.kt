@@ -1594,6 +1594,38 @@ class KapitalEngine(val seed: Long) {
         }
     }
 
+    class CrisisPlan(
+        val era: Int, val start: Int, val months: Int, val title: String, val warning: String, val body: String, val chain: String,
+        val demandPerMonth: Double, val creditShock: Double, val fxHit: Double, val commodityShock: Double
+    )
+
+    private var crisisCache: List<CrisisPlan>? = null
+
+    /** Satu krisis makro di tiap Era 2–4, waktu mulai deterministik dari seed; keparahan naik per era. */
+    fun crisisPlans(): List<CrisisPlan> {
+        crisisCache?.let { return it }
+        val plans = mutableListOf<CrisisPlan>()
+        for (era in 2..4) {
+            val r = Random(seed * 977L + era * 131L + 7L)
+            val eraStart = ERA_START_TURNS[era - 1]
+            val span = (if (era < 4) ERA_START_TURNS[era] else 481) - eraStart
+            val start = eraStart + 14 + r.nextInt(span - 40)
+            plans += when (era) {
+                2 -> CrisisPlan(2, start, 9, "Resesi Global", "Pesanan ekspor dunia melemah dan bank sentral asing menaikkan bunga; ekonom memperingatkan resesi.",
+                    "Permintaan dunia mengerut selama sekitar 9 bulan; bank memperketat kredit.", "Overinvestasi global → pengetatan moneter → resesi → permintaan dan kredit mengerut.",
+                    -0.014 - 0.004 * r.nextDouble(), 0.5, 0.03, 0.0)
+                3 -> CrisisPlan(3, start, 12, "Krisis Keuangan", "Spread kredit melebar dan beberapa lembaga keuangan menahan pencairan; pasar saham gelisah.",
+                    "Krisis kepercayaan di sektor keuangan: kredit mengering, Rial melemah, permintaan turun tajam selama sekitar 12 bulan.", "Utang korporasi menumpuk → gagal bayar berantai → kredit mengering → permintaan jatuh.",
+                    -0.019 - 0.005 * r.nextDouble(), 1.0, 0.06, 0.0)
+                else -> CrisisPlan(4, start, 14, "Guncangan Energi dan Disrupsi Teknologi", "Harga energi melonjak dan otomasi AI mengubah pasar tenaga kerja; pemerintah menyiapkan paket darurat.",
+                    "Biaya energi melonjak dan gelombang disrupsi menekan permintaan serta upah selama sekitar 14 bulan.", "Transisi energi dan disrupsi AI → biaya melonjak, permintaan bergeser → margin tertekan.",
+                    -0.018 - 0.006 * r.nextDouble(), 0.6, 0.04, 0.2)
+            }
+        }
+        crisisCache = plans
+        return plans
+    }
+
     private fun drawEvents(lines: MutableList<ReportLine>) {
         val r = rng(60)
         if (gameOverReason != null) return
@@ -1744,6 +1776,26 @@ class KapitalEngine(val seed: Long) {
         foreignMeta.getValue("aurelia").fxToRs = kurs
 
         var demandShock = 0.0
+        // Krisis makro per era (tekanan naik tiap era, sesuai dokumen desain): jadwal deterministik dari seed
+        crisisPlans().firstOrNull { turn >= it.start - 3 && turn < it.start + it.months }?.let { cp ->
+            if (turn == cp.start - 3) {
+                lines += ReportLine("Sinyal dini: ${cp.warning}", Tone.WARN)
+            }
+            if (turn >= cp.start) {
+                val k = turn - cp.start
+                demandShock += cp.demandPerMonth * (if (k < cp.months / 2) 1.0 else 0.6)
+                if (turn == cp.start) {
+                    creditShock += cp.creditShock
+                    kurs *= 1.0 + cp.fxHit
+                    foreignMeta.getValue("aurelia").fxToRs = kurs
+                    if (cp.commodityShock > 0.0) commodities.triggerCorneringShock(cp.months / 2, cp.commodityShock)
+                    lines += ReportLine("${cp.title} dimulai: ${cp.body}", Tone.BAD)
+                    chronicle += ChronicleItem(turn, cp.title, cp.body, cp.chain, actionCount)
+                } else if (turn == cp.start + cp.months - 1) {
+                    lines += ReportLine("${cp.title} mereda; pasar mulai pulih perlahan.", Tone.GOOD)
+                }
+            }
+        }
         if (turn == electionTurn) {
             lines += ReportLine("Pemilu Sundara berlangsung bulan ini.", Tone.INFO)
             if (electionShock) {
