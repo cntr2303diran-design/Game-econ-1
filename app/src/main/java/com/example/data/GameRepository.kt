@@ -270,8 +270,58 @@ class GameRepository(context: Context? = null) {
     fun acquireRival(rivalId: String) {
         val block = eng.acquireRivalBlock(rivalId)
         if (recordAndApply(Action.AcquireRival(rivalId))) {
-            banner = "Akuisisi pesaing berhasil! Kapasitas pabrik bertambah +1 lini dan pangsa pasar meningkat."
+            banner = "Akuisisi pesaing berhasil! Goodwill & aset tetap wajar dicatat di neraca, kapasitas +1 lini."
         } else banner = block ?: "Akuisisi gagal."
+        refresh()
+    }
+
+    fun borrowForeignSub(countryId: String, amountLocal: Int) {
+        if (recordAndApply(Action.BorrowForeignSub(countryId, amountLocal))) {
+            val sub = eng.subsidiaries[countryId]
+            banner = "Fasilitas kredit bank lokal ${sub?.spec?.countryName ?: countryId} sebesar $amountLocal jt ${sub?.spec?.currencyCode ?: ""} berhasil ditarik."
+        } else banner = "Gagal menarik kredit lokal: butuh 1 AP, anak usaha harus aktif, dan belum melebihi batas utang lokal."
+        refresh()
+    }
+
+    fun issueCorporateBond(amountRs: Int, tenorMonths: Int) {
+        if (recordAndApply(Action.IssueCorporateBond(amountRs, tenorMonths))) {
+            banner = "Penerbitan Obligasi Korporasi ${fmt(amountRs.toDouble())} jt RS (tenor $tenorMonths bln) dijadwalkan cair akhir bulan ini."
+        } else banner = "Gagal menerbitkan obligasi: butuh 2 AP dan nominal 1.000–50.000 jt RS."
+        refresh()
+    }
+
+    fun executeIpo(floatPct: Int, dualClassShares: Boolean) {
+        if (recordAndApply(Action.ExecuteIpo(floatPct, dualClassShares))) {
+            banner = "IPO berhasil! Perusahaan kini tercatat di Bursa Efek Sundara dengan $floatPct% saham publik."
+        } else banner = "IPO gagal: butuh 3 AP, belum pernah IPO, dan tidak sedang menjalankan obral kredit (channel stuffing)."
+        refresh()
+    }
+
+    fun openCaptiveBank() {
+        if (recordAndApply(Action.OpenCaptiveBank)) {
+            banner = "Unit Bank & Asuransi Grup resmi didirikan dengan rasio kecukupan modal (CAR) ≥ 12%."
+        } else banner = "Gagal mendirikan Bank Grup: butuh 3 AP, belum berdiri, dan kas induk mencukupi."
+        refresh()
+    }
+
+    fun mediaLobby(kind: String) {
+        if (recordAndApply(Action.MediaLobby(kind))) {
+            banner = if (kind == "media") "Akuisisi grup media nasional selesai." else "Program lobi parlemen & asosiasi industri dijalankan."
+        } else banner = "Gagal: butuh 2 AP dan kas mencukupi."
+        refresh()
+    }
+
+    fun carbonAction(kind: String, units: Int) {
+        if (recordAndApply(Action.CarbonAction(kind, units))) {
+            banner = if (kind == "buy") "Membeli $units kredit karbon di bursa emisi." else "Menjual $units kredit karbon surplus."
+        } else banner = "Gagal transaksi karbon: butuh 1 AP dan saldo kas / kredit karbon mencukupi."
+        refresh()
+    }
+
+    fun appointSuccessor(candidateId: String) {
+        if (recordAndApply(Action.AppointSuccessor(candidateId))) {
+            banner = "Kandidat suksesi CEO ($candidateId) ditetapkan dan mulai menjalani kaderisasi."
+        } else banner = "Gagal menetapkan suksesor: butuh 2 AP."
         refresh()
     }
 
@@ -934,24 +984,27 @@ class GameRepository(context: Context? = null) {
                 "Penyebut rasio ICR; naik saat bunga acuan atau kurs A$ naik", "Σ (Saldo pinjaman × bunga tahunan / 12)."),
             row("Pendapatan Bunga Kas", "intinc", false, false, SemanticTone.GOOD_GREEN,
                 "Bunga giro/deposito atas saldo kas positif (suku bunga acuan − 3%)", "Kas × maks(0, bunga acuan − 3%) / 12."),
-            row("Pajak Penghasilan Badan (Efektif ${fmt1(eng.effectiveTaxRate() * 100)}%)", "tax", true, false, SemanticTone.NEUTRAL_GRAY,
-                "Mode ${eng.transferPricingMode.label}; kompensasi rugi fiskal: ${fmt(eng.taxLossCarryforward())} jt RS", "Tarif efektif × laba kena pajak setelah kompensasi kerugian."),
-            row("Laba Bersih", "ni", false, true, if ((m["ni"] ?: 0.0) >= 0) SemanticTone.GOOD_GREEN else SemanticTone.DANGER_RED,
-                "Akrual — bandingkan dengan Arus Kas Operasi di tabel 3!", "EBIT − Bunga + Bunga Kas − Pajak.")
+            row("Pajak Penghasilan Badan & Withholding Dividen (Efektif Grup ${fmt1(eng.effectiveTaxRate() * 100)}%)", "tax", true, false, SemanticTone.NEUTRAL_GRAY,
+                "Termasuk pajak withholding repatriasi ${fmt(m["wht_tax"] ?: 0.0)} jt RS; kompensasi rugi: ${fmt(eng.taxLossCarryforward())} jt RS", "PPh badan 22% induk + pajak withholding dividen lintas batas."),
+            row("Laba Bersih Induk", "ni", false, true, if ((m["ni"] ?: 0.0) >= 0) SemanticTone.GOOD_GREEN else SemanticTone.DANGER_RED,
+                "Akrual Induk — Laba Bersih Konsolidasi Grup: ${fmt(eng.lastConsolidatedIncome["ni"] ?: (m["ni"] ?: 0.0))} jt RS", "EBIT − Bunga + Bunga Kas − Pajak.")
         )
     }
 
     private fun buildBalanceRows(date: String): List<FinancialRowItem> {
         val b = eng.balanceSnapshot()
         val p = eng.prevBalance
+        val cons = eng.consolidatedBalanceSnapshot()
         fun row(label: String, key: String, bold: Boolean = false, tone: SemanticTone = SemanticTone.NEUTRAL_GRAY, note: String): FinancialRowItem {
             val cur = fmt(b[key] ?: 0.0)
             val prv = fmt(p[key] ?: 0.0)
             return FinancialRowItem(label, cur, prv, note, bold, tone,
-                DataOriginInfo(label, "$cur jt RS", "Neraca PT Benang Sundara", date, "Identitas akuntansi: Aset = Liabilitas + Ekuitas.", note, ConfidenceTier.HIGH))
+                DataOriginInfo(label, "$cur jt RS", "Neraca PT Benang Sundara & Konsolidasi Grup", date, "Identitas akuntansi: Aset = Liabilitas + Ekuitas.", note, ConfidenceTier.HIGH))
         }
+        val ctaVal = cons["cta_equity"] ?: 0.0
+        val ctaTxt = if (ctaVal < -0.5) "(${fmt(-ctaVal)})" else fmt(ctaVal)
         return listOf(
-            row("Kas dan Setara Kas", "cash", false, if (eng.cash < 3000) SemanticTone.DANGER_RED else SemanticTone.GOOD_GREEN, "Uang tunai siap pakai di bank induk"),
+            row("Kas dan Setara Kas", "cash", false, if (eng.cash < 3000) SemanticTone.DANGER_RED else SemanticTone.GOOD_GREEN, "Kas induk (Kas Konsolidasi Grup: ${fmt(cons["cash"] ?: eng.cash)} jt RS)"),
             row("Piutang Usaha (Total)", "ar", false, if (eng.stuffedTotal() > 1500) SemanticTone.WARNING_YELLOW else SemanticTone.NEUTRAL_GRAY,
                 "DSO ${eng.dso().roundToInt()} hari"),
             row("  · Piutang lancar (pelanggan sehat)", "ar_normal", false, SemanticTone.NEUTRAL_GRAY, "Termin normal 50–62 hari"),
@@ -959,14 +1012,20 @@ class GameRepository(context: Context? = null) {
                 "Sekitar 45% macet saat berumur 6 bulan"),
             row("Persediaan Bahan & Barang Jadi", "inv", false, SemanticTone.NEUTRAL_GRAY, "DIO ${eng.dio().roundToInt()} hari"),
             row("Investasi Saham di Bursa (Nilai Pasar)", "pf", false, SemanticTone.PRIMARY_BLUE, "Portofolio saham tercatat (mark-to-market)"),
-            row("Aset Tetap Bersih (Pabrik, Mesin & Anak Usaha)", "fa", false, SemanticTone.NEUTRAL_GRAY, "Setelah penyusutan + belanja modal pemintalan/ekspansi/anak usaha"),
-            row("TOTAL ASET", "assets", true, SemanticTone.PRIMARY_BLUE, "Kas + Piutang + Persediaan + Saham + Aset Tetap"),
+            row("Investasi pada Anak Usaha (Biaya Historis)", "inv_subs", false, SemanticTone.PRIMARY_BLUE, "Dieliminasi penuh terhadap ekuitas lokal anak usaha saat konsolidasi grup"),
+            row("Goodwill Akuisisi (M&A)", "goodwill", false, SemanticTone.NEUTRAL_GRAY, "Selisih harga beli di atas aset bersih wajar pesaing; diuji penurunan nilai (impairment)"),
+            row("Modal Inti Unit Bank & Asuransi Grup", "captive_bank", false, SemanticTone.PRIMARY_BLUE, "Aset produktif unit jasa keuangan internal (CAR ≥ 12%)"),
+            row("Aset Tetap Bersih (Pabrik & Mesin Induk)", "fa", false, SemanticTone.NEUTRAL_GRAY, "Aset tetap konsolidasi grup: ${fmt(cons["fa"] ?: (b["fa"] ?: 0.0))} jt RS"),
+            row("TOTAL ASET", "assets", true, SemanticTone.PRIMARY_BLUE, "Total Aset Konsolidasi Grup: ${fmt(cons["assets"] ?: (b["assets"] ?: 0.0))} jt RS"),
             row("Utang Dagang ke Pemasok", "payables", false, SemanticTone.NEUTRAL_GRAY, "DPO ${eng.dpo().roundToInt()} hari"),
             row("Utang Bank Jangka Pendek (≤12 bln)", "debt_st", false, if ((b["debt_st"] ?: 0.0) > 0) SemanticTone.DANGER_RED else SemanticTone.NEUTRAL_GRAY,
                 "Pinjaman yang jatuh tempo dalam 12 giliran"),
-            row("Utang Bank Jangka Panjang (>12 bln)", "debt_lt", false, SemanticTone.WARNING_YELLOW, "Pinjaman dengan jatuh tempo di atas 12 giliran"),
-            row("TOTAL LIABILITAS", "liab", true, SemanticTone.WARNING_YELLOW, "Utang Dagang + Seluruh Pinjaman Bank"),
-            row("TOTAL EKUITAS", "equity", true, SemanticTone.GOOD_GREEN, "Aset − Liabilitas (selalu seimbang)")
+            row("Utang Bank & Obligasi Jangka Panjang (>12 bln)", "debt_lt", false, SemanticTone.WARNING_YELLOW, "Pinjaman bank & obligasi korporasi jatuh tempo > 12 giliran"),
+            row("TOTAL LIABILITAS", "liab", true, SemanticTone.WARNING_YELLOW, "Total Liabilitas Konsolidasi Grup: ${fmt(cons["liab"] ?: (b["liab"] ?: 0.0))} jt RS"),
+            FinancialRowItem("Selisih Kurs Translasi Konsolidasi (CTA)", ctaTxt, "0",
+                "Selisih translasi aset bersih valas anak usaha ke Rial Sundara (bagian dari Ekuitas Grup)", false, SemanticTone.PRIMARY_BLUE,
+                DataOriginInfo("Selisih Kurs Translasi (CTA)", "$ctaTxt jt RS", "Konsolidasi Grup", date, "Σ (Ekuitas Lokal × Kurs Akhir − Ekuitas Historis RS)", "Bukan laba operasi; dicatat di ekuitas konsolidasi.", ConfidenceTier.HIGH)),
+            row("TOTAL EKUITAS", "equity", true, SemanticTone.GOOD_GREEN, "Ekuitas Induk (Ekuitas Konsolidasi Grup: ${fmt(cons["equity"] ?: (b["equity"] ?: 0.0))} jt RS)")
         )
     }
 
@@ -993,18 +1052,18 @@ class GameRepository(context: Context? = null) {
                 "NI + Penyusutan − ΔAR − ΔInv + ΔAP"),
             r("Belanja modal pengganti mesin", "d_capex_repl", false, SemanticTone.NEUTRAL_GRAY, "70% dari penyusutan untuk menjaga kapasitas"),
             r("Belanja modal proyek pemintalan", "d_capex_spin", false, SemanticTone.WARNING_YELLOW, "Sesuai fase jadwal Gantt"),
-            r("Belanja modal ekspansi & anak usaha", "d_capex_exp", false, SemanticTone.WARNING_YELLOW, "Lini baru, otomasi, gudang, IPAL, anak usaha luar negeri"),
-            r("Pembelian saham di bursa", "d_stock_buy", false, SemanticTone.NEUTRAL_GRAY, "Termasuk biaya pialang 0,15%"),
+            r("Belanja modal ekspansi & setoran modal anak usaha", "d_capex_exp", false, SemanticTone.WARNING_YELLOW, "Lini baru, otomasi, gudang, IPAL, investasi anak usaha luar negeri"),
+            r("Pembelian saham / M&A goodwill / modal bank grup", "d_stock_buy", false, SemanticTone.NEUTRAL_GRAY, "Termasuk biaya pialang 0,15% & kas akuisisi"),
             r("Penjualan saham di bursa", "d_stock_sell", false, SemanticTone.GOOD_GREEN, "Bersih setelah biaya & pajak"),
-            r("Dividen tunai dari portofolio saham", "d_divin", false, SemanticTone.GOOD_GREEN, "Dividen tahunan emiten"),
+            r("Dividen tunai saham & repatriasi anak usaha", "d_divin", false, SemanticTone.GOOD_GREEN, "Dieliminasi untuk porsi antar-entitas pada konsolidasi grup"),
             r("B. ARUS KAS DARI AKTIVITAS INVESTASI (CFI)", "cfi", true, SemanticTone.NEUTRAL_GRAY,
                 "Jumlah seluruh arus kas investasi di atas"),
-            r("Pencairan pinjaman bank baru", "d_newdebt", false, SemanticTone.GOOD_GREEN, "Kredit baru atau refinancing"),
-            r("Pembayaran pokok pinjaman terjadwal", "d_repay", false, SemanticTone.WARNING_YELLOW, "Cicilan bulanan atau pelunasan"),
+            r("Pencairan pinjaman bank & obligasi baru", "d_newdebt", false, SemanticTone.GOOD_GREEN, "Kredit baru, obligasi korporasi, atau refinancing"),
+            r("Pembayaran pokok pinjaman terjadwal", "d_repay", false, SemanticTone.WARNING_YELLOW, "Cicilan bulanan atau pelunasan bullet"),
             r("Penarikan / (pelunasan) fasilitas RCF", "d_rcf", false, SemanticTone.WARNING_YELLOW, "Fasilitas modal kerja otomatis"),
             r("Pelunasan paksa covenant", "d_forced", false, SemanticTone.DANGER_RED, "15% pokok saat gagal covenant kedua"),
             r("Pencairan anjak piutang (factoring)", "d_factor", false, SemanticTone.DANGER_RED, "Penjualan piutang darurat (potongan 4%)"),
-            r("Suntikan ekuitas pemegang saham", "d_cure", false, SemanticTone.GOOD_GREEN, "Equity cure"),
+            r("Setoran modal (Equity Cure / IPO)", "d_cure", false, SemanticTone.GOOD_GREEN, "Suntikan pemegang saham atau dana bersih IPO"),
             r("Pembayaran dividen ke pemegang saham", "d_divpaid", false, SemanticTone.WARNING_YELLOW, "Dividen tahunan / khusus"),
             r("C. ARUS KAS DARI AKTIVITAS PENDANAAN (CFF)", "cff", true, SemanticTone.NEUTRAL_GRAY,
                 "Jumlah seluruh arus kas pendanaan di atas"),
@@ -1024,11 +1083,13 @@ class GameRepository(context: Context? = null) {
             r("Ekuitas Awal Periode", "e_open", true, SemanticTone.NEUTRAL_GRAY, "Sama dengan ekuitas akhir bulan lalu"),
             r("(+) Laba Bersih periode berjalan", "e_ni", false, SemanticTone.GOOD_GREEN, "Dari laporan laba rugi"),
             r("(+) Dividen tunai portofolio saham", "e_divin", false, SemanticTone.GOOD_GREEN, "Pendapatan investasi saham"),
+            r("(+) Dividen repatriasi dari anak usaha (Induk)", "e_sub_div", false, SemanticTone.GOOD_GREEN, "Dieliminasi penuh pada ekuitas konsolidasi grup"),
             r("(+/−) Selisih nilai pasar portofolio saham (MTM)", "e_mtm", false, SemanticTone.PRIMARY_BLUE, "Keuntungan/kerugian belum direalisasi"),
+            r("(−) Penurunan nilai Goodwill / Hapus buku aset", "e_impair", false, SemanticTone.WARNING_YELLOW, "Impairment goodwill M&A atau nasionalisasi"),
             r("(−) Biaya transaksi jual-beli saham", "e_fees", false, SemanticTone.NEUTRAL_GRAY, "Komisi pialang & pajak bursa"),
             r("(+/−) Selisih kurs atas pinjaman valas (A$)", "e_fx", false, SemanticTone.WARNING_YELLOW, "Perubahan kewajiban RS karena kurs A$"),
             r("(−) Potongan anjak piutang (factoring 4%)", "e_factor", false, SemanticTone.DANGER_RED, "Diskon penjualan piutang darurat"),
-            r("(+) Setoran modal (equity cure)", "e_cure", false, SemanticTone.GOOD_GREEN, "Suntikan pemegang saham"),
+            r("(+) Setoran modal (Equity Cure / IPO)", "e_cure", false, SemanticTone.GOOD_GREEN, "Suntikan pemegang saham / penerbitan saham publik"),
             r("(−) Dividen kepada pemegang saham", "e_div", false, SemanticTone.WARNING_YELLOW, "Pembagian laba"),
             r("EKUITAS AKHIR PERIODE", "e_close", true, SemanticTone.GOOD_GREEN, "Harus cocok dengan Total Ekuitas di Neraca")
         )
@@ -1070,24 +1131,25 @@ class GameRepository(context: Context? = null) {
             .joinToString(", ") { (m, list) -> "umur $m bln: ${fmt(list.sumOf { it.second })} jt RS" }
             .ifEmpty { "tidak ada piutang obral" }
 
+        val consBal = eng.consolidatedBalanceSnapshot()
         val subNote = if (eng.subsidiaries.isEmpty()) {
             "Belum ada anak usaha luar negeri. Grup beroperasi sebagai entitas domestik di Sundara (PPh badan standar 22%)."
         } else {
             eng.subsidiaries.values.joinToString("\n") { s ->
                 val meta = eng.foreignMeta.getValue(s.spec.countryId)
-                "• ${s.spec.title} (${s.spec.countryName}, ${s.spec.currencyCode}): status ${if (s.active) "Beroperasi" else "Konstruksi"}, laba ditahan lokal ${fmt1(s.retainedForeign)} jt ${s.spec.currencyCode} (kurs ${fmt1(meta.fxToRs)} RS/${s.spec.currencyCode}), PPh lokal ${fmt1(meta.profile.corpTaxPct)}%."
+                "• ${s.spec.title} (${s.spec.countryName}, ${s.spec.currencyCode}): status ${if (s.nationalized) "Dinasionalisasi" else if (s.active) "Beroperasi" else "Konstruksi"}, aset lokal ${fmt1(s.totalAssetsLocal())} jt ${s.spec.currencyCode}, utang bank lokal ${fmt1(s.bankDebtLocal)} jt ${s.spec.currencyCode}, laba ditahan siap repatriasi ${fmt1(s.retainedForeign)} jt ${s.spec.currencyCode} (kurs ${fmt1(meta.fxToRs)} RS/${s.spec.currencyCode}), PPh lokal ${fmt1(meta.profile.corpTaxPct)}%."
             }
         }
 
         return listOf(
-            StatementNote(1, "Kebijakan Akuntansi & Pajak Multinasional",
-                "Laporan disusun dengan basis akrual dalam juta Rial Sundara (jt RS). Aset tetap disusutkan 0,81% per bulan; belanja modal pengganti rutin sebesar 70% penyusutan. Kebijakan Transfer Pricing aktif: ${eng.transferPricingMode.label}, menghasilkan tarif pajak penghasilan badan efektif grup sebesar ${fmt1(eng.effectiveTaxRate() * 100)}%. Rugi fiskal yang dapat dikompensasikan saat ini: ${fmt(eng.taxLossCarryforward())} jt RS."),
+            StatementNote(1, "Kebijakan Akuntansi, Konsolidasi Grup & Pajak Multinasional",
+                "Laporan disusun dengan basis akrual dalam juta Rial Sundara (jt RS). Anak usaha luar negeri menyusun pembukuan penuh dalam mata uang lokal masing-masing (TRS, KST, HLV, MRD) dan dikonsolidasikan ke RS dengan eliminasi penuh atas investasi induk, transaksi royalti antar-entitas (${fmt(eng.lastConsolidatedIncome["elim_intercompany_rev"] ?: 0.0)} jt RS), serta dividen antar-entitas. Selisih Kurs Translasi (CTA) saat ini: ${fmt(consBal["cta_equity"] ?: 0.0)} jt RS. Tarif PPh efektif grup: ${fmt1(eng.effectiveTaxRate() * 100)}% (mode ${eng.transferPricingMode.label})."),
             StatementNote(2, "Piutang Usaha & Kualitas Kredit Pelanggan",
                 "Piutang lancar sebesar ${fmt(eng.normalAR)} jt RS berasal dari peritel dengan termin standar (${if (eng.salesScheme == SalesScheme.OMZET) 62 else 50} hari). Piutang berisiko sebesar ${fmt(eng.stuffedTotal())} jt RS berasal dari penjualan dengan termin 90 hari kepada peritel kecil ($ageBuckets). Berdasarkan pengalaman historis, 45% dari piutang berisiko yang mencapai umur 6 bulan tidak tertagih dan dihapusbukukan."),
-            StatementNote(3, "Rincian Pinjaman Bank, Covenant & Lindung Nilai Valas",
+            StatementNote(3, "Rincian Pinjaman Bank, Obligasi, Covenant & Lindung Nilai Valas",
                 "$loanLines\n• Status Lindung Nilai Forward Valas RS/A$: ${if (eng.fxHedgeActive) "Aktif hingga ${dateText(eng.fxHedgeUntilTurn)} pada kurs ${fmt(eng.hedgedKurs)} RS/A$" else "Tidak aktif"}."),
-            StatementNote(4, "Anak Usaha Lintas Negara (Era 2) & Komitmen Modal",
-                "$subNote\n• Tenaga kerja produksi: ${eng.headcountProd()} orang (termasuk ${eng.foreignWorkers()} di luar negeri) dan staf: ${eng.headcountStaff()} orang. Utilisasi pabrik ${fmt1((eng.utilization() * 100).coerceAtMost(100.0))}%.")
+            StatementNote(4, "Anak Usaha Lintas Negara (Era 2), Goodwill M&A (Era 3) & Transisi Hijau (Era 4)",
+                "$subNote\n• Goodwill Akuisisi: ${fmt(eng.goodwill)} jt RS · Modal Bank Grup: ${fmt(eng.captiveBankCapitalRs)} jt RS · Saham Publik (IPO): ${if (eng.isPublicCompany) "Tercatat (porsi pendiri ${fmt1(eng.founderSharePct)}%)" else "Tertutup"} · Kredit Karbon: ${eng.carbonCredits} unit · Suksesor CEO: ${eng.appointedSuccessorId ?: "Belum ditunjuk"}.")
         )
     }
 

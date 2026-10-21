@@ -305,6 +305,13 @@ fun KapitalAppRoot(
                                     onOpenSubsidiary = { viewModel.openSubsidiary(it) },
                                     onRepatriateSubsidiary = { viewModel.repatriateSubsidiary(it) },
                                     onSetTransferPricing = { viewModel.setTransferPricingMode(it) },
+                                    onBorrowForeignSub = { id, amt -> viewModel.borrowForeignSub(id, amt) },
+                                    onIssueCorporateBond = { amt, tenor -> viewModel.issueCorporateBond(amt, tenor) },
+                                    onExecuteIpo = { pct -> viewModel.executeIpo(pct) },
+                                    onOpenCaptiveBank = { viewModel.openCaptiveBank() },
+                                    onMediaLobby = { intensity -> viewModel.mediaLobby(intensity) },
+                                    onCarbonAction = { type -> viewModel.carbonAction(type) },
+                                    onAppointSuccessor = { id -> viewModel.appointSuccessor(id) },
                                     onApplyCredit = { bankId, amount, tenor, purpose, floating, bullet ->
                                         viewModel.applyCredit(bankId, amount, tenor, purpose, floating, bullet)
                                     },

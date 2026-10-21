@@ -42,6 +42,13 @@ fun PerusahaanScreen(
     onOpenSubsidiary: (String) -> Unit,
     onRepatriateSubsidiary: (String) -> Unit,
     onSetTransferPricing: (String) -> Unit,
+    onBorrowForeignSub: (String, Int) -> Unit = { _, _ -> },
+    onIssueCorporateBond: (Int, Int) -> Unit = { _, _ -> },
+    onExecuteIpo: (Int) -> Unit = {},
+    onOpenCaptiveBank: () -> Unit = {},
+    onMediaLobby: (Int) -> Unit = {},
+    onCarbonAction: (Int) -> Unit = {},
+    onAppointSuccessor: (String) -> Unit = {},
     onApplyCredit: (bankId: String, amount: Int, tenor: Int, purpose: String, floating: Boolean, bullet: Boolean) -> Unit,
     onReviewCreditOffer: (String) -> Unit,
     onAcceptCreditOffer: (String) -> Unit,
@@ -114,7 +121,14 @@ fun PerusahaanScreen(
                         onStartInvestment = onStartInvestment,
                         onOpenSubsidiary = onOpenSubsidiary,
                         onRepatriateSubsidiary = onRepatriateSubsidiary,
-                        onSetTransferPricing = onSetTransferPricing
+                        onSetTransferPricing = onSetTransferPricing,
+                        onBorrowForeignSub = onBorrowForeignSub,
+                        onIssueCorporateBond = onIssueCorporateBond,
+                        onExecuteIpo = onExecuteIpo,
+                        onOpenCaptiveBank = onOpenCaptiveBank,
+                        onMediaLobby = onMediaLobby,
+                        onCarbonAction = onCarbonAction,
+                        onAppointSuccessor = onAppointSuccessor
                     )
                     4 -> KontrakTabContent(
                         contracts = gameState.contracts,
@@ -989,7 +1003,14 @@ private fun EkspansiMultinasionalTabContent(
     onStartInvestment: (String) -> Unit,
     onOpenSubsidiary: (String) -> Unit,
     onRepatriateSubsidiary: (String) -> Unit,
-    onSetTransferPricing: (String) -> Unit
+    onSetTransferPricing: (String) -> Unit,
+    onBorrowForeignSub: (String, Int) -> Unit,
+    onIssueCorporateBond: (Int, Int) -> Unit,
+    onExecuteIpo: (Int) -> Unit,
+    onOpenCaptiveBank: () -> Unit,
+    onMediaLobby: (Int) -> Unit,
+    onCarbonAction: (Int) -> Unit,
+    onAppointSuccessor: (String) -> Unit
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
@@ -1104,27 +1125,34 @@ private fun EkspansiMultinasionalTabContent(
                         shape = RoundedCornerShape(4.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(
-                            modifier = Modifier.padding(10.dp).fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
                                 Text(
                                     text = "Laba Kas Ditahan di ${sub.countryName}: ${sub.retainedForeignText} (${sub.retainedRsEquivalentText})",
                                     style = MaterialTheme.typography.labelMedium.copy(fontFamily = MonoFontFamily, fontWeight = FontWeight.Bold)
                                 )
                                 Text(sub.withholdingTaxText, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Button(
-                                onClick = { onRepatriateSubsidiary(sub.countryId) },
-                                enabled = sub.canRepatriate,
-                                colors = ButtonDefaults.buttonColors(containerColor = KapitalSemanticColors.blue, contentColor = Color.White),
-                                shape = RoundedCornerShape(6.dp),
-                                modifier = Modifier.heightIn(min = 48.dp)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text("Repatriasi (1 AP)")
+                                Button(
+                                    onClick = { onRepatriateSubsidiary(sub.countryId) },
+                                    enabled = sub.canRepatriate,
+                                    colors = ButtonDefaults.buttonColors(containerColor = KapitalSemanticColors.blue, contentColor = Color.White),
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                                ) {
+                                    Text("Repatriasi (1 AP)", style = MaterialTheme.typography.labelSmall)
+                                }
+                                OutlinedButton(
+                                    onClick = { onBorrowForeignSub(sub.countryId, 1500) },
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                                ) {
+                                    Text("Pinjam Lokal 1.500 RS (1 AP)", style = MaterialTheme.typography.labelSmall)
+                                }
                             }
                         }
                     }
@@ -1143,7 +1171,71 @@ private fun EkspansiMultinasionalTabContent(
         }
     }
 
-    // Bagian 3: Proyek Investasi & Ekspansi Domestik / Era 3-5
+    // Bagian 3: Pasar Modal, Institusi & Tata Kelola (Era 3–5)
+    Text(
+        text = "Pasar Modal, Unit Keuangan & Strategi Era 3–5",
+        style = MaterialTheme.typography.titleLarge,
+        color = MaterialTheme.colorScheme.onSurface
+    )
+
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(6.dp),
+        modifier = Modifier.fillMaxWidth().border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Instrumen Pendanaan Korporasi & Konglomerasi", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Era 3+: Terbitkan obligasi korporasi kupon tetap, lakukan Penawaran Umum Perdana (IPO), atau dirikan Bank & Asuransi Internal (Captive Finance). Era 4+: Lobi media/regulator, perdagangan kredit karbon, dan suksesi kepemimpinan.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = { onIssueCorporateBond(3000, 36) },
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                ) {
+                    Text("Obligasi 3.000 RS (2 AP)", style = MaterialTheme.typography.labelSmall)
+                }
+                OutlinedButton(
+                    onClick = { onExecuteIpo(20) },
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                ) {
+                    Text("IPO 20% Saham (3 AP)", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = { onOpenCaptiveBank() },
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                ) {
+                    Text("Dirikan Bank Grup (3 AP)", style = MaterialTheme.typography.labelSmall)
+                }
+                OutlinedButton(
+                    onClick = { onMediaLobby(1) },
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                ) {
+                    Text("Komunikasi Publik (1 AP)", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = { onCarbonAction(1) },
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                ) {
+                    Text("Sertifikasi ESG (1 AP)", style = MaterialTheme.typography.labelSmall)
+                }
+                OutlinedButton(
+                    onClick = { onAppointSuccessor("ex_coo") },
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                ) {
+                    Text("Tunjuk Suksesor COO (1 AP)", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+    }
+
+    // Bagian 4: Proyek Investasi & Ekspansi Domestik / Era 3-5
     Text(
         text = "Proyek Investasi & Modernisasi (Domestik & Era 3–5)",
         style = MaterialTheme.typography.titleLarge,
