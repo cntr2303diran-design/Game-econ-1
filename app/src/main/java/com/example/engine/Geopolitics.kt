@@ -283,6 +283,14 @@ class Geopolitics(private val seed: Long, sundaraElectionTurn: Int, sundaraBaseT
         return m
     }
 
+    /** Rata-rata ketegangan satu negara dengan semua negara lain (dipakai peringkat utang). */
+    fun meanTensionOf(id: String): Double {
+        val i = idx.getValue(id)
+        var s = 0.0
+        for (j in 0 until n) if (j != i) s += t[i * n + j]
+        return s / (n - 1)
+    }
+
     fun meanTension(): Double {
         var s = 0.0; var c = 0
         for (i in 0 until n) for (j in i + 1 until n) { s += t[i * n + j]; c++ }

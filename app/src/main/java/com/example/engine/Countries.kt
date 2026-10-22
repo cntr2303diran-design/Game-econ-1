@@ -93,6 +93,9 @@ class SecondaryState(val profile: SecondaryProfile) {
     var risk: Int = profile.risk0                 // 0..100
     var fullySimulated: Boolean = false
     var crisisMonthsLeft: Int = 0
+
+    /** Suku bunga acuan menurut aturan Taylor sederhana (dipakai bank sentral negara sekunder). */
+    val taylorStar: Double get() = 2.0 + inflation + 0.5 * (inflation - 3.0) + 0.4 * (growth - profile.growth0)
 }
 
 /**

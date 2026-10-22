@@ -21,7 +21,9 @@ class DuniaContext(
     val linkedBlocks: Set<Block>,
     val anchorGrowth: Map<Block, Double>,
     /** (inflasi %, pengangguran %) suatu negara; dipakai pemilu. */
-    val macro: (String) -> Pair<Double, Double>
+    val macro: (String) -> Pair<Double, Double>,
+    /** Masukan makro lengkap tiap negara (24) untuk modul makro lanjut. */
+    val macroInput: (String) -> MacroInput
 )
 
 class DuniaEffects(
@@ -30,7 +32,9 @@ class DuniaEffects(
     val creditShock: Double,
     val kursDrift: Double,
     val policyBias: Double,
-    val notes: List<DuniaNote>
+    val notes: List<DuniaNote>,
+    /** Bias aturan Taylor bank sentral negara inti asing. */
+    val foreignBias: Map<String, Double> = emptyMap()
 ) {
     companion object {
         val NEUTRAL = DuniaEffects(0.0, 1.0, 0.0, 0.0, 0.0, emptyList())
@@ -59,6 +63,7 @@ class Dunia(seed: Long, sundaraElectionTurn: Int, sundaraBaseTension: Map<String
     val geo = Geopolitics(seed, sundaraElectionTurn, sundaraBaseTension)
     val secondary = SecondaryWorld()
     val sectors = SectorModel()
+    val macro = MacroPlus(seed)
 
     private val discovered = HashSet<String>()
     private var lastCostBand = 0
@@ -103,7 +108,15 @@ class Dunia(seed: Long, sundaraElectionTurn: Int, sundaraBaseTension: Map<String
         }
         lastCostBand = band
 
-        val fx = DuniaEffects(demand, cost, sr.creditAdd * 0.2 * k, 0.0, 0.0, notes)
+        val mx = macro.step(
+            ctx.turn, rng(104), ctx.macroInput, geo,
+            if (linked.isEmpty()) 1.0 else linked.average(), ctx.oilIndex, ctx.crisisActive, notes
+        )
+        val demandAll = (demand + mx.demandAdd * k).coerceIn(-0.04, 0.01)
+        val fx = DuniaEffects(
+            demandAll, cost, (sr.creditAdd * 0.2 + mx.creditAdd) * k, mx.kursDrift * k, mx.policyBias * k, notes,
+            mx.foreignBias.mapValues { it.value * k }
+        )
         lastEffects = fx
         return fx
     }

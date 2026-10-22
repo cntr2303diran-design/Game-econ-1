@@ -159,7 +159,8 @@ class World(
         kursChangeMonthly: Double,
         kurs: Double,
         extraDemandShock: Double = 0.0,
-        obs: PlayerObservation? = null
+        obs: PlayerObservation? = null,
+        policyBias: Double = 0.0
     ): Output {
         val events = mutableListOf<String>()
         monthsElapsed++
@@ -253,7 +254,7 @@ class World(
         kursHistory.addLast(kurs); if (kursHistory.size > 4) kursHistory.removeFirst()
         val depr3m = if (kursHistory.size >= 4) (kurs / kursHistory.first() - 1.0) * 100.0 else 0.0
         val star = neutralRealRate + inflation + 0.5 * (inflation - inflationTarget) +
-            0.5 * (gap * 100.0) + 0.12 * max(0.0, depr3m - 1.5)
+            0.5 * (gap * 100.0) + 0.12 * max(0.0, depr3m - 1.5) + policyBias
         taylorStar = star
         shadowRate += (0.30 * (star - shadowRate)).coerceIn(-0.5, 0.5)
         shadowRate = shadowRate.coerceIn(2.0, 14.0)

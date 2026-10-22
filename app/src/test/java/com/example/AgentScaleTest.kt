@@ -92,6 +92,8 @@ class AgentScaleTest {
         val e = KapitalEngine(7919L)
         val census = e.agentCensus()
         assertEquals(200_000, census["rumah_tangga"])
+        assertEquals(AgentScale.GOVERNMENTS, census["pemerintah"])
+        assertEquals(AgentScale.CENTRAL_BANKS, census["bank_sentral"])
         assertEquals(200_000, AgentScale.TOTAL_HOUSEHOLDS)
         // Target total dokumen: ±207.000 agen.
         assertTrue("target total ${AgentScale.TARGET_TOTAL}", AgentScale.TARGET_TOTAL in 207_000..207_500)

@@ -256,6 +256,9 @@ class KapitalEngine(val seed: Long) {
     fun agentCensus(): Map<String, Int> {
         val m = LinkedHashMap<String, Int>()
         m["rumah_tangga"] = world.householdSector.agents + foreign.values.sumOf { it.householdSector.agents }
+        // Pemerintah dan bank sentral: satu objek hidup per negara (24) di modul makro lanjut (A5).
+        m["pemerintah"] = dunia.macro.states.size
+        m["bank_sentral"] = dunia.macro.states.size
         return m
     }
     val foreignMeta: Map<String, ForeignCountryMeta> = foreignProfiles.associate { p ->
@@ -1957,6 +1960,13 @@ class KapitalEngine(val seed: Long) {
                         foreign.containsKey(id) -> foreign.getValue(id).let { it.inflation to it.unemployment }
                         else -> dunia.secondary.state(id).let { it.inflation to 5.0 }
                     }
+                },
+                { id ->
+                    when {
+                        id == "sundara" -> MacroInput(inflationAnnual, world.gap, world.unemployment, policyRate, world.taylorStar, 2.5 + 40.0 * world.gap)
+                        foreign.containsKey(id) -> foreign.getValue(id).let { MacroInput(it.inflation, it.gap, it.unemployment, it.policyRate, it.taylorStar, 2.5 + 40.0 * it.gap) }
+                        else -> dunia.secondary.state(id).let { MacroInput(it.inflation, (it.gdpIndex - 1.0) * 0.5, 5.0, it.policyRate, it.taylorStar, it.growth) }
+                    }
                 }
             ), this::rng
         )
@@ -1966,7 +1976,7 @@ class KapitalEngine(val seed: Long) {
         }
         foreignProfiles.forEachIndexed { i, p ->
             val fw = foreign.getValue(p.id)
-            fw.step(rng(20 + i), 1.0, 1.0, 1.0, 0.0, 1.0)
+            fw.step(rng(20 + i), 1.0, 1.0, 1.0, 0.0, 1.0, policyBias = duniaFx.foreignBias[p.id] ?: 0.0)
             val meta = foreignMeta.getValue(p.id)
             if (meta.capitalControlTurnsLeft > 0) meta.capitalControlTurnsLeft--
             // Kurs mata uang lokal terhadap RS mengikuti PPP selisih inflasi Sundara vs negara tersebut
@@ -2059,7 +2069,7 @@ class KapitalEngine(val seed: Long) {
             allowCoalition = difficulty.allowRivalCoalition
         )
 
-        val out = world.step(rWorld, rpPlayer, costPressure, fxPassLevel(), kurs / kursBefore - 1.0, kurs, demandShock, playerObs)
+        val out = world.step(rWorld, rpPlayer, costPressure, fxPassLevel(), kurs / kursBefore - 1.0, kurs, demandShock, playerObs, duniaFx.policyBias)
         econ = out.demand
 
         // Tindak lanjut serangan terarah dari pesaing AI yang belajar (Tahap A)
