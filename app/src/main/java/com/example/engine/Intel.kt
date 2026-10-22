@@ -13,7 +13,8 @@ package com.example.engine
 enum class IntelKind(val code: String, val label: String) {
     SEKTOR("sektor", "Laporan sektor"),
     NEGARA("negara", "Laporan negara"),
-    PESAING("pesaing", "Laporan pesaing");
+    PESAING("pesaing", "Laporan pesaing"),
+    SEGMEN("segmen", "Laporan segmen konsumen");
 
     companion object { fun of(code: String): IntelKind? = values().firstOrNull { it.code == code } }
 }

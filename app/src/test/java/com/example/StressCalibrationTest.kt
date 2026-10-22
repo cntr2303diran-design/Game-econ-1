@@ -36,9 +36,10 @@ class StressCalibrationTest {
     /** Tahap B: aksi acak lama ditambah aksi mekanik baru (jarang agar urutan lama tidak bergeser banyak). */
     fun randomActionB(r: java.util.Random, e: KapitalEngine): Action? {
         if (r.nextInt(5) != 0) return randomAction(r, e)
-        val kinds = listOf("sektor", "negara", "pesaing", "xx")
+        val kinds = listOf("sektor", "negara", "pesaing", "segmen", "xx")
         val kind = kinds[r.nextInt(kinds.size)]
-        return when (r.nextInt(2)) {
+        return when (r.nextInt(3)) {
+            2 -> Action.SetSegmentFocus(Segment.values()[r.nextInt(Segment.values().size)].code, r.nextInt(4) - 0)
             0 -> {
                 val subj = IntelKind.of(kind)?.let { k -> e.intelSubjects(k).let { l -> l[r.nextInt(l.size)].first } } ?: "zz"
                 Action.BuyIntel(kind, subj, r.nextInt(5))

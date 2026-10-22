@@ -248,7 +248,8 @@ fun KapitalAppScaffold(
                     onInvest = { viewModel.invest(it) },
                     onCorporateAction = { viewModel.corporateAction(it) },
                     onBuyIntel = { k, s, t -> viewModel.buyIntel(k, s, t) },
-                    onAnswerBoard = { viewModel.answerBoard(it) }
+                    onAnswerBoard = { viewModel.answerBoard(it) },
+                    onSetSegmentFocus = { s, l -> viewModel.setSegmentFocus(s, l) }
                 )
             }
 

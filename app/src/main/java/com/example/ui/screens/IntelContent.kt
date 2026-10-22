@@ -106,3 +106,42 @@ fun IntelTabContent(
         }
     }
 }
+
+/** B2: tab Segmen: lima segmen konsumen, tren (survei berderau), merek, dan tingkat fokus. */
+@Composable
+fun SegmenTabContent(
+    view: ProductMarketView,
+    ap: Int,
+    onSetFocus: (segment: String, level: Int) -> Unit
+) {
+    Text("Pasar produk: lima segmen", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    IntelCard {
+        Text("${view.brandText} · ${view.focusText}", style = MaterialTheme.typography.bodyMedium)
+        Text(view.costText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "Mengabaikan segmen mengurangi cakupan 15%; fokus menambah cakupan 18% tetapi menambah biaya dan membangun merek. " +
+                "Survei konsumen berderau; riset Intelijen memberi angka lebih tepat. Perubahan memakan 1 poin aksi dan ada jeda 6 bulan.",
+            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+    view.rows.forEach { row ->
+        IntelCard {
+            Text(row.label, style = MaterialTheme.typography.titleMedium)
+            Text("${row.weightText} · ${row.surveyText} · ${row.adoptionText}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("Abaikan", "Layani", "Fokus").forEachIndexed { lv, label ->
+                    val blocked = row.blocks[lv]
+                    FilterChip(
+                        selected = row.level == lv,
+                        onClick = { if (blocked == null && ap >= 1) onSetFocus(row.code, lv) },
+                        enabled = row.level == lv || (blocked == null && ap >= 1),
+                        label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                        modifier = Modifier.testTag("segmen_${row.code}_$lv")
+                    )
+                }
+            }
+            val why = row.blocks.filterNotNull().firstOrNull()
+            if (why != null && row.level == 1) Text(why, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}

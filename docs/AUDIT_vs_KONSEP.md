@@ -37,6 +37,14 @@ Dikerjakan sebelum masuk Tahap B; semua terverifikasi lokal dengan suite penuh (
 ### Keseimbangan terukur (300 seed × 480 giliran, bot uji)
 Sebelum Tahap A (60 seed, mesin lama): pasif 45%, aktif 53%. Awal Tahap A: pasif 137/300 (45,7%), aktif 186/300 (62%). **Akhir Tahap A (setelah perbaikan): pasif 132/300 (44%), kematian per era [80, 38, 25, 25]; aktif 192/300 (64%), [62, 34, 7, 5].** (Sebelum perbaikan: 133 dan 189.) Galat baku ±2,9 poin persentase per angka. Ini hanya mengukur bot; belum ada uji manusia.
 
+## Tahap B — mekanik pemain dan bot: progres
+
+| Butir | Yang dibuat | Bukti terukur | Kekurangan jujur |
+| :--- | :--- | :--- | :--- |
+| B1 intelijen | `BuyIntel` (laporan sektor, negara, pesaing, segmen; 3 tingkat anggaran, galat relatif 25/12/6%) dan rapat dewan kuartalan (`BoardAnswer`, benar +6, salah −6, diam −4); tab "Intelijen" | `IntelBoardTest` 6 tes: galat menyusut menurut anggaran, ±2 pita mencakup ≥90% (150 seed), biaya masuk beban usaha, neraca seimbang; CI hijau | Laporan hanya memberi informasi; dewan tidak punya kepribadian lanjutan atau memori antar pertanyaan; belum ada laporan "pesaing" yang membuka niat strategis mereka |
+| B2 pasar produk | 5 segmen konsumen (bobot, tren AR(1), kurva adopsi jangka panjang, kepekaan merek), fokus 0/1/2 per segmen dengan batas total, jeda 6 bulan, merek, biaya pemasaran bulanan; tab "Segmen" | `ProductMarketTest` 8 tes: faktor awal 1,0; mengabaikan segmen terbesar merugikan ≈ −8% ekuitas; fokus tetap ≈ +1% (bukan uang gratis); `AntiExploitTest` bot acak 200 seed maks 1,44× ekuitas (bot disiplin maks 2,64×) | **Keseimbangan bergeser:** bot pasif 44% → 40%, bot aktif 64% → 58% (300 seed; kematian Era 1 naik karena variansi pendapatan dari tren segmen). Nilai informasi kecil: fokus berdasar survei atau oracle hanya sekitar +1–2% ekuitas dibanding fokus acak. Permintaan agregat lama masih dipakai di bawah faktor segmen (belum diganti total); harga masih global, belum per segmen |
+| Anti-eksploit | `AntiExploitTest`: bot acak 200 seed × 60 giliran, ekuitas akhir/awal median 0,98, p99 1,26, maks 1,44 | Lulus; neraca seimbang | Hanya mengukur aksi yang sudah ada; diperbarui tiap mekanik B baru |
+
 ### Catatan kalibrasi (agar tidak diulang)
 - Lapisan dunia sempat membuat permainan hampir mustahil (menang 1%) karena penuh dampak sejak Era 1; sekarang dampaknya diredam 0,35 di Era 1 (`DuniaTuning.era1Gate`) karena rantai pasok lintas negara baru relevan di Era 2.
 - Pengali biaya dunia hanya boleh masuk ke HPP pemain, bukan ke `costPressure` bersama (pesaing tidak bisa menaikkan harga dan bangkrut, pemain menang 72%).

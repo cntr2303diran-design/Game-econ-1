@@ -62,6 +62,8 @@ sealed class Action {
     data class BuyIntel(val kind: String, val subject: String, val tier: Int) : Action()
     /** B1: jawab pertanyaan rapat dewan: naik, turun, tetap, atau abstain. */
     data class BoardAnswer(val claim: String) : Action()
+    /** B2: atur tingkat fokus pada satu segmen konsumen (0 abaikan, 1 layani, 2 fokus). */
+    data class SetSegmentFocus(val segment: String, val level: Int) : Action()
 
     fun encode(): String = when (this) {
         EndTurn -> "END"
@@ -108,6 +110,7 @@ sealed class Action {
         ChainAudit -> "CHA"
         is BuyIntel -> "INT|${esc(kind)}|${esc(subject)}|$tier"
         is BoardAnswer -> "BRD|${esc(claim)}"
+        is SetSegmentFocus -> "SEG|${esc(segment)}|$level"
     }
 
     companion object {
@@ -162,6 +165,7 @@ sealed class Action {
                     "CHA" -> ChainAudit
                     "INT" -> BuyIntel(p[1], p[2], p[3].toInt())
                     "BRD" -> BoardAnswer(p[1])
+                    "SEG" -> SetSegmentFocus(p[1], p[2].toInt())
                     else -> null
                 }
             } catch (_: Exception) {

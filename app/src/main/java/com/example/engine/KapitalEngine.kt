@@ -178,6 +178,8 @@ class KapitalEngine(val seed: Long) {
     var gameOverReason: String? = null; private set
     var isVictory: Boolean = false; private set
     var boardTrust: Int = 78; private set
+    /** B2: pasar produk (harus dideklarasikan sebelum blok init yang memperkirakan pendapatan). */
+    val market = ProductMarket()
 
     // ---------- Neraca ----------
     var cash = sc.cash; private set
@@ -806,7 +808,7 @@ class KapitalEngine(val seed: Long) {
     fun playerShare(): Double = world.playerShare((1.0 + priceAdjPct / 100.0) * fxPassLevel())
 
     private fun baseNormalRevenue(prodFactor: Double): Double {
-        var r = sc.baseRevenue * volumeCap() * econ * trendGrowth() * modProduct("rev") * (if (turn <= dumpingUntil) 0.98 else 1.0) * priceIndex * fxPassLevel() * prodFactor * (1.0 - lostCustomerShare) * priceRevenueFactor()
+        var r = sc.baseRevenue * volumeCap() * econ * trendGrowth() * modProduct("rev") * (if (turn <= dumpingUntil) 0.98 else 1.0) * priceIndex * fxPassLevel() * prodFactor * (1.0 - lostCustomerShare) * priceRevenueFactor() * market.revenueFactor(turn)
         if (salesScheme == SalesScheme.KAS) r *= 0.97
         if (!exec("exec_sales").present) r *= 0.95
         return r
@@ -830,7 +832,7 @@ class KapitalEngine(val seed: Long) {
 
     /** Biaya operasional tambahan di induk (beban lokal anak usaha sudah dibukukan di laporan entitas anak masing-masing!). */
     private fun extraOpex(): Double {
-        return (extraLines * 70.0 + (if (exportOn) 40.0 else 0.0) + (if (warehouse) 25.0 else 0.0) + (if (isPublicCompany) 35.0 else 0.0)) * sc.size * costIndex
+        return (extraLines * 70.0 + (if (exportOn) 40.0 else 0.0) + (if (warehouse) 25.0 else 0.0) + (if (isPublicCompany) 35.0 else 0.0)) * sc.size * costIndex + market.monthlyCost(sc.baseRevenue, costIndex)
     }
 
     private fun trendGrowth(): Double = Math.pow(1.025, trendMonths / 12.0)
@@ -1167,6 +1169,7 @@ class KapitalEngine(val seed: Long) {
             is Action.AppointSuccessor -> eraBlock(4) == null && doAppointSuccessor(action.candidateId)
             is Action.BuyIntel -> doBuyIntel(action.kind, action.subject, action.tier)
             is Action.BoardAnswer -> doBoardAnswer(action.claim)
+            is Action.SetSegmentFocus -> doSetSegmentFocus(action.segment, action.level)
         }
         if (ok) actionCount++
         return ok
@@ -1486,6 +1489,7 @@ class KapitalEngine(val seed: Long) {
         IntelKind.SEKTOR -> Sector.values().map { it.name to it.label }
         IntelKind.NEGARA -> Countries.coreIds.filter { it != "sundara" }.map { it to Countries.byId.getValue(it).name }
         IntelKind.PESAING -> world.rivals.map { it.id to it.name }
+        IntelKind.SEGMEN -> Segment.values().map { it.code to it.label }
     }
 
     /** Nilai sebenarnya yang disembunyikan dari pemain; hanya dipakai untuk menurunkan perkiraan berderau. */
@@ -1497,6 +1501,9 @@ class KapitalEngine(val seed: Long) {
             Triple(dunia.geo.tension("sundara", subject), 50.0, "ketegangan dengan Sundara (0–100)" to "poin") else null
         IntelKind.PESAING -> world.rivals.firstOrNull { it.id == subject }?.let {
             Triple(it.unitCost, 0.5, "biaya satuan relatif (1,0 = harga pasar awal)" to "rasio")
+        }
+        IntelKind.SEGMEN -> Segment.of(subject)?.let {
+            Triple(market.trend[it.ordinal] * market.secular(it, turn), 0.25, "indeks permintaan segmen (1,0 = normal)" to "indeks")
         }
     }
 
@@ -1514,7 +1521,12 @@ class KapitalEngine(val seed: Long) {
         val r = Random(seed * 1_000_003L + intelSeq * 7_919L + turn * 104_729L + 110L)
         intelSeq++
         var est = truth + sd * gaussian(r)
-        if (kind == IntelKind.SEKTOR) est = est.coerceIn(0.0, 1.2) else if (kind == IntelKind.NEGARA) est = est.coerceIn(0.0, 100.0) else est = est.coerceAtLeast(0.1)
+        est = when (kind) {
+            IntelKind.SEKTOR -> est.coerceIn(0.0, 1.2)
+            IntelKind.NEGARA -> est.coerceIn(0.0, 100.0)
+            IntelKind.SEGMEN -> est.coerceIn(0.3, 1.8)
+            else -> est.coerceAtLeast(0.1)
+        }
         val label = intelSubjects(kind).firstOrNull { it.first == subject }?.second ?: subject
         intelReports += IntelReport(intelSeq, kind, subject, label, meta.first, turn, tier, cost, est, sd, meta.second)
         chronicle += ChronicleItem(turn, "${kind.label}: $label",
@@ -1573,6 +1585,34 @@ class KapitalEngine(val seed: Long) {
         }
         boardQuestionSeq++
         boardQuestion = BoardQuestion(boardQuestionSeq, member, text, metric, boardMetricNow(metric), turn, turn + 3)
+    }
+
+
+    // =====================================================================
+    // B2: pasar produk, lima segmen konsumen (lihat ProductMarket.kt)
+    // =====================================================================
+    /** Alasan fokus segmen ditolak, atau null bila boleh. */
+    fun segmentFocusBlock(segmentCode: String, level: Int): String? {
+        val sg = Segment.of(segmentCode) ?: return "Segmen tidak dikenal."
+        if (level !in 0..2) return "Tingkat fokus harus 0, 1, atau 2."
+        val cur = market.level[sg.ordinal]
+        if (level == cur) return "Segmen sudah pada tingkat itu."
+        if (turn - market.lastChangeTurn[sg.ordinal] < ProductMarket.COOLDOWN) return "Segmen ini baru diubah; tunggu ${ProductMarket.COOLDOWN} bulan antar perubahan."
+        val cap = ProductMarket.focusCap(era(turn))
+        if (market.focusUsed() - cur + level > cap) return "Batas total fokus $cap sudah terpakai; turunkan segmen lain dulu."
+        return null
+    }
+
+    private fun doSetSegmentFocus(segmentCode: String, level: Int): Boolean {
+        if (segmentFocusBlock(segmentCode, level) != null) return false
+        if (!spend(1)) return false
+        val sg = Segment.of(segmentCode)!!
+        market.level[sg.ordinal] = level
+        market.lastChangeTurn[sg.ordinal] = turn
+        chronicle += ChronicleItem(turn, "Fokus segmen: ${sg.label}",
+            "Tingkat fokus menjadi $level (${listOf("diabaikan", "dilayani", "difokuskan")[level]}).",
+            "Strategi segmen → cakupan permintaan dan merek → pendapatan; fokus menambah biaya pemasaran bulanan.", actionCount)
+        return true
     }
 
     /** Akuisisi Media atau Lobi Parlemen (Era 3). */
@@ -2069,6 +2109,7 @@ class KapitalEngine(val seed: Long) {
         var periodSubWriteOffRs = 0.0
 
         // ---- 1. Makro & Geopolitik 7 Negara Asing ----
+        market.step(turn, rng(111))
         val rMacro = rng(1)
         val rWorld = rng(8)
         val kursBefore = kurs

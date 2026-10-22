@@ -15,6 +15,8 @@ import com.example.engine.KapitalEngine.Companion.signed
 import com.example.engine.IntelKind
 import com.example.engine.IntelTier
 import com.example.engine.Ladder
+import com.example.engine.ProductMarket
+import com.example.engine.Segment
 import com.example.engine.SalesScheme
 import com.example.engine.Tech
 import com.example.engine.Tone
@@ -122,6 +124,7 @@ class GameRepository(
     }
 
     fun adjustPrice(deltaPct: Int) = perform(Action.AdjustPrice(deltaPct))
+    fun setSegmentFocus(segment: String, level: Int) = perform(Action.SetSegmentFocus(segment, level))
     fun buyIntel(kind: String, subject: String, tier: Int) = perform(Action.BuyIntel(kind, subject, tier))
     fun answerBoard(claim: String) = perform(Action.BoardAnswer(claim))
     fun applyCredit(bankId: String, amount: Int, tenor: Int, purpose: String, floating: Boolean, bullet: Boolean) =
@@ -251,6 +254,29 @@ class GameRepository(
         }
         val record = "benar ${e.boardCorrect} · salah ${e.boardWrong} · mengelak ${e.boardAbstained} · tak dijawab ${e.boardIgnored}"
         return IntelView(kinds, tiers, reports, board, e.boardTrust, record)
+    }
+
+
+    private fun productMarketView(e: KapitalEngine): ProductMarketView {
+        val m = e.market
+        val rows = Segment.values().map { sg ->
+            val i = sg.ordinal
+            val sec = m.secular(sg, e.turn)
+            SegmentRowView(
+                code = sg.code, label = sg.label,
+                weightText = "${(sg.weight * 100).roundToInt()}% dari pasar",
+                surveyText = "survei ${fmt2(m.survey[i])} (berderau ±${(ProductMarket.SURVEY_NOISE * 100).roundToInt()}%)",
+                adoptionText = if (sec >= 1.0) "adopsi jangka panjang +${fmt1((sec - 1.0) * 100)}%" else "adopsi jangka panjang ${fmt1((sec - 1.0) * 100)}%",
+                level = m.level[i],
+                blocks = (0..2).map { e.segmentFocusBlock(sg.code, it) }
+            )
+        }
+        return ProductMarketView(
+            rows = rows,
+            brandText = "Merek ${fmt1(m.brand)}/100 (netral ${ProductMarket.BRAND_NEUTRAL.roundToInt()})",
+            focusText = "Fokus terpakai ${m.focusUsed()}/${ProductMarket.focusCap(e.currentEra)}",
+            costText = "Biaya pemasaran ${fmt(m.monthlyCost(e.sc.baseRevenue, e.costIndex))} jt RS per bulan"
+        )
     }
 
     private fun liveTensions(e: KapitalEngine): List<PairwiseTension> {
@@ -1035,6 +1061,7 @@ class GameRepository(
             pairwiseTensions = liveTensions(e),
             worldLayer = worldLayerView(e),
             intel = intelView(e),
+            productMarket = productMarketView(e),
             incomeStatementRows = incomeRows,
             balanceSheetRows = balanceRows,
             cashFlowRows = cashFlowRows,

@@ -215,6 +215,26 @@ data class IntelView(
     val boardRecord: String = ""
 )
 
+/** B2: satu segmen konsumen di tab Segmen. */
+data class SegmentRowView(
+    val code: String,
+    val label: String,
+    val weightText: String,
+    val surveyText: String,
+    val adoptionText: String,
+    val level: Int,
+    /** Alasan penolakan untuk memilih tingkat 0, 1, 2 (null = boleh). */
+    val blocks: List<String?>
+)
+
+/** B2: tampilan tab Segmen (pasar produk). */
+data class ProductMarketView(
+    val rows: List<SegmentRowView> = emptyList(),
+    val brandText: String = "",
+    val focusText: String = "",
+    val costText: String = ""
+)
+
 data class GanttTask(
     val id: String,
     val projectName: String,
@@ -406,6 +426,7 @@ data class GameState(
     val pairwiseTensions: List<PairwiseTension>,
     val worldLayer: WorldLayerView = WorldLayerView(),
     val intel: IntelView = IntelView(),
+    val productMarket: ProductMarketView = ProductMarketView(),
 
     // Layar Perusahaan (Laporan Keuangan, Organisasi, Proyek Gantt, Kontrak)
     val incomeStatementRows: List<FinancialRowItem>,

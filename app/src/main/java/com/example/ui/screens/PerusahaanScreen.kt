@@ -49,9 +49,10 @@ fun PerusahaanScreen(
     onCorporateAction: (String) -> Unit = {},
     onBuyIntel: (kind: String, subject: String, tier: Int) -> Unit = { _, _, _ -> },
     onAnswerBoard: (String) -> Unit = {},
+    onSetSegmentFocus: (segment: String, level: Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
-    val subTabs = listOf("Laporan keuangan", "Organisasi", "Proyek", "Kontrak", "Bank", "Pelaku", "Investasi", "Intelijen")
+    val subTabs = listOf("Laporan keuangan", "Organisasi", "Proyek", "Kontrak", "Bank", "Pelaku", "Investasi", "Intelijen", "Segmen")
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -131,6 +132,7 @@ fun PerusahaanScreen(
                     5 -> PelakuTabContent(gameState.actors)
                     6 -> InvestTabContent(gameState.investments, gameState.investSummary, gameState.actionPoints, onInvest, onCorporateAction)
                     7 -> IntelTabContent(gameState.intel, gameState.actionPoints, onBuyIntel, onAnswerBoard)
+                    8 -> SegmenTabContent(gameState.productMarket, gameState.actionPoints, onSetSegmentFocus)
                 }
             }
         }
