@@ -1179,7 +1179,7 @@ class KapitalEngine(val seed: Long) {
             is Action.BuyStock -> doBuy(action.companyId, action.lots)
             is Action.SellStock -> doSell(action.companyId, action.lots)
             is Action.AdjustPrice -> {
-                val target = (priceAdjPct + action.deltaPct).coerceIn(-15, 15)
+                val target = (priceAdjPct.toLong() + action.deltaPct.toLong()).coerceIn(-15L, 15L).toInt() // Long: Int.MAX_VALUE tidak boleh meluap dan memutar tanda
                 if (target != priceAdjPct && spend(1)) { priceAdjPct = target; true } else false
             }
             is Action.SetDifficulty -> {
