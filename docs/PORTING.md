@@ -1,0 +1,29 @@
+# Dokumentasi Pemulihan Dasar & Inventaris Porting (`docs/PORTING.md`)
+
+## 1. Konfirmasi Basis Kode (`claude/simulasi-era1`) & Ringkasan Arsitektur (15 Baris)
+
+Basis kerja ini berdiri di atas arsitektur **`claude/simulasi-era1`** yang memisahkan mesin simulasi murni Kotlin (`com.example.engine`) dari lapisan data (`com.example.data`), model tampilan (`com.example.model`), dan antarmuka Jetpack Compose (`com.example.ui`):
+1. `Scenario.kt`: Membangkitkan skenario awal secara deterministik dari `seed` (6 premis: `warisan`, `pelanggan_tunggal`, `mesin_tua`, `ekspansi_berutang`, `pasar_lesu`, `sengketa_serikat`).
+2. `World.kt`: Mensimulasikan 50.000 agen rumah tangga (`employed`, `income`, `mpc`), 4 pesaing tekstil (`riv_mitra`, `riv_cahaya`, `riv_prima`, `riv_importir`), dan Bank Sentral aturan Taylor (`policyRate`, `inflation`, `unemployment`, `gap`).
+3. `Commodities.kt`: Menggerakkan harga spot dan indeks AR(1) *mean-reverting* untuk kapas (`cotton`), minyak (`oil`), dan baja (`steel`) beserta guncangan pasokan El Niño dan Selat Norvaldia.
+4. `Credit.kt`: Mengelola meja kredit (`CreditDesk`) dengan 4 institusi keuangan (`bk_niaga`, `bk_pembangunan`, `bk_aurelia`, `bk_dana`), skor kredit 6 komponen, waktu telaah multi-giliran, dan klausul tersembunyi (`macClause`, `stepUpPct`, `dividendLock`, `callable`).
+5. `Bourse.kt`: Mensimulasikan Bursa Efek Sundara (7 emiten: `MTNU`, `CAWE`, `PRGU`, `VELM`, `MHKT`, `KPLP`, `TAKA`) lengkap dengan laporan bulanan/kuartalan, kejutan konsensus analis, dividen, dan risiko pailit/delisting.
+6. `Events.kt`: Mengelola dek kartu kejadian (`EventDeck`) dan pemberitahuan makro (`NoticeTemplate`) dengan bobot peluang yang bergantung pada kondisi aktual dunia (`EventCtx`).
+7. `Actions.kt`: Mendefinisikan `sealed class Action` beserta serialisasi deterministik `encode()` dan `decode()` untuk fitur simpan/muat berbasis *replay* (`SEED` + daftar aksi).
+8. `KapitalEngine.kt`: Mengintegrasikan operasi pabrik, modal kerja (`DSO`, `DIO`, `DPO`), perilaku agen eksekutif internal (`stuffingActive`, `deferralActive`, `kickbackActive`), 6 jenis investasi awal, laporan keuangan akrual (`lastIncome`, `balanceSnapshot`, `lastCashFlow`, `lastDetail`), koran pagi 5 sudut pandang, serta skenario tandingan (`replayUntil`).
+9. `GameRepository.kt`: Menjembatani `KapitalEngine` dengan `StateFlow<GameState>` untuk antarmuka pengguna dan mengelola penyimpanan ke `SharedPreferences`.
+
+---
+
+## 2. Inventaris Commit `97abc44` dan Keputusan Teknis per Fitur
+
+Berikut adalah daftar seluruh perubahan yang sempat masuk di commit `97abc44`, hasil audit atas masing-masing item, dan keputusan rekayasa yang diambil:
+
+| No | Fitur / Komponen di `97abc44` | Temuan Audit pada `97abc44` | Keputusan | Tindakan Rekayasa yang Dilakukan |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 | **Aksi Baru di `Actions.kt`** (`SetDifficulty`, `OpenSubsidiary`, `SetTransferPricing`, `Repatriate`, `HedgeFx`, `AcquireRival`) | Di `97abc44`, panggilan ada di `KapitalEngine.kt` tetapi deklarasi dan `encode`/`decode` tertinggal dari komit. | **PORT & PERLUAS** | Diimplementasikan penuh di `Actions.kt` ditambah aksi Era 2–4 (`BorrowForeignSub`, `IssueCorporateBond`, `ExecuteIpo`, `OpenCaptiveBank`, `MediaLobby`, `CarbonAction`, `AppointSuccessor`) lengkap dengan tes *round-trip*. |
+| 2 | **Kartu Kejadian Berantai di `Events.kt`** (`ScheduledChainEvent`, `customWarning`, `eventRateMult`) | Di `97abc44`, tanda tangan `makeEvent` dan `draw` tidak sinkron; jumlah kartu baru 34. | **PORT & PERLUAS** | Disinkronkan penuh dan diperluas menjadi **44 template kartu unik** (mencakup rantai buruh, mutu, lingkungan, sanksi, siber, *whistleblower*, kongesti pelabuhan, perang tarif, kontrol modal, *greenmail*, *short-seller*, *bank run*, antimonopoli, AI, karbon, dan suksesi). |
+| 3 | **Pembelajaran Pesaing AI di `World.kt`** (`PlayerObservation`, `RivalStrategy`, evaluasi 12 giliran) | Di `97abc44`, simbol `PlayerObservation` belum terkomit di `World.kt` dan efek pembelajaran atas harga/biaya pesaing belum diuji pada *seed* kembar. | **PORT & PERbaiki** | Diimplementasikan di `World.kt` dengan siklus pembaruan model perilaku tiap 12 giliran (`monthsElapsed % 12 == 0`) yang mengubah strategi, agresivitas harga, dan efisiensi pesaing berdasarkan pola pemain, dibuktikan lewat tes unit deterministik. |
+| 4 | **Skor Etika Rahasia, 4 Tingkat Kesulitan, & Evaluasi 5 Pilar** (`EthicsEvidence`, `Difficulty`, `evaluateCampaign`) | Berjalan untuk kasus dasar tetapi perlu diselaraskan dengan akuntansi konsolidasi dan suksesi Era 4. | **PORT & SEempurnakan** | Dipertahankan dan dihubungkan ke pembukuan konsolidasi grup, audit *transfer pricing* berbasis rasio aktivitas, dan evaluasi kampanye 5 pilar. |
+| 5 | **Model Anak Usaha Multinasional (`SubsidiaryState` dengan `localSurplusRate` & `retainedForeign`)** | **Cacat Desain Ekonomi**: memakai rumus tetap `sc.baseRevenue * localSurplusRate * econ * priceIndex`, menumpuk di luar neraca, dividen dicatat sebagai `pendingIncome` (pendapatan lain), pajak dividen dicatat sebagai `oneOffOpex`, dan imbal hasil terlalu tinggi tanpa risiko rugi. | **BUANG & TULIS ULANG TOTAL** | Diganti total pada Tahap 3 dengan **`SubsidiaryEntity`** yang memiliki pembukuan sendiri dalam mata uang lokal (`cashLocal`, `arLocal`, `invLocal`, `faLocal`, `apLocal`, `bankDebtLocal`, `paidInCapitalLocal`, `retainedEarningsLocal`), pendapatan dari pasar lokal + kurva belajar, konsolidasi grup dengan eliminasi transaksi/dividen antar-entitas, pencatatan pajak *withholding* sebagai pajak, dan Selisih Kurs Translasi (`ctaEquity`) di ekuitas. |
+| 6 | **Dokumen `docs/AUDIT_vs_KONSEP.md` lama** | Menyebut simbol yang tidak ada di kode dan mengklaim "100%" tanpa bukti keluaran tes/simulasi. | **BUANG & TULIS ULANG DARI NOL** | Dihapus dan ditulis ulang dari nol berdasarkan simbol kode yang benar-benar ada serta hasil eksekusi kompilasi dan pengujian yang terukur. |
