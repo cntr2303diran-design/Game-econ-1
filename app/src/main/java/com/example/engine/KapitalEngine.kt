@@ -1165,6 +1165,8 @@ class KapitalEngine(val seed: Long) {
             is Action.ChainAudit -> eraBlock(2) == null && doChainAudit()
             is Action.CarbonAction -> eraBlock(4) == null && doCarbonAction(action.kind, action.units)
             is Action.AppointSuccessor -> eraBlock(4) == null && doAppointSuccessor(action.candidateId)
+            is Action.BuyIntel -> doBuyIntel(action.kind, action.subject, action.tier)
+            is Action.BoardAnswer -> doBoardAnswer(action.claim)
         }
         if (ok) actionCount++
         return ok
@@ -1463,6 +1465,111 @@ class KapitalEngine(val seed: Long) {
             "Biaya ${fmt(cost)} jt RS. Simpul tersembunyi terungkap: $hidden. Pasokan bisa dialihkan lebih cepat bila sanksi menyentuhnya, tetapi uji tuntas tidak pernah 100% akurat.",
             "Uji tuntas → paparan Tier-2/3 terlihat → dampak sanksi lebih kecil.", actionCount)
         return true
+    }
+
+
+    // =====================================================================
+    // B1: Intelijen berbayar dan rapat dewan kuartalan (lihat Intel.kt)
+    // =====================================================================
+    val intelReports = mutableListOf<IntelReport>()
+    private var intelSeq = 0
+    var boardQuestion: BoardQuestion? = null; private set
+    private var boardQuestionSeq = 0
+    var boardCorrect = 0; private set
+    var boardWrong = 0; private set
+    var boardAbstained = 0; private set
+    var boardIgnored = 0; private set
+    private var boardAbstainStreak = 0
+
+    /** Daftar subjek yang bisa diriset untuk suatu jenis laporan (kode, label). */
+    fun intelSubjects(kind: IntelKind): List<Pair<String, String>> = when (kind) {
+        IntelKind.SEKTOR -> Sector.values().map { it.name to it.label }
+        IntelKind.NEGARA -> Countries.coreIds.filter { it != "sundara" }.map { it to Countries.byId.getValue(it).name }
+        IntelKind.PESAING -> world.rivals.map { it.id to it.name }
+    }
+
+    /** Nilai sebenarnya yang disembunyikan dari pemain; hanya dipakai untuk menurunkan perkiraan berderau. */
+    private fun intelTruth(kind: IntelKind, subject: String): Triple<Double, Double, Pair<String, String>>? = when (kind) {
+        IntelKind.SEKTOR -> Sector.values().firstOrNull { it.name == subject }?.let {
+            Triple(dunia.sectors.availability[it.ordinal], 1.0, "ketersediaan pasokan (1,0 = penuh)" to "indeks")
+        }
+        IntelKind.NEGARA -> if (subject != "sundara" && Countries.coreIds.contains(subject))
+            Triple(dunia.geo.tension("sundara", subject), 50.0, "ketegangan dengan Sundara (0–100)" to "poin") else null
+        IntelKind.PESAING -> world.rivals.firstOrNull { it.id == subject }?.let {
+            Triple(it.unitCost, 0.5, "biaya satuan relatif (1,0 = harga pasar awal)" to "rasio")
+        }
+    }
+
+    private fun doBuyIntel(kindCode: String, subject: String, tier: Int): Boolean {
+        val kind = IntelKind.of(kindCode) ?: return false
+        if (tier !in 1..3) return false
+        val (truth, scale, meta) = intelTruth(kind, subject) ?: return false
+        val cost = IntelTier.cost(tier) * sc.size * costIndex
+        if (cash - cost < 1200.0 || !spend(1)) return false
+        oneOffOpex += cost
+        val sd = IntelTier.errorSd(tier) * scale
+        val r = Random(seed * 1_000_003L + intelSeq * 7_919L + turn * 104_729L + 110L)
+        intelSeq++
+        var est = truth + sd * gaussian(r)
+        if (kind == IntelKind.SEKTOR) est = est.coerceIn(0.0, 1.2) else if (kind == IntelKind.NEGARA) est = est.coerceIn(0.0, 100.0) else est = est.coerceAtLeast(0.1)
+        val label = intelSubjects(kind).firstOrNull { it.first == subject }?.second ?: subject
+        intelReports += IntelReport(intelSeq, kind, subject, label, meta.first, turn, tier, cost, est, sd, meta.second)
+        chronicle += ChronicleItem(turn, "${kind.label}: $label",
+            "Anggaran ${fmt(cost)} jt RS (tingkat $tier). Perkiraan ${meta.first}: ${fmt2(est)} ± ${fmt2(sd)}.",
+            "Riset berbayar → perkiraan dengan margin error → keputusan lebih terinformasi (tidak pernah pasti).", actionCount)
+        return true
+    }
+
+    private fun boardMetricNow(metric: String): Double = when (metric) {
+        "ebit" -> ebitHist.takeLast(3).sum()
+        "cash" -> cash
+        else -> revenueHist.lastOrNull() ?: 0.0
+    }
+
+    private fun doBoardAnswer(claim: String): Boolean {
+        val q = boardQuestion ?: return false
+        if (q.answer != null || claim !in Board.CLAIMS) return false
+        q.answer = claim
+        return true
+    }
+
+    /** Dipanggil tiap tiga bulan pada akhir giliran: menilai jawaban rapat lalu dan mengajukan pertanyaan baru. */
+    private fun boardMeeting(lines: MutableList<ReportLine>) {
+        val q = boardQuestion
+        if (q != null && q.dueTurn <= turn) {
+            val actual = Board.classify(q.baseline, boardMetricNow(q.metric))
+            val ans = q.answer
+            when {
+                ans == null -> {
+                    boardIgnored++; boardTrust = (boardTrust - 4).coerceAtLeast(0)
+                    lines += ReportLine("Dewan: pertanyaan ${q.member} tentang ${Board.METRICS.getValue(q.metric)} tidak Anda jawab. Kepercayaan dewan turun.", Tone.WARN)
+                }
+                ans == "abstain" -> {
+                    boardAbstained++; boardAbstainStreak++
+                    if (boardAbstainStreak >= 3) { boardTrust = (boardTrust - 3).coerceAtLeast(0); lines += ReportLine("Dewan mulai kesal: Anda terus mengelak ($boardAbstainStreak rapat berturut-turut).", Tone.WARN) }
+                }
+                ans == actual -> {
+                    boardCorrect++; boardAbstainStreak = 0; boardTrust = (boardTrust + 6).coerceAtMost(100)
+                    lines += ReportLine("Dewan: perkiraan Anda tentang ${Board.METRICS.getValue(q.metric)} ($ans) terbukti benar. Kepercayaan dewan naik.", Tone.GOOD)
+                }
+                else -> {
+                    boardWrong++; boardAbstainStreak = 0; boardTrust = (boardTrust - 6).coerceAtLeast(0)
+                    lines += ReportLine("Dewan: Anda memperkirakan ${Board.METRICS.getValue(q.metric)} $ans, kenyataannya $actual. Kepercayaan dewan turun.", Tone.BAD)
+                }
+            }
+        }
+        val r = rng(110)
+        val member = Board.MEMBERS[r.nextInt(Board.MEMBERS.size)]
+        val metric = Board.METRICS.keys.toList()[r.nextInt(Board.METRICS.size)]
+        val desc = Board.METRICS.getValue(metric)
+        val text = when (Board.MEMBERS.indexOf(member)) {
+            0 -> "Angka kuartal ini sudah kami baca. Terus terang, ke mana arah $desc tiga bulan ke depan: naik, turun, atau datar?"
+            1 -> "Catatan auditor menyoroti $desc. Berani Anda menjamin arahnya dalam tiga bulan: naik, turun, atau tetap?"
+            2 -> "Pemegang saham pengendali ingin kepastian soal $desc. Apa taruhan Anda untuk kuartal depan?"
+            else -> "Dana kami menimbang posisi. Jika $desc turun, kami keluar. Naik, turun, atau tetap kuartal depan?"
+        }
+        boardQuestionSeq++
+        boardQuestion = BoardQuestion(boardQuestionSeq, member, text, metric, boardMetricNow(metric), turn, turn + 3)
     }
 
     /** Akuisisi Media atau Lobi Parlemen (Era 3). */
@@ -2891,6 +2998,7 @@ class KapitalEngine(val seed: Long) {
                 "$gameOverReason ${eval.summaryText}", "Lihat post-mortem dan evaluasi 5 komponen.")
         }
 
+        if (gameOverReason == null && (turn + 1) % 3 == 0) boardMeeting(lines)
         if (gameOverReason == null) successionMilestones(lines)
         if (gameOverReason == null && era(turn + 1) != era(turn)) eraTransitionReview(era(turn), lines)
         turn += 1

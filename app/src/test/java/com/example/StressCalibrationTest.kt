@@ -33,6 +33,20 @@ class StressCalibrationTest {
         else -> null
     }
 
+    /** Tahap B: aksi acak lama ditambah aksi mekanik baru (jarang agar urutan lama tidak bergeser banyak). */
+    fun randomActionB(r: java.util.Random, e: KapitalEngine): Action? {
+        if (r.nextInt(5) != 0) return randomAction(r, e)
+        val kinds = listOf("sektor", "negara", "pesaing", "xx")
+        val kind = kinds[r.nextInt(kinds.size)]
+        return when (r.nextInt(2)) {
+            0 -> {
+                val subj = IntelKind.of(kind)?.let { k -> e.intelSubjects(k).let { l -> l[r.nextInt(l.size)].first } } ?: "zz"
+                Action.BuyIntel(kind, subj, r.nextInt(5))
+            }
+            else -> Action.BoardAnswer(Board.CLAIMS[r.nextInt(Board.CLAIMS.size)])
+        }
+    }
+
     /** Pemeriksaan laporan konsolidasi: arus kas = perubahan kas grup, laba rugi dan ekuitas konsolidasi cocok. Mengembalikan kas grup akhir. */
     private fun checkConsolidated(e: KapitalEngine, prevCash: Double, ctx: String): Double {
         val tol = 1e-6

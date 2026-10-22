@@ -58,6 +58,10 @@ sealed class Action {
 
     // Tahap A: lapisan dunia
     object ChainAudit : Action()
+    /** B1: beli laporan intelijen (jenis sektor/negara/pesaing, subjek, tingkat anggaran 1..3). */
+    data class BuyIntel(val kind: String, val subject: String, val tier: Int) : Action()
+    /** B1: jawab pertanyaan rapat dewan: naik, turun, tetap, atau abstain. */
+    data class BoardAnswer(val claim: String) : Action()
 
     fun encode(): String = when (this) {
         EndTurn -> "END"
@@ -102,6 +106,8 @@ sealed class Action {
         is CarbonAction -> "CRB|${esc(kind)}|$units"
         is AppointSuccessor -> "SUC|${esc(candidateId)}"
         ChainAudit -> "CHA"
+        is BuyIntel -> "INT|${esc(kind)}|${esc(subject)}|$tier"
+        is BoardAnswer -> "BRD|${esc(claim)}"
     }
 
     companion object {
@@ -154,6 +160,8 @@ sealed class Action {
                     "CRB" -> CarbonAction(p[1], p[2].toInt())
                     "SUC" -> AppointSuccessor(p[1])
                     "CHA" -> ChainAudit
+                    "INT" -> BuyIntel(p[1], p[2], p[3].toInt())
+                    "BRD" -> BoardAnswer(p[1])
                     else -> null
                 }
             } catch (_: Exception) {

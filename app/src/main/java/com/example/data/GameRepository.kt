@@ -119,6 +119,8 @@ class GameRepository(
     }
 
     fun adjustPrice(deltaPct: Int) = perform(Action.AdjustPrice(deltaPct))
+    fun buyIntel(kind: String, subject: String, tier: Int) = perform(Action.BuyIntel(kind, subject, tier))
+    fun answerBoard(claim: String) = perform(Action.BoardAnswer(claim))
     fun applyCredit(bankId: String, amount: Int, tenor: Int, purpose: String, floating: Boolean, bullet: Boolean) =
         perform(Action.ApplyCredit(bankId, amount, tenor, purpose, floating, bullet))
     fun reviewOffer(appId: String) = perform(Action.ReviewOffer(appId))

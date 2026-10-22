@@ -77,7 +77,7 @@ class StageAStressTest {
                 for (t in 1..60) {
                     if (e.gameOverReason != null) break
                     if (start != 0) TestBots.disciplinedStep(e, 500 + t)
-                    repeat(2) { actions.randomAction(r, e)?.let { a -> e.apply(a) } }
+                    repeat(2) { actions.randomActionB(r, e)?.let { a -> e.apply(a) } }
                     for (ev in e.openEvents.toList()) e.apply(Action.EventChoice(ev.id, ev.options[r.nextInt(ev.options.size)].id))
                     val t0 = System.nanoTime()
                     e.apply(Action.EndTurn)
@@ -107,7 +107,7 @@ class StageAStressTest {
             val e = KapitalEngine(seed); val r = java.util.Random(seed)
             for (t in 1..80) {
                 if (e.gameOverReason != null) break
-                actions.randomAction(r, e)?.let { a -> e.apply(a) }
+                actions.randomActionB(r, e)?.let { a -> e.apply(a) }
                 for (ev in e.openEvents.toList()) e.apply(Action.EventChoice(ev.id, ev.options[0].id))
                 e.apply(Action.EndTurn)
             }
