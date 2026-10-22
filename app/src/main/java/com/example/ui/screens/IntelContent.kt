@@ -12,6 +12,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.model.*
@@ -38,7 +40,7 @@ private fun StockChartCard(series: List<Double>, caption: String) {
     IntelCard {
         Text("Harga saham", style = MaterialTheme.typography.titleMedium)
         Text("$caption · ${series.size} bulan: ${"%+.1f".format((last / first - 1.0) * 100.0)}%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Canvas(Modifier.fillMaxWidth().height(140.dp).testTag("grafik_saham")) {
+        Canvas(Modifier.fillMaxWidth().height(140.dp).testTag("grafik_saham").semantics { contentDescription = "Grafik harga saham, ${series.size} bulan: awal ${"%.0f".format(first)}, kini ${"%.0f".format(last)}" }) {
             val lo = series.min(); val hi = series.max()
             val span = (hi - lo).coerceAtLeast(1e-9)
             fun y(v: Double) = (size.height - ((v - lo) / span).toFloat() * size.height * 0.84f - size.height * 0.08f)
@@ -61,7 +63,7 @@ private fun SeriesChartCard(title: String, series: List<Double>, caption: String
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(title, style = MaterialTheme.typography.titleSmall)
         Text(caption, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Canvas(Modifier.fillMaxWidth().height(96.dp).testTag(tag)) {
+        Canvas(Modifier.fillMaxWidth().height(96.dp).testTag(tag).semantics { contentDescription = "Grafik $title, ${series.size} bulan. $caption" }) {
             val lo = series.min()
             val hi = series.max()
             val span = (hi - lo).coerceAtLeast(1e-9)

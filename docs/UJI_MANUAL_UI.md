@@ -53,7 +53,7 @@ Perangkat minimum yang disarankan: ponsel 5,5" (360 dp lebar), ponsel besar (412
 |---|---|---|---|
 | E1 | Font sistem 130% | Tidak ada teks terpotong pada tombol atau dialog penting | |
 | E2 | Tema gelap | Kontras cukup di semua kartu dan grafik; grafik garis terlihat | |
-| E3 | TalkBack | Tombol utama punya label bermakna; grafik punya deskripsi atau diabaikan dengan jelas (**kemungkinan GAGAL**: grafik Canvas belum diberi deskripsi aksesibilitas) | |
+| E3 | TalkBack | Tombol utama punya label bermakna; grafik punya deskripsi atau diabaikan dengan jelas (grafik saham dan riwayat kini punya deskripsi teks; **FanChart dan Sparkline belum**, kemungkinan GAGAL) | |
 | E4 | Target sentuh | Tombol aksi minimal 48 dp dan tidak terlalu rapat | |
 | E5 | Bahasa | Seluruh teks UI berbahasa Indonesia, tanpa tulisan Inggris tersisa selain nama istilah (AP, L/C, SPV) | |
 
@@ -65,7 +65,7 @@ Perangkat minimum yang disarankan: ponsel 5,5" (360 dp lebar), ponsel besar (412
 | F3 | Pantau memori beberapa puluh giliran | Tidak naik terus tanpa henti | |
 
 ## Risiko yang sudah diketahui (belum diperbaiki)
-- Grafik Canvas (saham, riwayat, FanChart, Sparkline) tidak punya deskripsi aksesibilitas.
+- Grafik saham dan riwayat punya deskripsi aksesibilitas; FanChart dan Sparkline belum.
 - Peta belum mendukung pinch-zoom (belum diverifikasi); label negara bisa bertumpuk pada layar kecil.
 - Tata letak lanskap/tablet belum diuji; hanya dikodekan.
 - Tidak ada tutorial interaktif, hanya dialog "Cara bermain" berisi teks.
