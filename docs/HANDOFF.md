@@ -30,6 +30,14 @@ Bot pasif disiplin menang 132/300 (44%); bot aktif 192/300 (64%). Rincian dan ca
 1. Tampilan Compose belum pernah dilihat di perangkat; hanya terbukti kompilasi di CI.
 2. Kartu kejadian 42 dari target ±600 — kekurangan konten terbesar. Cara menambah: templat baru di `Events.kt`, ikuti pola `Template(id, kategori, jeda, bobot) { ... }`; tes `ChainCardsTest` memvalidasi semua kartu.
 3. Multiplayer belum dimulai (sesuai desain, terakhir).
-4. Opsi valas tidak ada (hanya forward); pajak withholding atas bagian NCI tidak dihitung; tidak ada grafik harga saham sungguhan.
+4. Derivatif: opsi valas, futures kapas, swap suku bunga sudah ada (B4b); CDS dan opsi jual belum. Withholding NCI dan grafik harga saham selesai (B4c); tag-along belum.
 5. Transisi era berbasis kalender; kinerja hanya memengaruhi syarat kredit.
 6. Cabang `main` milik pihak lain tidak dapat dikompilasi; cabang ini adalah basis yang valid.
+
+## Tahap B (mekanik pemain dan perilaku bot) — status akhir sesi ini
+Berkas mesin baru: `engine/Derivatives.kt` (derivatif), `Forensics.kt` (skor-M Beneish), `Actors.kt` (politisi/aktivis/eksekutif egois yang belajar, `ActorTuning`), `Insight.kt` (pasar prediksi berpoin, `BiasDetector`, `PostMortemBuilder`).
+Kode aksi baru: `DRV` derivatif, `WDR` percantikan laporan, `EAU` auditor, `SPV`, `PMK` taruhan pasar prediksi; `NCI|c|pct|ask` kini membawa diskon tawar.
+Tes baru: `DerivativesTest`, `MinorityTest`, `ForensicsTest`, `LawTest`, `ActorsTest`, `InsightTest`, `SaveSlotsTest`, `ActiveBotTest` (daftar di `tools/run-tests.sh`). Suite lokal terakhir: 193 lulus, 0 gagal. `StressCalibrationTest.randomActionB` memuat aksi B4–B7 dan dipakai `AntiExploitTest` (200 seed).
+Simpanan: `GameRepository(store, seedOverride, slots: SlotStore?)`; lima slot autosave bergilir tiap 6 giliran (baris `META:` setelah `SEED:`), tidak ada pada Ironman; "Permainan baru" tanpa argumen mewarisi kesulitan.
+Bot uji: `ActiveBot` (di `TestBots.kt`) mengatur harga, cadangan kas untuk belanja non-produktif, batas leverage, lindung nilai, asuransi; sakelar `ActiveBotTuning` untuk eksperimen. Keseimbangan terukur: pasif ±41% (300 seed), aktif ±64% (200 seed).
+Catatan jujur tiap mekanik ada di `docs/AUDIT_vs_KONSEP.md` (baris B4a–B9).

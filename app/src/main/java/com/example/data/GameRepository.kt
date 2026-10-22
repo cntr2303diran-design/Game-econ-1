@@ -40,6 +40,20 @@ interface SaveStore {
     fun write(text: String)
 }
 
+/** Slot autosave (B8): lima slot bergilir, ditulis tiap [EVERY] giliran; tidak ditulis pada kesulitan Ironman. */
+interface SlotStore {
+    fun readSlot(slot: Int): String?
+    fun writeSlot(slot: Int, text: String)
+}
+
+object Autosave {
+    const val SLOTS = 5
+    const val EVERY = 6
+    /** Slot (1..5) untuk autosave pada giliran [turn]; urutan bergilir menurut kalender sehingga deterministik. */
+    fun slotFor(turn: Int): Int = (turn / EVERY) % SLOTS + 1
+    const val META = "META:"
+}
+
 /** Status tampilan yang bukan bagian dari simulasi. */
 private data class UiFlags(
     val isDarkTheme: Boolean? = null,
@@ -55,7 +69,9 @@ private data class UiFlags(
 
 class GameRepository(
     private val store: SaveStore? = null,
-    seedOverride: Long? = null
+    seedOverride: Long? = null,
+    private val slots: SlotStore? = null,
+    private val newSeed: () -> Long = { System.currentTimeMillis() }
 ) {
     private var seed: Long
     private val log = mutableListOf<String>()
@@ -70,6 +86,7 @@ class GameRepository(
             seed = savedSeed
             engine = KapitalEngine(seed)
             for (l in lines.drop(1)) {
+                if (l.startsWith(Autosave.META)) continue
                 val a = Action.decode(l) ?: continue
                 if (engine.apply(a)) log += l
             }
@@ -91,9 +108,47 @@ class GameRepository(
         if (ok) {
             log += action.encode()
             persist()
+            if (action == Action.EndTurn) autosave()
         }
         publish()
         return ok
+    }
+
+    /** Tulis autosave bergilir (B8). Ironman tidak boleh punya autosave: tak ada jalan mundur. */
+    private fun autosave() {
+        val st = slots ?: return
+        if (engine.difficulty.ironman || engine.gameOverReason != null || engine.turn % Autosave.EVERY != 0) return
+        val meta = listOf(engine.turn, dateText(engine.turn), engine.difficulty.name, engine.equity.roundToInt()).joinToString("|")
+        st.writeSlot(Autosave.slotFor(engine.turn), (listOf("SEED:$seed", Autosave.META + meta) + log).joinToString("\n"))
+    }
+
+    /** Ringkasan kelima slot (kosong bila belum ada), diurutkan dari yang terbaru. */
+    private fun autosaveViews(): List<AutosaveView> {
+        val st = slots ?: return emptyList()
+        return (1..Autosave.SLOTS).map { i ->
+            val m = st.readSlot(i)?.lineSequence()?.firstOrNull { it.startsWith(Autosave.META) }?.removePrefix(Autosave.META)?.split("|")
+            if (m == null || m.size < 4) AutosaveView(i, 0, "Slot $i · kosong")
+            else AutosaveView(i, m[0].toIntOrNull() ?: 0, "Slot $i · ${m[1]} (giliran ${m[0]}) · ${Difficulty.entries.firstOrNull { it.name == m[2] }?.label ?: m[2]} · ekuitas ${m[3]} jt RS")
+        }.sortedByDescending { it.turn }
+    }
+
+    /** Muat autosave: mainkan ulang log slot dari seed-nya. Ditolak selama permainan Ironman masih berjalan. */
+    fun loadSlot(slot: Int): Boolean {
+        val st = slots ?: return false
+        if (engine.difficulty.ironman && engine.gameOverReason == null) return false
+        val lines = st.readSlot(slot)?.lines()?.filter { it.isNotBlank() } ?: return false
+        val s = lines.firstOrNull()?.removePrefix("SEED:")?.toLongOrNull() ?: return false
+        val e = KapitalEngine(s)
+        val newLog = mutableListOf<String>()
+        for (l in lines.drop(1)) {
+            if (l.startsWith(Autosave.META)) continue
+            val a = Action.decode(l) ?: continue
+            if (e.apply(a)) newLog += l
+        }
+        seed = s; engine = e; log.clear(); log.addAll(newLog)
+        ui = UiFlags(isDarkTheme = ui.isDarkTheme)
+        persist(); publish()
+        return true
     }
 
     private fun persist() {
@@ -203,11 +258,13 @@ class GameRepository(
         perform(Action.EndTurn)
     }
 
-    fun newGame(difficulty: Difficulty = Difficulty.MANAJER) {
-        seed = System.currentTimeMillis()
+    /** Permainan baru; tanpa argumen, kesulitan diwarisi dari permainan yang sedang/baru berakhir (B8). */
+    fun newGame(difficulty: Difficulty? = null) {
+        val d = difficulty ?: engine.difficulty
+        seed = newSeed()
         log.clear()
         engine = KapitalEngine(seed)
-        val first = Action.SetDifficulty(difficulty)
+        val first = Action.SetDifficulty(d)
         if (engine.apply(first)) log += first.encode()
         ui = UiFlags(isDarkTheme = ui.isDarkTheme)
         persist()
@@ -1109,6 +1166,10 @@ class GameRepository(
             showMonthlyReport = ui.showMonthlyReport,
             gameOverReason = e.gameOverReason,
             evaluationTitle = if (e.gameOverReason != null) e.evaluateCampaign().let { "Kelas ${it.grade} · ${it.archetypeTitle} · skor ${it.totalScore}/100" } else "",
+            difficultyLabel = e.difficulty.label,
+            cashRs = e.cash,
+            equityRs = e.equity,
+            autosaves = autosaveViews(),
             postMortemLines = if (e.gameOverReason != null) e.postMortem().lines() else emptyList(),
             prediction = predictionView(e),
             evaluationRows = if (e.gameOverReason != null) e.evaluateCampaign().let {

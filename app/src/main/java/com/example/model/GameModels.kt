@@ -205,6 +205,9 @@ data class BoardView(
     val answered: String?
 )
 
+/** B8: ringkasan satu slot autosave. */
+data class AutosaveView(val slot: Int, val turn: Int, val label: String)
+
 /** B7: pertanyaan pasar prediksi yang terbuka. */
 data class PredictionQuestionView(val id: Int, val text: String, val crowdYesPct: Int, val monthsLeft: Int, val position: String?)
 
@@ -449,6 +452,10 @@ data class GameState(
     val evaluationTitle: String = "",
     val evaluationRows: List<Pair<String, String>> = emptyList(),
     val postMortemLines: List<String> = emptyList(),
+    val difficultyLabel: String = "",
+    val cashRs: Double = 0.0,
+    val equityRs: Double = 0.0,
+    val autosaves: List<AutosaveView> = emptyList(),
     val prediction: PredictionView = PredictionView(),
     val salesSchemeLabel: String = "",
     val factorySchemeLabel: String = "",

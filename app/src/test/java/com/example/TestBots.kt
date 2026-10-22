@@ -56,28 +56,71 @@ object TestBots {
     }
 }
 
-/** Bot aktif: bertindak seperti pemain cakap (ekspansi saat penuh, anak usaha, IPO, buyback, suksesi, karbon). */
+/** Sakelar perilaku ActiveBot (dipakai eksperimen keseimbangan untuk mengukur sumbangan tiap kebiasaan). */
+object ActiveBotTuning {
+    var reserve = true
+    var leverage = true
+    var hedge = true
+    var insure = true
+    var pricing = true
+    var reserveMult = 1.1
+}
+
+/**
+ * Bot aktif (B9): bertindak seperti pemain cakap. Selain ekspansi (garis produksi, anak usaha, IPO, buyback, suksesi, karbon)
+ * ia (1) menjaga kas minimum sebelum belanja non-produktif, (2) membatasi leverage untuk ekspansi berisiko (anak usaha, buyback) dan menerbitkan saham saat terlalu berutang,
+ * (2b) menyesuaikan harga mengikuti utilisasi dan kas (temuan terbesar: harga tak pernah diubah = bias status quo),
+ * (3) melindungi nilai (kapas, kurs, suku bunga) dan (4) mengasuransikan aset.
+ */
 object ActiveBot {
+    /** Kas minimum: bagian dari penjualan bulanan; belanja non-produktif (anak usaha, IPO, buyback, bank, karbon, lindung nilai) hanya dari kas di atas ini. Kapasitas produksi dikecualikan: mengekangnya terbukti memperbanyak kematian Era 1. */
+    fun reserveRs(e: KapitalEngine): Double = ActiveBotTuning.reserveMult * (e.lastIncome["revenue"] ?: e.sc.baseRevenue)
+
+    fun leverage(e: KapitalEngine): Double = e.totalDebt() / maxOf(1.0, e.equity)
+
     fun step(e: KapitalEngine, t: Int) {
         TestBots.disciplinedStep(e, t)
         if (e.gameOverReason != null) return
+        val T = ActiveBotTuning
         val era = KapitalEngine.era(e.turn)
-        if (e.utilization() > 0.97 && e.extraLines < 3 && e.cash > 18000.0 * e.sc.size) e.apply(Action.Invest("line"))
-        if (t % 24 == 7 && e.cash > 15000.0 * e.sc.size) e.apply(Action.Invest(listOf("automation", "brand", "rnd")[(t / 24) % 3]))
-        if (!e.esgCompliant && e.cash > 12000.0 * e.sc.size) e.apply(Action.Invest("solar"))
-        if (era >= 2 && t % 12 == 3) {
-            for (c in listOf("tarsis", "kestrel")) if (e.cash > 30000.0 * e.sc.size) e.apply(Action.OpenSubsidiary(c))
+        val n = e.sc.size
+        val spare = if (T.reserve) e.cash - reserveRs(e) else e.cash
+        if (T.pricing) {
+            val util = e.utilization()
+            val rev = e.lastIncome["revenue"] ?: e.sc.baseRevenue
+            if (e.cash < 0.25 * rev && e.priceAdjPct < 12) e.apply(Action.AdjustPrice(3))
+            else if (t % 3 == 0 && util > 0.92 && e.priceAdjPct < 10) e.apply(Action.AdjustPrice(2))
+            else if (t % 3 == 0 && util < 0.70 && e.priceAdjPct > -6) e.apply(Action.AdjustPrice(-2))
+        }
+        val levOk = !T.leverage || (leverage(e) < 1.2 && e.covenantDistancePct() > 15.0)
+
+        // kapasitas dan produktivitas tak dikekang leverage atau cadangan kas (terbukti memperbanyak kematian Era 1)
+        if (e.utilization() > 0.97 && e.extraLines < 3 && e.cash > 18000.0 * n) e.apply(Action.Invest("line"))
+        if (t % 24 == 7 && e.cash > 15000.0 * n) e.apply(Action.Invest(listOf("automation", "brand", "rnd")[(t / 24) % 3]))
+        if (!e.esgCompliant && spare > 12000.0 * n) e.apply(Action.Invest("solar"))
+        if (T.insure && e.insuranceLevel == 0 && t >= 5 && t % 4 == 1 && spare > 3000.0 * n) e.apply(Action.SetInsurance(1))
+        if (T.hedge) {
+            if (t % 6 == 2 && spare > 1000.0 * n && e.derivBlock("ctf", 50) == null) e.apply(Action.BuyDerivative("ctf", 50))
+            if (e.subsidiaries.isNotEmpty() && t % 12 == 4 && spare > 1000.0 * n && e.derivBlock("fxo", 50) == null) e.apply(Action.BuyDerivative("fxo", 50))
+        }
+        if (era >= 2 && t % 12 == 3 && levOk) {
+            for (c in listOf("tarsis", "kestrel")) if (e.cash - (if (T.reserve) reserveRs(e) else 0.0) > 30000.0 * n) e.apply(Action.OpenSubsidiary(c))
+            if (e.fxHedgeActive.not() && e.subsidiaries.isNotEmpty()) e.apply(Action.HedgeFx)
+            for (c in e.subsidiaries.keys) e.apply(Action.Repatriate(c))
+        } else if (era >= 2 && t % 12 == 3) {
             if (e.fxHedgeActive.not() && e.subsidiaries.isNotEmpty()) e.apply(Action.HedgeFx)
             for (c in e.subsidiaries.keys) e.apply(Action.Repatriate(c))
         }
         if (era >= 3) {
-            if (!e.isPublicCompany && e.ipoBlock() == null && e.cash > 20000.0 * e.sc.size) e.apply(Action.ExecuteIpo(20, false))
-            if (e.isPublicCompany && t % 12 == 9 && e.cash > 60000.0 * e.sc.size) e.apply(Action.Buyback(2000))
-            if (t % 12 == 5 && e.cash > 40000.0 * e.sc.size) e.apply(Action.OpenCaptiveBank)
+            if (!e.isPublicCompany && e.ipoBlock() == null && spare > 20000.0 * n) e.apply(Action.ExecuteIpo(20, false))
+            if (e.isPublicCompany && t % 12 == 9 && spare > 60000.0 * n && levOk) e.apply(Action.Buyback(2000))
+            if (t % 12 == 5 && spare > 40000.0 * n) e.apply(Action.OpenCaptiveBank)
+            // pemulihan leverage: emiten yang terlalu berutang menerbitkan saham baru
+            if (T.leverage && e.isPublicCompany && leverage(e) > 2.0 && t % 12 == 11) e.apply(Action.IssueShares((0.25 * e.equity).toInt().coerceAtLeast(1000)))
         }
         if (era >= 4) {
             if (e.appointedSuccessorId == null) e.apply(Action.AppointSuccessor("exec_cfo"))
-            if (e.carbonCredits < 5 && e.cash > 20000.0 * e.sc.size) e.apply(Action.CarbonAction("buy", 5))
+            if (e.carbonCredits < 5 && spare > 20000.0 * n) e.apply(Action.CarbonAction("buy", 5))
         }
     }
 }

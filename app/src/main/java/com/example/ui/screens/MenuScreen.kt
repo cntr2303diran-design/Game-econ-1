@@ -27,8 +27,10 @@ fun MenuScreen(
     onContinue: () -> Unit,
     onNewGame: (com.example.engine.Difficulty) -> Unit,
     onToggleTheme: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onLoadSlot: (Int) -> Unit = {}
 ) {
+    var showSlots by rememberSaveable { mutableStateOf(false) }
     var showHow by rememberSaveable { mutableStateOf(false) }
     var showAbout by rememberSaveable { mutableStateOf(false) }
     var confirmNew by rememberSaveable { mutableStateOf(false) }
@@ -99,6 +101,13 @@ fun MenuScreen(
                     modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("menu_new_game")
                 ) { Text("Mulai permainan", style = MaterialTheme.typography.titleMedium) }
             }
+            if (gameState.autosaves.any { it.turn > 0 }) {
+                OutlinedButton(
+                    onClick = { showSlots = true },
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("menu_slots")
+                ) { Text("Muat autosave", style = MaterialTheme.typography.titleMedium) }
+            }
             OutlinedButton(
                 onClick = { showHow = true },
                 shape = RoundedCornerShape(6.dp),
@@ -111,6 +120,28 @@ fun MenuScreen(
             ) { Text("Ganti tema terang/gelap", style = MaterialTheme.typography.titleMedium) }
             TextButton(onClick = { showAbout = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Tentang permainan") }
         }
+    }
+
+    if (showSlots) {
+        AlertDialog(
+            onDismissRequest = { showSlots = false },
+            title = { Text("Muat autosave") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Autosave ditulis tiap 6 bulan permainan (5 slot bergilir). Memuat akan mengganti permainan saat ini; Ironman tidak punya autosave.",
+                        style = MaterialTheme.typography.bodySmall)
+                    gameState.autosaves.forEach { a ->
+                        OutlinedButton(
+                            onClick = { if (a.turn > 0) { showSlots = false; onLoadSlot(a.slot) } },
+                            enabled = a.turn > 0,
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.fillMaxWidth().testTag("slot_${a.slot}")
+                        ) { Text(a.label, style = MaterialTheme.typography.bodySmall) }
+                    }
+                }
+            },
+            confirmButton = { OutlinedButton(onClick = { showSlots = false }) { Text("Tutup") } }
+        )
     }
 
     if (confirmNew) {

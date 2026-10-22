@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import com.example.data.GameRepository
 import com.example.data.SaveStore
+import com.example.data.SlotStore
 import com.example.model.*
 import kotlinx.coroutines.flow.StateFlow
 import java.io.File
@@ -30,9 +31,24 @@ class FileSaveStore(private val file: File) : SaveStore {
     }
 }
 
+/** Lima slot autosave bergilir sebagai berkas internal (kapital_slot_1..5.txt). */
+class FileSlotStore(private val dir: File) : SlotStore {
+    private fun file(slot: Int) = File(dir, "kapital_slot_$slot.txt")
+    override fun readSlot(slot: Int): String? = try {
+        file(slot).let { if (it.exists()) it.readText() else null }
+    } catch (e: Exception) { null }
+
+    override fun writeSlot(slot: Int, text: String) {
+        FileSaveStore(file(slot)).write(text)
+    }
+}
+
 class KapitalViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = GameRepository(FileSaveStore(File(application.filesDir, "kapital_save.txt")))
+    private val repository = GameRepository(
+        FileSaveStore(File(application.filesDir, "kapital_save.txt")),
+        slots = FileSlotStore(application.filesDir)
+    )
 
     val gameState: StateFlow<GameState> = repository.gameState
 
@@ -80,7 +96,8 @@ class KapitalViewModel(application: Application) : AndroidViewModel(application)
     fun advanceTurn() = repository.advanceTurn()
     fun dismissMonthlyReport() = repository.dismissMonthlyReport()
     fun showMonthlyReport() = repository.showMonthlyReport()
-    fun newGame(difficulty: com.example.engine.Difficulty = com.example.engine.Difficulty.MANAJER) = repository.newGame(difficulty)
+    fun newGame(difficulty: com.example.engine.Difficulty? = null) = repository.newGame(difficulty)
+    fun loadSlot(slot: Int) = repository.loadSlot(slot)
     fun runCounterfactual(actionIndex: Int) = repository.runCounterfactual(actionIndex)
     fun clearCounterfactual() = repository.clearCounterfactual()
     fun rejectDecision(decisionId: String) = repository.rejectDecision(decisionId)

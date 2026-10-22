@@ -198,7 +198,15 @@ fun KapitalAppScaffold(
                             launchSingleTop = true
                         }
                     },
-                    onToggleTheme = { viewModel.toggleTheme(isDarkNow) }
+                    onToggleTheme = { viewModel.toggleTheme(isDarkNow) },
+                    onLoadSlot = { slot ->
+                        if (viewModel.loadSlot(slot)) {
+                            navController.navigate(ROUTE_MARKAS) {
+                                popUpTo(ROUTE_MENU) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    }
                 )
             }
 
