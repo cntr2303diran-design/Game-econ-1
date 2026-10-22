@@ -30,6 +30,14 @@ class ForensicsTest {
 
     @Test
     fun windowDress_isTimingOnly_cashNeutralNowAndProfitNeutralLater() {
+        // Kartu generator dipicu keadaan dunia (kas, laba), jadi percantikan menggeser kartu yang muncul dan
+        // mengaburkan selisih yang diuji. Undian kartu dimatikan agar hanya efek percantikan yang terukur.
+        val oldDraw = CardTuning.drawChance
+        CardTuning.drawChance = 0.0
+        try { windowDressBody() } finally { CardTuning.drawChance = oldDraw }
+    }
+
+    private fun windowDressBody() {
         var ran = 0
         for (seed in listOf(3L, 8L, 17L, 21L, 30L, 41L)) {
             val ctl = KapitalEngine(seed); val e = KapitalEngine(seed)

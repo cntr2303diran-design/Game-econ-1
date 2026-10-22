@@ -714,7 +714,7 @@ object EventDeck {
         val roll = r.nextDouble()
         val pEvent = (0.30 * rateMult).coerceIn(0.0, 0.8)
         if (roll < pEvent) {
-            val cands = templates.filter { it.id !in open && ctx.turn - (lastFired[it.id] ?: -999) >= it.cooldown }
+            val cands = baseTemplates.filter { it.id !in open && ctx.turn - (lastFired[it.id] ?: -999) >= it.cooldown }
                 .map { it to it.weight(ctx) }.filter { it.second > 0.0 }
             if (cands.isNotEmpty()) {
                 var x = r.nextDouble() * cands.sumOf { it.second }

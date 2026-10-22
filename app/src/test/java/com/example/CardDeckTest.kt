@@ -122,6 +122,21 @@ class CardDeckTest {
     }
 
     @Test
+    fun oldDeckNeverDrawsGeneratorCards_soStreamsAreIndependent() {
+        val genIds = cards.map { it.id }.toSet()
+        var drawn = 0
+        for (k in 1..30) {
+            val e = KapitalEngine(k * 7919L)
+            val c = e.eventCtx()
+            for (t in 1..200) {
+                val d = EventDeck.draw(c, java.util.Random(k * 31L + t).let { r -> kotlin.random.Random(r.nextLong()) }, emptySet(), emptyMap(), t, 1.0)
+                d.event?.let { drawn++; assertTrue("dek lama menarik kartu generator ${it.templateId}", it.templateId !in genIds) }
+            }
+        }
+        assertTrue("dek lama memang menarik kartu tulisan tangan: $drawn", drawn > 100)
+    }
+
+    @Test
     fun cardsActuallyAppearInPlay() {
         var gen = 0; var chained = 0; var games = 0
         val genIds = cards.map { it.id }.toSet(); val chainIds = cards.filter { it.trig == null }.map { it.id }.toSet()
@@ -144,7 +159,7 @@ class CardDeckTest {
     }
 
     companion object {
-        const val EXPECTED_MIN_CARDS = 60
-        const val EXPECTED_MIN_CHAIN = 9
+        const val EXPECTED_MIN_CARDS = 600
+        const val EXPECTED_MIN_CHAIN = 100
     }
 }

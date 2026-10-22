@@ -2674,9 +2674,9 @@ class KapitalEngine(val seed: Long) {
             }
         }
         // C1: kartu generator diundi terpisah (aliran acak sendiri) agar dek lama tidak bergeser
-        EventCards.draw(eventCtx(), rng(125), openEvents.map { it.templateId }.toSet(), eventLastFired, eventCounter++, difficulty.eventRateMult)?.let { ev ->
+        EventCards.draw(eventCtx(), rng(125), openEvents.map { it.templateId }.toSet(), eventLastFired, eventCounter, difficulty.eventRateMult)?.let { ev ->
             if (openEvents.size < 3) {
-                openEvents += ev; eventsRaised++; eventLastFired[ev.templateId] = turn
+                eventCounter++; openEvents += ev; eventsRaised++; eventLastFired[ev.templateId] = turn
                 lines += ReportLine("Kartu keputusan baru: ${ev.title}.", Tone.WARN)
             }
         }
