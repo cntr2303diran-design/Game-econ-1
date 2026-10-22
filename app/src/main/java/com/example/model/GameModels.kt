@@ -303,6 +303,8 @@ data class GameState(
     val monthlyReportLines: List<ReportLineItem> = emptyList(),
     val showMonthlyReport: Boolean = false,
     val gameOverReason: String? = null,
+    val evaluationTitle: String = "",
+    val evaluationRows: List<Pair<String, String>> = emptyList(),
     val salesSchemeLabel: String = "",
     val factorySchemeLabel: String = "",
     val salesSchemeOptions: List<Pair<String, String>> = emptyList(),

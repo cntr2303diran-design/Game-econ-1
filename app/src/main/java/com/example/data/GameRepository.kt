@@ -829,6 +829,16 @@ class GameRepository(
             monthlyReportLines = e.lastReport.map { ReportLineItem(it.text, tone(it.tone)) },
             showMonthlyReport = ui.showMonthlyReport,
             gameOverReason = e.gameOverReason,
+            evaluationTitle = if (e.gameOverReason != null) e.evaluateCampaign().let { "Kelas ${it.grade} · ${it.archetypeTitle} · skor ${it.totalScore}/100" } else "",
+            evaluationRows = if (e.gameOverReason != null) e.evaluateCampaign().let {
+                listOf(
+                    "Nilai perusahaan riil (30%)" to "${it.nilaiPerusahaanScore}/100",
+                    "Ketahanan (20%)" to "${it.ketahananScore}/100",
+                    "Kualitas keputusan dan kalibrasi (20%)" to "${it.kualitasKeputusanScore}/100",
+                    "Etika dan reputasi (15%)" to "${it.etikaReputasiScore}/100",
+                    "Dampak sosial (15%)" to "${it.dampakSosialScore}/100"
+                )
+            } else emptyList(),
             salesSchemeLabel = e.salesScheme.name,
             factorySchemeLabel = e.factoryScheme.name,
             salesSchemeOptions = SalesScheme.entries.map { it.name to it.label },

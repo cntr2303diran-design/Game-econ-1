@@ -188,3 +188,21 @@ class PublicCompanyTest {
         assertTrue("perusahaan publik harus menerima kartu pasar modal", ipos == 0 || pubSeen > 0)
     }
 }
+
+class EvaluationTest {
+    @Test
+    fun finalEvaluationIsBoundedAndFailuresGetGradeF() {
+        var failures = 0; var wins = 0; val totals = mutableListOf<Int>()
+        for (seed in 1L..40L) {
+            val e = KapitalEngine(seed * 7919L)
+            var t = 0
+            while (e.gameOverReason == null && e.turn < 481) { t++; TestBots.disciplinedStep(e, t); e.apply(Action.EndTurn) }
+            val ev = e.evaluateCampaign()
+            for (x in listOf(ev.nilaiPerusahaanScore, ev.ketahananScore, ev.kualitasKeputusanScore, ev.etikaReputasiScore, ev.dampakSosialScore, ev.totalScore))
+                assertTrue("skor 0..100: $x", x in 0..100)
+            if (e.isVictory) { wins++; totals += ev.totalScore; assertTrue("pemenang tidak F", ev.grade != "F") }
+            else { failures++; assertEquals("F", ev.grade) }
+        }
+        println("EVALUASI: menang=$wins gagal=$failures skor menang min=${totals.minOrNull()} maks=${totals.maxOrNull()} rata2=${if (totals.isEmpty()) 0 else totals.average().toInt()}")
+    }
+}

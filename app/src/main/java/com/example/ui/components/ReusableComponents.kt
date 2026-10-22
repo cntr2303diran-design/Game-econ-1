@@ -790,7 +790,9 @@ fun GameOverPanel(
     dateText: String,
     onNewGame: () -> Unit,
     onOpenChronicle: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    evaluationTitle: String = "",
+    evaluationRows: List<Pair<String, String>> = emptyList()
 ) {
     Surface(
         color = KapitalSemanticColors.redContainer,
@@ -813,6 +815,19 @@ fun GameOverPanel(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
+            if (evaluationRows.isNotEmpty()) {
+                Text(
+                    text = evaluationTitle,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                evaluationRows.forEach { (k, v) ->
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(k, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(v, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+            }
             Text(
                 text = "Buka Kronik Dunia untuk melihat rantai keputusan yang membawa ke sini, lalu coba lagi dengan dunia baru.",
                 style = MaterialTheme.typography.bodySmall,

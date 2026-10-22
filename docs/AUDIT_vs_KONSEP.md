@@ -207,3 +207,11 @@ Tes baru: `EraCrisisTest` (satu krisis per era, dalam batas era, deterministik; 
 - Peringatan pelunasan pokok obligasi/pinjaman bullet 6 dan 2 bulan sebelum jatuh tempo (sebelumnya pelunasan terjadi tanpa peringatan).
 - Tes: `identities_hold_inEra3And4_withCorporateActions` (3.390 giliran-permainan mulai giliran 232 dan 376, aksi acak termasuk IPO/obligasi/bank grup/akuisisi, semua identitas < 1e-6) dan `PublicCompanyTest` (43 IPO: kartu pasar modal diterima perusahaan publik 54 kali, perusahaan swasta 0 kali).
 - Belum ada: harga saham perusahaan pemain di bursa, dividen/pembelian kembali saham sebagai keputusan berkelanjutan, kepentingan nonpengendali, dan dampak dilusi ke kendali (`founderSharePct` hanya dicatat).
+
+---
+
+## Build-25: evaluasi akhir tampil di layar (Tahap 5, sebagian)
+
+- Panel akhir permainan (`GameOverPanel`) kini menampilkan kelas, arketipe, skor total dan 5 pilar (nilai riil 30%, ketahanan 20%, kalibrasi keputusan 20%, etika 15%, sosial 15%) dari `evaluateCampaign()` lewat `GameState.evaluationTitle/evaluationRows`. Sebelumnya hanya teks ringkas di laporan bulanan.
+- Tes `EvaluationTest` (40 seed, bot disiplin sampai akhir): semua skor dalam 0..100; kegagalan selalu Kelas F, pemenang tidak pernah F. Hasil: 15 menang, 25 gagal; skor pemenang 53–87, rata-rata 74.
+- Belum ada: grafik atau tabel pembanding antar kampanye, post-mortem naratif yang menautkan keputusan ke skor, dan kalibrasi rumus skor terhadap pemain manusia (bobot dan konstanta adalah perkiraan).

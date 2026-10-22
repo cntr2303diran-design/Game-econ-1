@@ -73,7 +73,9 @@ fun MarkasScreen(
                             turn = gameState.turn,
                             dateText = gameState.dateText,
                             onNewGame = onNewGame,
-                            onOpenChronicle = onOpenChronicle
+                            onOpenChronicle = onOpenChronicle,
+                            evaluationTitle = gameState.evaluationTitle,
+                            evaluationRows = gameState.evaluationRows
                         )
                     }
 
@@ -164,7 +166,9 @@ fun MarkasScreen(
                         turn = gameState.turn,
                         dateText = gameState.dateText,
                         onNewGame = onNewGame,
-                        onOpenChronicle = onOpenChronicle
+                        onOpenChronicle = onOpenChronicle,
+                        evaluationTitle = gameState.evaluationTitle,
+                        evaluationRows = gameState.evaluationRows
                     )
                 }
 
