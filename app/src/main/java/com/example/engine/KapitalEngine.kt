@@ -191,7 +191,7 @@ class KapitalEngine(val seed: Long) {
     private var initialEquity = 0.0
 
     // ---------- Makro & Dunia Multinasional (Era 2–4) ----------
-    val world = World()
+    val world = World(AgentScale.HOUSEHOLDS.getValue("sundara"))
     val bourse = Bourse()
     val credit = CreditDesk()
     private val policyHist = MutableList(6) { sc.policy }
@@ -239,7 +239,17 @@ class KapitalEngine(val seed: Long) {
     )
 
     val foreign: Map<String, World> = foreignProfiles.associate { p ->
-        p.id to World(2_000, p.target, p.rStar).also { it.initScenario(p.infl, p.policy) }
+        p.id to World(AgentScale.HOUSEHOLDS.getValue(p.id), p.target, p.rStar).also { it.initScenario(p.infl, p.policy) }
+    }
+
+    /**
+     * Jumlah agen yang BENAR-BENAR disimulasikan saat ini, dihitung dari objek hidup (bukan konstanta desain).
+     * Kelas agen yang belum diimplementasikan tidak dilaporkan di sini.
+     */
+    fun agentCensus(): Map<String, Int> {
+        val m = LinkedHashMap<String, Int>()
+        m["rumah_tangga"] = world.householdSector.agents + foreign.values.sumOf { it.householdSector.agents }
+        return m
     }
     val foreignMeta: Map<String, ForeignCountryMeta> = foreignProfiles.associate { p ->
         p.id to ForeignCountryMeta(p)

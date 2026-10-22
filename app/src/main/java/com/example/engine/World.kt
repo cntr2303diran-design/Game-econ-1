@@ -1,10 +1,7 @@
 package com.example.engine
 
-import kotlin.math.exp
-import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.pow
-import kotlin.math.sqrt
 import kotlin.random.Random
 
 /**
@@ -93,10 +90,8 @@ class World(
     var lastLearnedAttackTrigger: String? = null; private set
     private var monthsElapsed = 0
 
-    // ---- Rumah tangga ----
-    private val employed = BooleanArray(households)
-    private val income = DoubleArray(households)
-    private val mpc = DoubleArray(households)
+    // ---- Rumah tangga (kohort pendapatan; lihat Agents.kt) ----
+    val householdSector = HouseholdSector(households)
     private var baseConsumption = 1.0
 
     // ---- Keadaan makro ----
@@ -115,26 +110,10 @@ class World(
     var taylorStar = 6.5; private set
 
     init {
-        val r = Random(20330301L)
-        for (i in 0 until households) {
-            employed[i] = r.nextDouble() > 0.05
-            val z = gauss(r)
-            income[i] = exp(0.55 * z)
-            mpc[i] = (0.97 - 0.30 * (income[i] / (income[i] + 1.5))).coerceIn(0.55, 0.97)
-        }
-        baseConsumption = rawConsumption()
+        baseConsumption = householdSector.consumption()
     }
 
-    private fun gauss(r: Random): Double {
-        val u1 = max(r.nextDouble(), 1e-9)
-        return sqrt(-2.0 * ln(u1)) * kotlin.math.cos(2.0 * Math.PI * r.nextDouble())
-    }
-
-    private fun rawConsumption(): Double {
-        var s = 0.0
-        for (i in 0 until households) if (employed[i]) s += income[i] * mpc[i]
-        return s
-    }
+    private fun gauss(r: Random): Double = stdNormal(r)
 
     // =====================================================================
     // Pasar produk: pangsa pemain sebagai fungsi harga relatif
@@ -195,17 +174,8 @@ class World(
         val gapLag = gap
         val sep = (SEP_BASE * (1.0 - 4.0 * gapLag)).coerceIn(0.004, 0.045)
         val find = (FIND_BASE * (1.0 + 4.0 * gapLag)).coerceIn(0.08, 0.60)
-        var emp = 0
-        var consumption = 0.0
-        for (i in 0 until households) {
-            if (employed[i]) { if (r.nextDouble() < sep) employed[i] = false }
-            else { if (r.nextDouble() < find) employed[i] = true }
-            if (employed[i]) {
-                emp++
-                consumption += income[i] * mpc[i]
-            }
-        }
-        unemployment = 100.0 * (1.0 - emp.toDouble() / households)
+        val consumption = householdSector.step(r, sep, find)
+        unemployment = householdSector.unemploymentPct()
 
         // ---- 3. Permintaan agregat ----
         demand = ((consumption / baseConsumption) * (1.0 + confidence + rateDrag)).coerceIn(0.80, 1.20)
