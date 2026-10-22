@@ -1,6 +1,8 @@
 package com.example.data
 
 import com.example.engine.Action
+import com.example.engine.BiasDetector
+import com.example.engine.PredictionMarket
 import com.example.engine.Board
 import com.example.engine.Countries
 import com.example.engine.DataKind
@@ -139,6 +141,7 @@ class GameRepository(
     fun windowDress(pct: Int) = perform(Action.WindowDress(pct))
     fun setAuditor(level: Int) = perform(Action.SetAuditor(level))
     fun openSpv(amountRs: Int) = perform(Action.OpenSpv(amountRs))
+    fun predict(qid: Int, yes: Boolean, stake: Int) = perform(Action.Predict(qid, yes, stake))
     fun sellSubStake(countryId: String, pct: Int, askDiscountPct: Int) = perform(Action.SellSubStake(countryId, pct, askDiscountPct))
     fun buyIntel(kind: String, subject: String, tier: Int) = perform(Action.BuyIntel(kind, subject, tier))
     fun answerBoard(claim: String) = perform(Action.BoardAnswer(claim))
@@ -249,6 +252,21 @@ class GameRepository(
     // ------------------------------------------------------------------
     // Lapisan dunia dinamis → model tampilan
     // ------------------------------------------------------------------
+
+    private fun predictionView(e: KapitalEngine): PredictionView {
+        val m = e.predMarket
+        val qs = m.open().map { q ->
+            val pos = m.positionOf(q.id)
+            PredictionQuestionView(q.id, q.text, (q.crowdYes * 100).roundToInt(), (q.resolveTurn - e.turn).coerceAtLeast(0),
+                pos?.let { "Posisi ${if (it.yes) "YA" else "TIDAK"}: ${it.stake.toInt()} poin pada harga ${(it.price * 100).roundToInt()}%" })
+        }
+        val settled = m.positions.filter { it.payout != null }
+        val summary = "Poin ${m.points.roundToInt()} (awal ${PredictionMarket.START_POINTS.toInt()}) · ${settled.count { it.won == true }}/${settled.size} posisi menang · bonus skor +${m.scoreBonus()}"
+        val recent = m.resolved().takeLast(5).reversed().map { q ->
+            "${q.text} → ${if (q.outcome == true) "YA" else "TIDAK"} (kerumunan ${(q.crowdYes * 100).roundToInt()}% YA)"
+        }
+        return PredictionView(m.points.roundToInt(), m.maxStake(), qs, summary, recent)
+    }
 
     private fun intelView(e: KapitalEngine): IntelView {
         val kinds = IntelKind.values().map { k -> Triple(k.code, k.label, e.intelSubjects(k)) }
@@ -1023,17 +1041,7 @@ class GameRepository(
                 it.outcome?.let { o -> val p = it.confidencePct / 100.0; val v = if (o) 1.0 else 0.0; (p - v) * (p - v) })
         }
         val evaluated = e.journals.filter { it.outcome != null }
-        val biases = mutableListOf<String>()
-        if (evaluated.size >= 2) {
-            val avgConf = evaluated.map { it.confidencePct }.average()
-            val hit = evaluated.count { it.outcome == true } * 100.0 / evaluated.size
-            if (avgConf - hit > 20) biases += "Overconfidence: rata-rata keyakinan Anda ${avgConf.toInt()}%, tetapi hanya ${hit.toInt()}% prediksi yang benar."
-            else if (hit - avgConf > 20) biases += "Underconfidence: Anda benar ${hit.toInt()}% dari waktu, lebih sering dari keyakinan Anda (${avgConf.toInt()}%)."
-        }
-        if (turn >= 42 && e.totalCrossChecks == 0) biases += "Confirmation bias: Anda belum pernah memeriksa silang berita sejak memimpin perusahaan."
-        if (e.spinningDecision == "approved" && e.spinningDelayed && turn - e.spinningStartTurn in 8..14)
-            biases += "Waspadai sunk cost: proyek pemintalan molor. Nilai ulang berdasarkan biaya ke depan, bukan dana yang sudah keluar."
-        if (biases.isEmpty()) biases += "Belum ada pola bias yang terdeteksi. Kalibrasi dinilai setelah jurnal dievaluasi."
+        val biases = BiasDetector.texts(e.biasFindings())
 
         val chronicles = e.chronicle.reversed().map {
             ChronicleEntry(it.turn, dateText(it.turn), "Era ${KapitalEngine.era(it.turn)}", it.title, it.description, it.causalChain,
@@ -1101,6 +1109,8 @@ class GameRepository(
             showMonthlyReport = ui.showMonthlyReport,
             gameOverReason = e.gameOverReason,
             evaluationTitle = if (e.gameOverReason != null) e.evaluateCampaign().let { "Kelas ${it.grade} · ${it.archetypeTitle} · skor ${it.totalScore}/100" } else "",
+            postMortemLines = if (e.gameOverReason != null) e.postMortem().lines() else emptyList(),
+            prediction = predictionView(e),
             evaluationRows = if (e.gameOverReason != null) e.evaluateCampaign().let {
                 listOf(
                     "Nilai perusahaan riil (30%)" to "${it.nilaiPerusahaanScore}/100",

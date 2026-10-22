@@ -86,9 +86,12 @@ fun IntelTabContent(
     intel: IntelView,
     ap: Int,
     onBuy: (kind: String, subject: String, tier: Int) -> Unit,
-    onAnswer: (String) -> Unit
+    onAnswer: (String) -> Unit,
+    prediction: PredictionView = PredictionView(),
+    onPredict: (Int, Boolean, Int) -> Unit = { _, _, _ -> }
 ) {
     var kindIdx by rememberSaveable { mutableStateOf(0) }
+    var stake by rememberSaveable { mutableStateOf(5) }
     var subjectIdx by rememberSaveable { mutableStateOf(0) }
 
     Text("Intelijen dan dewan", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -119,6 +122,36 @@ fun IntelTabContent(
                 Text("Benar +6, salah −6, tidak dijawab −4, mengelak netral (tiga kali berturut-turut mulai merugikan).", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+    }
+
+    IntelCard {
+        Text("Pasar prediksi (taruhan poin, bukan kas)", style = MaterialTheme.typography.titleMedium)
+        Text(prediction.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Harga YA = peluang menurut kerumunan. Benar membayar taruhan ÷ harga (dikurangi 2%); salah kehilangan taruhan. Maks. 20% poin per pertanyaan. Poin hanya menambah skor kualitas keputusan (maks. +10).",
+            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val cap = prediction.maxStake.coerceAtLeast(1)
+        val s0 = stake.coerceIn(1, cap)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(1, 5, 10, cap).distinct().filter { it <= cap }.forEach { v ->
+                FilterChip(selected = s0 == v, onClick = { stake = v }, label = { Text("$v poin") }, modifier = Modifier.testTag("pmk_stake_$v"))
+            }
+        }
+        if (prediction.questions.isEmpty()) Text("Belum ada pertanyaan terbuka; pertanyaan baru muncul tiap tiga bulan.", style = MaterialTheme.typography.bodySmall)
+        prediction.questions.forEach { q ->
+            Text(q.text, style = MaterialTheme.typography.bodyMedium)
+            Text("Kerumunan: ${q.crowdYesPct}% YA · selesai ${q.monthsLeft} bulan lagi", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (q.position != null) {
+                Text(q.position, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedButton(onClick = { onPredict(q.id, true, s0) }, enabled = prediction.maxStake >= 1, shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.heightIn(min = 48.dp).testTag("pmk_yes_${q.id}")) { Text("YA ${q.crowdYesPct}%") }
+                    OutlinedButton(onClick = { onPredict(q.id, false, s0) }, enabled = prediction.maxStake >= 1, shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.heightIn(min = 48.dp).testTag("pmk_no_${q.id}")) { Text("TIDAK ${100 - q.crowdYesPct}%") }
+                }
+            }
+        }
+        prediction.recent.forEach { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 
     IntelCard {

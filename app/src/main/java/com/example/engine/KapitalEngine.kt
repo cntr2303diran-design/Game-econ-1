@@ -597,6 +597,9 @@ class KapitalEngine(val seed: Long) {
     val cashHist = mutableListOf(sc.cash * 1.55, sc.cash * 1.42, sc.cash * 1.3, sc.cash * 1.22, sc.cash * 1.18, sc.cash)
     val revenueHist = mutableListOf<Double>()
     val journals = mutableListOf<JournalRecord>()
+    /** B7: pasar prediksi berpoin dan riwayat bulanan untuk detektor bias dan post-mortem (tak memengaruhi neraca). */
+    val predMarket = PredictionMarket()
+    val history = mutableListOf<MonthSnap>()
     val chronicle = mutableListOf<ChronicleItem>()
     var lastReport: List<ReportLine> = emptyList(); private set
     var lastReportTitle = ""; private set
@@ -1023,7 +1026,7 @@ class KapitalEngine(val seed: Long) {
 
         // 3. Kualitas keputusan: skor kalibrasi Brier & jurnal (20%)
         val brier = brierScore()
-        val calBase = ((0.35 - brier) / 0.35 * 85.0).roundToInt() + min(15, journals.size * 3) + min(10, totalCrossChecks * 2)
+        val calBase = ((0.35 - brier) / 0.35 * 85.0).roundToInt() + min(15, journals.size * 3) + min(10, totalCrossChecks * 2) + predMarket.scoreBonus()
         val kualitasScore = calBase.coerceIn(0, 100)
 
         // 4. Reputasi dan skor etika (15%)
@@ -1238,6 +1241,7 @@ class KapitalEngine(val seed: Long) {
             is Action.WindowDress -> doWindowDress(action.pct)
             is Action.SetAuditor -> doSetAuditor(action.level)
             is Action.OpenSpv -> doOpenSpv(action.amountRs)
+            is Action.Predict -> predMarket.bet(action.qid, action.yes, action.stake)
         }
         if (ok) actionCount++
         return ok
@@ -1913,6 +1917,30 @@ class KapitalEngine(val seed: Long) {
         dressedRs += x; dressedFreshRs += x; dressedSinceCleanRs += x
         recordEthicsEvidence(label, severity, "exec_cfo", "sundara")
     }
+
+    private fun marketObs(): MarketObs {
+        val h = history
+        var up = 0; var n = 0
+        for (i in 6 until h.size) { n++; if (h[i].kurs > h[i - 6].kurs) up++ }
+        // prior kerumunan: mata uang berinflasi tinggi cenderung melemah (75%), bobot setara 6 pengamatan
+        val share = (up + 4.5) / (n + 6.0)
+        return MarketObs(world.inflation, world.inflationExpectation, world.policyRate, world.gap * 100.0, kurs, share)
+    }
+
+    /** B7: selesaikan pertanyaan pasar prediksi yang jatuh tempo dan buka yang baru tiap 3 bulan. */
+    private fun insightMonthly(lines: MutableList<ReportLine>) {
+        val o = marketObs()
+        for ((t, tone) in predMarket.resolveDue(turn, o)) lines += ReportLine(t, tone)
+        if (gameOverReason == null && turn - sc.turn0 >= 3 && (turn - sc.turn0) % 3 == 0) predMarket.openNew(turn, o, rng(124))
+    }
+
+    /** B7: pola bias kognitif pemain dari jurnal, taruhan pasar, dan riwayat. */
+    fun biasFindings(): List<BiasFinding> = BiasDetector.detect(journals, predMarket, history, totalCrossChecks, turn,
+        spinningDecision == "approved" && spinningDelayed && turn - spinningStartTurn in 8..14)
+
+    /** B7: post-mortem (penyebab, titik balik, kualitas keputusan, pelajaran). */
+    fun postMortem(): PostMortem = PostMortemBuilder.build(gameOverReason, isVictory, history, chronicle, journals, predMarket, biasFindings(),
+        scandalsTriggered, covenantBreaches, cureUsed, brierScore())
 
     private fun actorsMonthly(lines: MutableList<ReportLine>) {
         val a = actors
@@ -3101,6 +3129,7 @@ class KapitalEngine(val seed: Long) {
         // Skor Rahasia Etika & Bom Waktu Skandal (Tahap C - Bagian 16 PDF)
         forensicsMonthly(lines)
         actorsMonthly(lines)
+        insightMonthly(lines)
         ethicsLoad *= 0.988
         var scandalCost = 0.0
         val departedWitnessBoost = ethicsEvidences.count { ev -> execs.any { it.id == ev.witnessExecId && !it.present } } * 0.035
@@ -3601,6 +3630,7 @@ class KapitalEngine(val seed: Long) {
         }
         forensics.record(revenue, cogs, opex + maint, dep, ni, cfo, totalAR(), totalAssets(), fixedAssets, totalLiabilities(),
             max(0.0, totalAssets() - cash - totalAR() - inventory - fixedAssets))
+        history += MonthSnap(turn, cash, totalDebt(), equity, revenue, ni, covenantDistancePct(), ethicsLoad, priceAdjPct, costIndex, kurs)
         prevCashFlow = lastCashFlow
         lastCashFlow = mapOf("ni" to ni, "dep" to dep, "wc" to (-dAR - dInv + dPay), "cfo" to cfo,
             "capex" to -(capex + periodSubInvestOutRs), "fin" to newDebt - principal, "stock" to periodInvestIn - periodInvestOut, "div" to (lastDividendIncome + periodSubDivInGrossRs), "net" to cash - startCash)

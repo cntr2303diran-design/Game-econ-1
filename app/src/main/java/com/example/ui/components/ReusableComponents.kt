@@ -792,7 +792,8 @@ fun GameOverPanel(
     onOpenChronicle: () -> Unit,
     modifier: Modifier = Modifier,
     evaluationTitle: String = "",
-    evaluationRows: List<Pair<String, String>> = emptyList()
+    evaluationRows: List<Pair<String, String>> = emptyList(),
+    postMortem: List<String> = emptyList()
 ) {
     Surface(
         color = KapitalSemanticColors.redContainer,
@@ -826,6 +827,20 @@ fun GameOverPanel(
                         Text(k, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(v, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
                     }
+                }
+            }
+            if (postMortem.isNotEmpty()) {
+                Text(
+                    text = "Post-mortem",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                postMortem.forEach { line ->
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
             Text(

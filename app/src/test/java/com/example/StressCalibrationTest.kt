@@ -38,7 +38,8 @@ class StressCalibrationTest {
         if (r.nextInt(5) != 0) return randomAction(r, e)
         val kinds = listOf("sektor", "negara", "pesaing", "segmen", "xx")
         val kind = kinds[r.nextInt(kinds.size)]
-        return when (r.nextInt(16)) {
+        return when (r.nextInt(17)) {
+            16 -> Action.Predict(e.predMarket.questions.let { q -> if (q.isEmpty() || r.nextInt(5) == 0) 999 else q[r.nextInt(q.size)].id }, r.nextBoolean(), r.nextInt(25) - 2)
             15 -> Action.OpenSpv(listOf(500, 1000, 5000, 20000)[r.nextInt(4)])
             13 -> Action.WindowDress(listOf(10, 25, 50, 30)[r.nextInt(4)])
             14 -> Action.SetAuditor(r.nextInt(4))

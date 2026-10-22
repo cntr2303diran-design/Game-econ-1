@@ -262,7 +262,8 @@ fun KapitalAppScaffold(
                     onSellStake = { c, p, a -> viewModel.sellSubStake(c, p, a) },
                     onWindowDress = { viewModel.windowDress(it) },
                     onSetAuditor = { viewModel.setAuditor(it) },
-                    onOpenSpv = { viewModel.openSpv(it) }
+                    onOpenSpv = { viewModel.openSpv(it) },
+                    onPredict = { q, y, st -> viewModel.predict(q, y, st) }
                 )
             }
 

@@ -75,7 +75,8 @@ fun MarkasScreen(
                             onNewGame = onNewGame,
                             onOpenChronicle = onOpenChronicle,
                             evaluationTitle = gameState.evaluationTitle,
-                            evaluationRows = gameState.evaluationRows
+                            evaluationRows = gameState.evaluationRows,
+                            postMortem = gameState.postMortemLines
                         )
                     }
 
@@ -168,7 +169,8 @@ fun MarkasScreen(
                         onNewGame = onNewGame,
                         onOpenChronicle = onOpenChronicle,
                         evaluationTitle = gameState.evaluationTitle,
-                        evaluationRows = gameState.evaluationRows
+                        evaluationRows = gameState.evaluationRows,
+                        postMortem = gameState.postMortemLines
                     )
                 }
 

@@ -205,6 +205,18 @@ data class BoardView(
     val answered: String?
 )
 
+/** B7: pertanyaan pasar prediksi yang terbuka. */
+data class PredictionQuestionView(val id: Int, val text: String, val crowdYesPct: Int, val monthsLeft: Int, val position: String?)
+
+/** B7: pasar prediksi berpoin (bukan kas). */
+data class PredictionView(
+    val points: Int = 100,
+    val maxStake: Int = 20,
+    val questions: List<PredictionQuestionView> = emptyList(),
+    val summary: String = "",
+    val recent: List<String> = emptyList()
+)
+
 /** B1: tampilan tab Intelijen (riset berbayar dan rapat dewan). */
 data class IntelView(
     val kinds: List<Triple<String, String, List<Pair<String, String>>>> = emptyList(), // kode, label, subjek (kode, label)
@@ -436,6 +448,8 @@ data class GameState(
     val gameOverReason: String? = null,
     val evaluationTitle: String = "",
     val evaluationRows: List<Pair<String, String>> = emptyList(),
+    val postMortemLines: List<String> = emptyList(),
+    val prediction: PredictionView = PredictionView(),
     val salesSchemeLabel: String = "",
     val factorySchemeLabel: String = "",
     val salesSchemeOptions: List<Pair<String, String>> = emptyList(),

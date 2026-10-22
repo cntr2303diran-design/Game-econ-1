@@ -89,6 +89,8 @@ sealed class Action {
     data class SetAuditor(val level: Int) : Action()
     /** B5: pendanaan lewat SPV di luar laporan resmi (jt RS, 1.000..20.000). Menyembunyikan utang dari kreditur sampai terbongkar. */
     data class OpenSpv(val amountRs: Int) : Action()
+    /** B7: taruhan poin di pasar prediksi (bukan kas). */
+    data class Predict(val qid: Int, val yes: Boolean, val stake: Int) : Action()
 
     fun encode(): String = when (this) {
         EndTurn -> "END"
@@ -148,6 +150,7 @@ sealed class Action {
         is WindowDress -> "WDR|$pct"
         is SetAuditor -> "EAU|$level"
         is OpenSpv -> "SPV|$amountRs"
+        is Predict -> "PMK|$qid|${if (yes) 1 else 0}|$stake"
     }
 
     companion object {
@@ -215,6 +218,7 @@ sealed class Action {
                     "WDR" -> WindowDress(p[1].toInt())
                     "EAU" -> SetAuditor(p[1].toInt())
                     "SPV" -> OpenSpv(p[1].toInt())
+                    "PMK" -> Predict(p[1].toInt(), p[2] == "1", p[3].toInt())
                     else -> null
                 }
             } catch (_: Exception) {
