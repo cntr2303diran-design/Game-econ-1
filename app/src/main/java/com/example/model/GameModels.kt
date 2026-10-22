@@ -303,6 +303,11 @@ data class OperationsView(
     // B4c: saham minoritas anak usaha dan grafik harga saham
     val stakes: List<StakeRowView> = emptyList(),
     val stockSeries: List<Double> = emptyList(),
+    // C2: riwayat bulanan (maks. 60 bulan terakhir) untuk grafik kas, ekuitas, dan laba bersih
+    val cashSeries: List<Double> = emptyList(),
+    val equitySeries: List<Double> = emptyList(),
+    val niSeries: List<Double> = emptyList(),
+    val historyText: String = "",
     val stockText: String = "",
     // B5: forensik
     val auditorLevel: Int = 0,

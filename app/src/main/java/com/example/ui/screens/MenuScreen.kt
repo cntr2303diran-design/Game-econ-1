@@ -189,6 +189,8 @@ fun MenuScreen(
                     HowLine("Laba bukan kas. Perhatikan arus kas operasi, piutang, dan persediaan di laporan keuangan.")
                     HowLine("Data tidak sempurna: inflasi terlambat, berita bisa bias, bawahan bisa berbohong. Periksa silang dan audit.")
                     HowLine("Ketuk atau tahan angka untuk melihat asal data dan tingkat keyakinannya.")
+                    HowLine("Kartu keputusan muncul dari kondisi dunia (kurs, bunga, geopolitik, pesaing, regulasi). Tiap kartu punya beberapa pilihan dengan untung-rugi; sebagian keputusan memicu kartu lanjutan beberapa bulan kemudian, dan peringatan di kartu lanjutan menjelaskan sebab-akibatnya.")
+                    HowLine("Layar Intel memuat grafik riwayat kas, ekuitas, dan laba, derivatif lindung nilai, pasar prediksi, serta pasca-mortem. Peta menampilkan aset Anda per negara.")
                     HowLine("Permainan tersimpan otomatis. Menu utama bisa dibuka dari ikon menu di kiri atas.")
                 }
             },

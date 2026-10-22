@@ -53,6 +53,42 @@ private fun StockChartCard(series: List<Double>, caption: String) {
     }
 }
 
+/** C2: grafik garis generik untuk riwayat bulanan; garis nol digambar bila deret melewati nol (laba/rugi). */
+@Composable
+private fun SeriesChartCard(title: String, series: List<Double>, caption: String, tag: String) {
+    val line = MaterialTheme.colorScheme.primary
+    val grid = MaterialTheme.colorScheme.outline
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, style = MaterialTheme.typography.titleSmall)
+        Text(caption, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Canvas(Modifier.fillMaxWidth().height(96.dp).testTag(tag)) {
+            val lo = series.min()
+            val hi = series.max()
+            val span = (hi - lo).coerceAtLeast(1e-9)
+            fun y(v: Double) = (size.height - ((v - lo) / span).toFloat() * size.height * 0.84f - size.height * 0.08f)
+            if (lo < 0.0 && hi > 0.0) drawLine(grid, Offset(0f, y(0.0)), Offset(size.width, y(0.0)), strokeWidth = 1f)
+            val path = Path()
+            series.forEachIndexed { i, v ->
+                val x = size.width * i / (series.size - 1)
+                if (i == 0) path.moveTo(x, y(v)) else path.lineTo(x, y(v))
+            }
+            drawPath(path, line, style = Stroke(width = 3f))
+        }
+    }
+}
+
+/** C2: kartu riwayat perusahaan: kas, ekuitas, laba bersih (maks. 60 bulan terakhir). */
+@Composable
+private fun HistoryChartsCard(view: OperationsView) {
+    IntelCard {
+        Text("Riwayat perusahaan", style = MaterialTheme.typography.titleMedium)
+        Text("${view.historyText} · ${view.cashSeries.size} bulan terakhir. Garis tipis = nol.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        SeriesChartCard("Kas", view.cashSeries, "Awal ${"%.0f".format(view.cashSeries.first())} → kini ${"%.0f".format(view.cashSeries.last())}", "grafik_kas")
+        SeriesChartCard("Ekuitas", view.equitySeries, "Awal ${"%.0f".format(view.equitySeries.first())} → kini ${"%.0f".format(view.equitySeries.last())}", "grafik_ekuitas")
+        SeriesChartCard("Laba bersih per bulan", view.niSeries, "Rata-rata ${"%.0f".format(view.niSeries.average())} · terendah ${"%.0f".format(view.niSeries.min())}", "grafik_laba")
+    }
+}
+
 /** B4c: jual saham minoritas anak usaha dengan tawar-menawar diskon. */
 @Composable
 private fun StakeCard(stakes: List<StakeRowView>, ap: Int, onSell: (String, Int, Int) -> Unit) {
@@ -349,6 +385,7 @@ fun OperasiTabContent(
         view.spvBlocks.filterNotNull().firstOrNull()?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         Text(view.lawText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
+    if (view.cashSeries.size >= 2 && view.equitySeries.size >= 2 && view.niSeries.size >= 2) HistoryChartsCard(view)
     if (view.stockSeries.size >= 2) StockChartCard(view.stockSeries, view.stockText)
     if (view.stakes.isNotEmpty()) StakeCard(view.stakes, ap, onSellStake)
     IntelCard {

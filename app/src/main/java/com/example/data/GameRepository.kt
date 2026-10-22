@@ -407,6 +407,10 @@ class GameRepository(
                     blockText = e.nciSaleBlock(id, 5, 20)
                 )
             },
+            cashSeries = e.history.takeLast(60).map { it.cash },
+            equitySeries = e.history.takeLast(60).map { it.equity },
+            niSeries = e.history.takeLast(60).map { it.ni },
+            historyText = e.history.lastOrNull()?.let { h -> "Kas ${fmt(h.cash)} · ekuitas ${fmt(h.equity)} · laba bersih bulan lalu ${fmt(h.ni)} (jt RS)" } ?: "",
             stockSeries = if (e.isPublicCompany) e.stockHistory.takeLast(60).toList() else emptyList(),
             stockText = if (e.isPublicCompany) "Harga ${fmt(e.stockPrice)} RS · kapitalisasi ${fmt(e.stockPrice * e.sharesOutM)} jt RS" else "",
             auditorLevel = e.auditorLevel,
