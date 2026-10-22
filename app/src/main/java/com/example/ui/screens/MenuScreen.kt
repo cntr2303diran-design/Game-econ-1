@@ -28,7 +28,8 @@ fun MenuScreen(
     onNewGame: (com.example.engine.Difficulty) -> Unit,
     onToggleTheme: () -> Unit,
     modifier: Modifier = Modifier,
-    onLoadSlot: (Int) -> Unit = {}
+    onLoadSlot: (Int) -> Unit = {},
+    onOpenPeran: () -> Unit = {}
 ) {
     var showSlots by rememberSaveable { mutableStateOf(false) }
     var showHow by rememberSaveable { mutableStateOf(false) }
@@ -108,6 +109,11 @@ fun MenuScreen(
                     modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("menu_slots")
                 ) { Text("Muat autosave", style = MaterialTheme.typography.titleMedium) }
             }
+            OutlinedButton(
+                onClick = onOpenPeran,
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("menu_peran")
+            ) { Text("Peran lain dan tantangan", style = MaterialTheme.typography.titleMedium) }
             OutlinedButton(
                 onClick = { showHow = true },
                 shape = RoundedCornerShape(6.dp),

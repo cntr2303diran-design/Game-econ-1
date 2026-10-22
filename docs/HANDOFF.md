@@ -51,3 +51,9 @@ Keseimbangan dengan kartu (200 seed): pasif 35%, cakap 62%; tanpa kartu 40%/64%.
 - C3: `BalanceTuning.covenantScale`=0,6 (di `KapitalEngine.kt`). Bot: `TestBots.disciplinedStep` (pasif), `ActiveBot` (cakap), `RecklessBot` (sembrono). Seed baru 1001–1250: pasif 40% (Era 1: 20%), cakap 66% (16%), sembrono 0%. Umpan balik pemain manusia: isi `docs/UMPAN_BALIK_PLAYTEST.md`.
 - Tes yang menonaktifkan sakelar demi mengisolasi sifat yang diuji: `ForensicsTest.windowDress...` (kartu dan covenant dimatikan).
 
+## Tahap C — C4 (peran alternatif dan tantangan asinkron) — status
+- Mesin: `engine/Roles.kt` (Gubernur, Manajer Dana, `MacroSim`, `RoleAction` dengan kode teks `NM`, `POL|laju`, `BUY|id|lot`, `SEL|id|lot`) dan `engine/Challenge.kt` (kode tantangan `KAPITAL-TANTANGAN|1|...`, hasil `KAPITAL-HASIL|1|nama|skor`, verifikator putar ulang, papan peringkat). Tes: `RolesTest` dan `ChallengeTest` (masuk `DEFAULT_CLASSES` di `tools/run-tests.sh`).
+- `World.step` mendapat parameter `policyOverride` (bawaan null, jalur CEO tidak berubah) agar Gubernur dapat menetapkan suku bunga.
+- Layar: `ui/screens/PeranScreen.kt`, rute `ROUTE_PERAN`, tombol `menu_peran` di `MenuScreen`. **Belum dilihat di emulator**, hanya kompilasi CI; daftar uji ada di `docs/UJI_MANUAL_UI.md` bagian G.
+- Batasan jujur: lihat baris C4 di `docs/AUDIT_vs_KONSEP.md` (tanpa Menteri, makro disederhanakan, log dapat disalin, tanpa server, sesi peran tidak disimpan).
+

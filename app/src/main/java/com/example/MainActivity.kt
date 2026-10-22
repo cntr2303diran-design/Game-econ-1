@@ -63,6 +63,7 @@ const val ROUTE_DUNIA = "dunia"
 const val ROUTE_KORAN_PAGI = "koran_pagi"
 const val ROUTE_JURNAL_KEPUTUSAN = "jurnal_keputusan/{decisionId}?option={option}"
 const val ROUTE_KRONIK_DUNIA = "kronik_dunia"
+const val ROUTE_PERAN = "peran"
 
 data class BottomNavTab(
     val route: String,
@@ -199,6 +200,7 @@ fun KapitalAppScaffold(
                         }
                     },
                     onToggleTheme = { viewModel.toggleTheme(isDarkNow) },
+                    onOpenPeran = { navController.navigate(ROUTE_PERAN) { launchSingleTop = true } },
                     onLoadSlot = { slot ->
                         if (viewModel.loadSlot(slot)) {
                             navController.navigate(ROUTE_MARKAS) {
@@ -208,6 +210,10 @@ fun KapitalAppScaffold(
                         }
                     }
                 )
+            }
+
+            composable(ROUTE_PERAN) {
+                PeranScreen(onBack = { navController.popBackStack() })
             }
 
             composable(ROUTE_MARKAS) {

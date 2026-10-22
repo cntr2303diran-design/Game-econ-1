@@ -64,9 +64,24 @@ Perangkat minimum yang disarankan: ponsel 5,5" (360 dp lebar), ponsel besar (412
 | F2 | Buka Operasi dengan riwayat 60 bulan | Tab terbuka tanpa jeda panjang | |
 | F3 | Pantau memori beberapa puluh giliran | Tidak naik terus tanpa henti | |
 
+## G. Peran lain dan tantangan
+| # | Langkah | Yang diharapkan | Hasil |
+|---|---|---|---|
+| G1 | Menu → "Peran lain dan tantangan" | Layar terbuka; tombol "Kembali" kembali ke menu | |
+| G2 | Pilih Gubernur, seed 123, 24 bln, Mulai | Ringkasan bulan 0 dari 24 dan suku bunga awal tampil | |
+| G3 | Tekan -0,25 dua kali lalu "Tetapkan dan lanjut 1 bulan" | Suku bunga naik/turun sesuai angka di layar; bulan ke-1 | |
+| G4 | Tekan +0,25 tujuh kali (+1,75) lalu lanjut | Pesan penolakan merah (batas 1,5 poin per bulan); bulan tidak maju | |
+| G5 | "Tahan suku bunga dan lanjut 6 bulan" berulang sampai selesai | Layar "Selesai" dengan skor; tidak macet | |
+| G6 | Salin kode tantangan, kembali, tempel di "Terima tantangan", Mainkan | Dunia identik (inflasi bulan pertama sama dengan sesi sebelumnya) | |
+| G7 | Selesai → isi nama → "Salin hasil saya" → "Papan peringkat" → tempel hasil → Verifikasi | "Diterima: skor terverifikasi N" dan baris peringkat muncul | |
+| G8 | Ubah satu angka skor pada teks hasil sebelum menempel | Ditolak dengan alasan skor tidak cocok | |
+| G9 | Pilih Manajer Dana; Beli 1 lot di satu saham berulang | Setelah melewati 35% dana, pembelian ditolak dengan pesan; kas dan lot di ringkasan berubah | |
+| G10 | Putar layar / font 130% / tema gelap di layar peran | Tidak ada teks terpotong; **perhatian**: sesi hilang saat layar diputar bila Activity dibuat ulang (state tidak disimpan) | |
+
 ## Risiko yang sudah diketahui (belum diperbaiki)
 - Grafik saham dan riwayat punya deskripsi aksesibilitas; FanChart dan Sparkline belum.
 - Peta belum mendukung pinch-zoom (belum diverifikasi); label negara bisa bertumpuk pada layar kecil.
 - Tata letak lanskap/tablet belum diuji; hanya dikodekan.
 - Tidak ada tutorial interaktif, hanya dialog "Cara bermain" berisi teks.
+- Layar Peran tidak menyimpan sesi saat rotasi layar (state memakai remember, bukan rememberSaveable).
 - Tidak ada tes Compose/Paparazzi; satu-satunya jaring pengaman otomatis adalah kompilasi CI dan tes mesin (JVM).
