@@ -356,6 +356,8 @@ class KapitalEngine(val seed: Long) {
         var lastDivPaidLocal: Double = 0.0
         /** Bagian pemilik minoritas (kepentingan non-pengendali), 0..0,49. */
         var nciPct: Double = 0.0
+        /** B4c: setelah penawaran ditolak, investor tidak mau berunding sampai giliran ini. */
+        var nciCooldownUntil: Int = -1
         var periodDivParentLocal: Double = 0.0
         var lastDivParentLocal: Double = 0.0
 
@@ -424,6 +426,8 @@ class KapitalEngine(val seed: Long) {
     private var periodSubDeconsolRs: Double = 0.0
     private var periodNciDivRs: Double = 0.0
     var nciSaleProceedsTotal = 0.0; private set
+    /** B4c: pajak tertahan atas dividen bagian minoritas (ditanggung pemegang minoritas, netral bagi grup), kumulatif jt RS. */
+    var nciWithheldRs = 0.0; private set
     private val subCashSnap = mutableMapOf<String, Pair<Double, Double>>()
     private var periodSubDivInGrossRs: Double = 0.0
     private var periodGoodwillImpairmentRs: Double = 0.0
@@ -1161,7 +1165,7 @@ class KapitalEngine(val seed: Long) {
             }
             is Action.OpenSubsidiary -> eraBlock(2) == null && doOpenSubsidiary(action.countryId)
             is Action.SetTransferPricing -> {
-                if (eraBlock(2) == null && action.mode != transferPricingMode && spend(1)) {
+                if (eraBlock(2) == null && action.mode != transferPricingMode && transferPricingVeto(action.mode) == null && spend(1)) {
                     transferPricingMode = action.mode
                     if (action.mode == TransferPricingMode.AGRESIF) {
                         recordEthicsEvidence("transfer_pricing", 1.5, "exec_cfo", "meridia")
@@ -1191,7 +1195,7 @@ class KapitalEngine(val seed: Long) {
             is Action.IssueCorporateBond -> eraBlock(3) == null && doIssueCorporateBond(action.amountRs, action.tenorMonths)
             is Action.Buyback -> isPublicCompany && action.amountRs in 100..20000 && pendingBuyback == 0.0 &&
                 cash - action.amountRs >= 3000.0 * sc.size * costIndex && spend(1).also { if (it) pendingBuyback = action.amountRs.toDouble() }
-            is Action.SellSubStake -> eraBlock(2) == null && doSellSubStake(action.countryId, action.pct)
+            is Action.SellSubStake -> eraBlock(2) == null && doSellSubStake(action.countryId, action.pct, action.askDiscountPct)
             is Action.IssueShares -> eraBlock(3) == null && doIssueShares(action.amountRs)
             is Action.ExecuteIpo -> eraBlock(3) == null && ipoBlock() == null && doExecuteIpo(action.floatPct, action.dualClassShares)
             Action.OpenCaptiveBank -> eraBlock(3) == null && doOpenCaptiveBank()
@@ -1313,9 +1317,11 @@ class KapitalEngine(val seed: Long) {
         periodNciDivRs += grossRs - parentRs
         sub.periodDivParentLocal += divLocal * parentShare
         pendingWithholdingTaxRs += taxRs * parentShare
+        nciWithheldRs += taxRs * sub.nciPct
 
         chronicle += ChronicleItem(turn, "Repatriasi Dividen dari ${sub.spec.countryName}",
-            "Menarik dividen ${fmt2(divLocal)} jt ${sub.spec.currencyCode} (${fmt(grossRs)} jt RS); pajak withholding dividen ${fmt1(effWithholdingPct)}% (${fmt(taxRs)} jt RS).",
+            "Menarik dividen ${fmt2(divLocal)} jt ${sub.spec.currencyCode} (${fmt(grossRs)} jt RS); pajak withholding dividen ${fmt1(effWithholdingPct)}% (${fmt(taxRs)} jt RS)." +
+                if (sub.nciPct > 0.0) " Pajak atas bagian minoritas ${fmt1(sub.nciPct * 100)}% (${fmt(taxRs * sub.nciPct)} jt RS) dipotong dari dividen mereka dan tidak membebani grup." else "",
             "Laba ditahan anak usaha → dividen kas lintas batas (dieliminasi pada konsolidasi) → pajak withholding diakui sebagai beban pajak.", actionCount)
         return true
     }
@@ -1413,23 +1419,72 @@ class KapitalEngine(val seed: Long) {
     fun nciEquityRs(): Double =
         subsidiaries.values.filter { !it.nationalized && it.active }.sumOf { it.nciPct * it.equityLocal() * foreignMeta.getValue(it.spec.countryId).fxToRs }
 
-    /** Jual saham minoritas anak usaha ke investor luar (kepentingan non-pengendali). Dana masuk sebagai ekuitas induk. */
-    private fun doSellSubStake(countryId: String, pct: Int): Boolean {
-        val sub = subsidiaries[countryId] ?: return false
-        if (!sub.active || sub.nationalized || sub.monthsActive < 12 || pct !in 5..25) return false
-        if (sub.nciPct + pct / 100.0 > 0.49 + 1e-9) return false
-        if (!spend(2)) return false
+    /** Porsi minoritas dari mana investor mendapat hak veto atas transaksi pihak terkait (B4c). */
+    val NCI_VETO_PCT = 0.20
+
+    /** Alasan transfer pricing agresif diveto oleh pemegang minoritas anak usaha, atau null. */
+    fun transferPricingVeto(mode: TransferPricingMode): String? {
+        if (mode != TransferPricingMode.AGRESIF) return null
+        val s = subsidiaries.values.firstOrNull { it.active && !it.nationalized && it.nciPct >= NCI_VETO_PCT - 1e-9 } ?: return null
+        return "Pemegang minoritas ${s.spec.countryName} (${fmt1(s.nciPct * 100)}%) memveto pengalihan laba ke SPV Meridia: transaksi pihak terkait merugikan mereka."
+    }
+
+    /** Nilai wajar 100% anak usaha (jt RS): yang lebih besar antara 70% ekuitas dan 9x laba tahunan. */
+    fun subValueRs(countryId: String): Double {
+        val sub = subsidiaries[countryId] ?: return 0.0
         val fx = foreignMeta.getValue(countryId).fxToRs
-        val eqRs = sub.equityLocal() * fx
-        val annNiRs = 12.0 * (sub.lastIncomeLocal["ni"] ?: 0.0) * fx
-        val value = max(0.7 * eqRs, 9.0 * annNiRs)
+        return max(0.7 * sub.equityLocal() * fx, 9.0 * 12.0 * (sub.lastIncomeLocal["ni"] ?: 0.0) * fx)
+    }
+
+    /** Batas diskon investor (fraksi): 8%..28% dari aliran acak giliran ini, naik 6 poin bila anak usaha merugi, dan 5 poin bila kas induk menipis. */
+    private fun nciReservation(countryId: String, sub: SubsidiaryState): Double {
+        val idx = max(0, Countries.coreIds.indexOf(countryId))
+        val base = 0.08 + 0.20 * rng(116 + idx).nextDouble()
+        val loss = if ((sub.lastIncomeLocal["ni"] ?: 0.0) <= 0.0) 0.06 else 0.0
+        val desperate = if (cash < 3000.0) 0.05 else 0.0
+        return base + loss + desperate
+    }
+
+    /** Alasan penjualan saham minoritas ditolak (sebelum berunding), atau null. */
+    fun nciSaleBlock(countryId: String, pct: Int, askDiscountPct: Int = 20): String? {
+        val sub = subsidiaries[countryId] ?: return "Belum ada anak usaha di negara ini."
+        if (!sub.active || sub.nationalized) return "Anak usaha belum aktif."
+        if (sub.monthsActive < 12) return "Anak usaha perlu beroperasi 12 bulan dulu."
+        if (pct !in 5..25) return "Porsi harus 5–25%."
+        if (askDiscountPct !in 5..30) return "Diskon penawaran harus 5–30%."
+        if (sub.nciPct + pct / 100.0 > 0.49 + 1e-9) return "Minoritas tidak boleh lebih dari 49%."
+        if (turn < sub.nciCooldownUntil) return "Investor menolak penawaran terakhir; berunding lagi mulai giliran ${sub.nciCooldownUntil}."
+        if (ap < 2) return "AP tidak cukup (butuh 2)."
+        return null
+    }
+
+    /**
+     * Jual saham minoritas anak usaha ke investor luar (kepentingan non-pengendali), dengan tawar-menawar: investor menerima
+     * bila diskon yang ditawarkan sudah mencapai batasnya (tidak diketahui; 8–34%), jika tidak ia menolak dan menghilang 3 bulan.
+     * Biaya transaksi 3%. Dana masuk sebagai ekuitas induk. Bagian minoritas 20% atau lebih memberi hak veto atas
+     * transfer pricing agresif. Pembeli menerima dividen bruto; pajak tertahan atas bagiannya ditanggung pemegang minoritas.
+     */
+    private fun doSellSubStake(countryId: String, pct: Int, askDiscountPct: Int): Boolean {
+        if (nciSaleBlock(countryId, pct, askDiscountPct) != null) return false
+        val sub = subsidiaries.getValue(countryId)
+        if (!spend(2)) return false
+        val reservation = nciReservation(countryId, sub)
+        val value = subValueRs(countryId)
         val gross = value * pct / 100.0
-        val net = gross * 0.97
-        if (net <= 0.0) return false
+        if (gross <= 0.0) { sub.nciCooldownUntil = turn + 3; return true }
+        if (askDiscountPct / 100.0 + 1e-12 < reservation) {
+            sub.nciCooldownUntil = turn + 3
+            chronicle += ChronicleItem(turn, "Investor menolak harga saham ${sub.spec.countryName}",
+                "Diskon ${askDiscountPct}% dari nilai wajar dianggap terlalu sempit; investor mundur tiga bulan.",
+                "Tawar-menawar → penawaran terlalu mahal → ditolak → jeda sebelum bisa berunding lagi.", actionCount)
+            return true
+        }
+        val net = gross * (1.0 - askDiscountPct / 100.0) * 0.97
         sub.nciPct += pct / 100.0
         cash += net; equity += net; periodCureIn += net; nciSaleProceedsTotal += net
         chronicle += ChronicleItem(turn, "Jual $pct% saham anak usaha ${sub.spec.countryName}",
-            "Investor luar membeli $pct% seharga ${fmt(net)} jt RS (bersih biaya 3%). Mereka kini berhak atas ${fmt1(sub.nciPct * 100)}% laba dan dividen anak usaha ini.",
+            "Investor luar membeli $pct% seharga ${fmt(net)} jt RS (diskon ${askDiscountPct}% dari nilai wajar, bersih biaya 3%). Mereka kini berhak atas ${fmt1(sub.nciPct * 100)}% laba dan dividen anak usaha ini." +
+                if (sub.nciPct >= NCI_VETO_PCT - 1e-9) " Dengan porsi sebesar ini mereka memegang hak veto atas transfer pricing agresif." else "",
             "Penjualan saham minoritas → kas masuk sebagai ekuitas → laba & dividen dibagi dengan kepentingan non-pengendali.", actionCount)
         return true
     }

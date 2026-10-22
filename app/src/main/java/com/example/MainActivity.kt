@@ -258,7 +258,8 @@ fun KapitalAppScaffold(
                     onSetInsurance = { viewModel.setInsurance(it) },
                     onSetTradeFinance = { viewModel.setTradeFinance(it) },
                     onSaleLeaseback = { viewModel.saleLeaseback(it) },
-                    onBuyDerivative = { k, p -> viewModel.buyDerivative(k, p) }
+                    onBuyDerivative = { k, p -> viewModel.buyDerivative(k, p) },
+                    onSellStake = { c, p, a -> viewModel.sellSubStake(c, p, a) }
                 )
             }
 

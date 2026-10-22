@@ -249,6 +249,14 @@ data class StaffRowView(
 )
 
 /** B3: tampilan tab Operasi (SDM, R&D, logistik, armada). */
+/** B4c: anak usaha yang dapat dijual sebagian ke investor minoritas. */
+data class StakeRowView(
+    val countryId: String,
+    val name: String,
+    val statusText: String,
+    val blockText: String?
+)
+
 /** B4b: baris derivatif: jenis, ringkasan kontrak aktif (atau null), alasan terblokir per porsi 25/50/100%, dan premi per porsi. */
 data class DerivRowView(
     val code: String,
@@ -276,7 +284,11 @@ data class OperationsView(
     val leaseText: String = "",
     val leaseBlocks: List<String?> = emptyList(),
     // B4b: derivatif
-    val derivs: List<DerivRowView> = emptyList()
+    val derivs: List<DerivRowView> = emptyList(),
+    // B4c: saham minoritas anak usaha dan grafik harga saham
+    val stakes: List<StakeRowView> = emptyList(),
+    val stockSeries: List<Double> = emptyList(),
+    val stockText: String = ""
 )
 
 data class GanttTask(

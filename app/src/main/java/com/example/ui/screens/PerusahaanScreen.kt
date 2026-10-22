@@ -59,6 +59,7 @@ fun PerusahaanScreen(
     onSetTradeFinance: (Boolean) -> Unit = {},
     onSaleLeaseback: (Int) -> Unit = {},
     onBuyDerivative: (String, Int) -> Unit = { _, _ -> },
+    onSellStake: (String, Int, Int) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val subTabs = listOf("Laporan keuangan", "Organisasi", "Proyek", "Kontrak", "Bank", "Pelaku", "Investasi", "Intelijen", "Segmen", "Operasi")
@@ -142,7 +143,7 @@ fun PerusahaanScreen(
                     6 -> InvestTabContent(gameState.investments, gameState.investSummary, gameState.actionPoints, onInvest, onCorporateAction)
                     7 -> IntelTabContent(gameState.intel, gameState.actionPoints, onBuyIntel, onAnswerBoard)
                     8 -> SegmenTabContent(gameState.productMarket, gameState.actionPoints, onSetSegmentFocus)
-                    9 -> OperasiTabContent(gameState.operations, gameState.actionPoints, onHireStaff, onFireStaff, onRaiseSalary, onSetRdLevel, onSetLogistics, onSetInsurance, onSetTradeFinance, onSaleLeaseback, onBuyDerivative)
+                    9 -> OperasiTabContent(gameState.operations, gameState.actionPoints, onHireStaff, onFireStaff, onRaiseSalary, onSetRdLevel, onSetLogistics, onSetInsurance, onSetTradeFinance, onSaleLeaseback, onBuyDerivative, onSellStake)
                 }
             }
         }

@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -7,6 +8,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -22,6 +26,57 @@ private fun IntelCard(content: @Composable ColumnScope.() -> Unit) {
         modifier = Modifier.fillMaxWidth().border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(8.dp))
     ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
+    }
+}
+
+/** B4c: grafik garis harga saham (maks. 60 bulan terakhir) dengan garis acuan pada harga awal jendela. */
+@Composable
+private fun StockChartCard(series: List<Double>, caption: String) {
+    val line = MaterialTheme.colorScheme.primary
+    val grid = MaterialTheme.colorScheme.outline
+    val first = series.first(); val last = series.last()
+    IntelCard {
+        Text("Harga saham", style = MaterialTheme.typography.titleMedium)
+        Text("$caption · ${series.size} bulan: ${"%+.1f".format((last / first - 1.0) * 100.0)}%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Canvas(Modifier.fillMaxWidth().height(140.dp).testTag("grafik_saham")) {
+            val lo = series.min(); val hi = series.max()
+            val span = (hi - lo).coerceAtLeast(1e-9)
+            fun y(v: Double) = (size.height - ((v - lo) / span).toFloat() * size.height * 0.84f - size.height * 0.08f)
+            drawLine(grid, Offset(0f, y(first)), Offset(size.width, y(first)), strokeWidth = 1f)
+            val path = Path()
+            series.forEachIndexed { i, v ->
+                val x = size.width * i / (series.size - 1)
+                if (i == 0) path.moveTo(x, y(v)) else path.lineTo(x, y(v))
+            }
+            drawPath(path, line, style = Stroke(width = 3f))
+        }
+    }
+}
+
+/** B4c: jual saham minoritas anak usaha dengan tawar-menawar diskon. */
+@Composable
+private fun StakeCard(stakes: List<StakeRowView>, ap: Int, onSell: (String, Int, Int) -> Unit) {
+    var pct by rememberSaveable { mutableStateOf(10) }
+    var ask by rememberSaveable { mutableStateOf(20) }
+    IntelCard {
+        Text("Saham minoritas anak usaha", style = MaterialTheme.typography.titleMedium)
+        Text("Anda menawarkan diskon dari nilai wajar. Investor menolak bila diskon terlalu sempit (batasnya 8–34% dan tidak diketahui), lalu menghilang tiga bulan. Porsi 20% ke atas memberi hak veto atas transfer pricing agresif. Pajak tertahan atas dividen minoritas ditanggung mereka.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Porsi dijual", style = MaterialTheme.typography.labelMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(5, 10, 20).forEach { p -> FilterChip(selected = pct == p, onClick = { pct = p }, label = { Text("$p%") }, modifier = Modifier.testTag("nci_pct_$p")) }
+        }
+        Text("Diskon yang ditawarkan", style = MaterialTheme.typography.labelMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(10, 20, 30).forEach { a -> FilterChip(selected = ask == a, onClick = { ask = a }, label = { Text("$a%") }, modifier = Modifier.testTag("nci_ask_$a")) }
+        }
+        stakes.forEach { s ->
+            Text(s.name, style = MaterialTheme.typography.titleSmall)
+            Text(s.statusText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedButton(onClick = { onSell(s.countryId, pct, ask) }, enabled = s.blockText == null && ap >= 2, shape = RoundedCornerShape(6.dp),
+                modifier = Modifier.heightIn(min = 48.dp).testTag("nci_jual_${s.countryId}")) { Text("Tawarkan $pct% dengan diskon $ask% (2 AP)") }
+            s.blockText?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
     }
 }
 
@@ -159,7 +214,8 @@ fun OperasiTabContent(
     onSetInsurance: (Int) -> Unit = {},
     onSetTradeFinance: (Boolean) -> Unit = {},
     onSaleLeaseback: (Int) -> Unit = {},
-    onBuyDerivative: (String, Int) -> Unit = { _, _ -> }
+    onBuyDerivative: (String, Int) -> Unit = { _, _ -> },
+    onSellStake: (String, Int, Int) -> Unit = { _, _, _ -> }
 ) {
     var hireTier by rememberSaveable { mutableStateOf(2) }
     Text("Operasi: karyawan kunci, R&D, logistik", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -228,6 +284,8 @@ fun OperasiTabContent(
         }
         view.leaseBlocks.filterNotNull().firstOrNull()?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
+    if (view.stockSeries.size >= 2) StockChartCard(view.stockSeries, view.stockText)
+    if (view.stakes.isNotEmpty()) StakeCard(view.stakes, ap, onSellStake)
     IntelCard {
         Text("Derivatif lindung nilai", style = MaterialTheme.typography.titleMedium)
         Text("Diselesaikan tunai saat jatuh tempo. Premi dibayar di muka dan sudah memuat marjin; derivatif bukan sumber untung rata-rata, tetapi meredam guncangan. Satu kontrak per jenis dan hanya sampai besar eksposur.",

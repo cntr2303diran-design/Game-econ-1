@@ -50,7 +50,8 @@ sealed class Action {
     data class ExecuteIpo(val floatPct: Int, val dualClassShares: Boolean) : Action()
     object OpenCaptiveBank : Action()
     data class Buyback(val amountRs: Int) : Action()
-    data class SellSubStake(val countryId: String, val pct: Int) : Action()
+    /** Jual saham minoritas anak usaha; [askDiscountPct] = diskon dari nilai wajar yang Anda tawarkan (5..30). Investor menolak bila diskon di bawah batasnya. */
+    data class SellSubStake(val countryId: String, val pct: Int, val askDiscountPct: Int = 20) : Action()
     data class IssueShares(val amountRs: Int) : Action()
     data class MediaLobby(val kind: String) : Action()
     data class CarbonAction(val kind: String, val units: Int) : Action()
@@ -120,7 +121,7 @@ sealed class Action {
         is ExecuteIpo -> "IPO|$floatPct|$dualClassShares"
         OpenCaptiveBank -> "CBK"
         is Buyback -> "BYB|$amountRs"
-        is SellSubStake -> "NCI|${esc(countryId)}|$pct"
+        is SellSubStake -> "NCI|${esc(countryId)}|$pct|$askDiscountPct"
         is IssueShares -> "SPO|$amountRs"
         is MediaLobby -> "LOB|${esc(kind)}"
         is CarbonAction -> "CRB|${esc(kind)}|$units"
@@ -184,7 +185,7 @@ sealed class Action {
                     "IPO" -> ExecuteIpo(p[1].toInt(), p[2].toBoolean())
                     "CBK" -> OpenCaptiveBank
                     "BYB" -> Buyback(p[1].toInt())
-                    "NCI" -> SellSubStake(p[1], p[2].toInt())
+                    "NCI" -> SellSubStake(p[1], p[2].toInt(), p.getOrNull(3)?.toInt() ?: 20)
                     "SPO" -> IssueShares(p[1].toInt())
                     "LOB" -> MediaLobby(p[1])
                     "CRB" -> CarbonAction(p[1], p[2].toInt())

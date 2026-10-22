@@ -136,6 +136,7 @@ class GameRepository(
     fun setTradeFinance(on: Boolean) = perform(Action.SetTradeFinance(on))
     fun saleLeaseback(pct: Int) = perform(Action.SaleLeaseback(pct))
     fun buyDerivative(kind: String, pct: Int) = perform(Action.BuyDerivative(kind, pct))
+    fun sellSubStake(countryId: String, pct: Int, askDiscountPct: Int) = perform(Action.SellSubStake(countryId, pct, askDiscountPct))
     fun buyIntel(kind: String, subject: String, tier: Int) = perform(Action.BuyIntel(kind, subject, tier))
     fun answerBoard(claim: String) = perform(Action.BoardAnswer(claim))
     fun applyCredit(bankId: String, amount: Int, tenor: Int, purpose: String, floating: Boolean, bullet: Boolean) =
@@ -319,6 +320,17 @@ class GameRepository(
             tradeFinanceText = if (e.tradeFinance) "L/C aktif: utang dagang 50 hari, biaya ${fmt(KapitalEngine.LC_FEE * e.sc.size * e.costIndex)} jt RS per bulan" else "L/C mati: utang dagang 35 hari. Mengaktifkan memperpanjang menjadi 50 hari (kas lebih longgar) dengan biaya bulanan.",
             leaseText = "Aset tetap disewa kembali ${fmt(e.leasedBackRs)} jt RS (sewa ${fmt(e.leasedBackRs * KapitalEngine.LEASE_RATE)} jt RS per bulan). Dijual pada nilai buku, batas ${(KapitalEngine.LEASEBACK_MAX * 100).toInt()}% aset tetap, tidak bisa dibeli kembali.",
             leaseBlocks = listOf(5, 10, 20).map { e.saleLeasebackBlock(it) },
+            stakes = e.subsidiaries.values.filter { it.active && !it.nationalized }.map { sb ->
+                val id = sb.spec.countryId
+                StakeRowView(
+                    countryId = id, name = sb.spec.countryName,
+                    statusText = "Nilai wajar 100%: ${fmt(e.subValueRs(id))} jt RS · minoritas sekarang ${fmt1(sb.nciPct * 100)}%" +
+                        if (sb.nciPct >= e.NCI_VETO_PCT - 1e-9) " · memegang hak veto transfer pricing agresif" else "",
+                    blockText = e.nciSaleBlock(id, 5, 20)
+                )
+            },
+            stockSeries = if (e.isPublicCompany) e.stockHistory.takeLast(60).toList() else emptyList(),
+            stockText = if (e.isPublicCompany) "Harga ${fmt(e.stockPrice)} RS · kapitalisasi ${fmt(e.stockPrice * e.sharesOutM)} jt RS" else "",
             derivs = DerivKind.values().map { k ->
                 val a = e.derivs.firstOrNull { it.kind == k }
                 DerivRowView(
