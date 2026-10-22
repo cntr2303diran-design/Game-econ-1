@@ -198,3 +198,12 @@ Halvenia tanpa sertifikat ESG sengaja merugi (pungutan CBAM bulanan tetap); itu 
 **Keterbatasan:** (1) Bot tidak mempersiapkan krisis, jadi ini batas bawah untuk pemain yang cermat; keseimbangan sebenarnya hanya bisa dinilai dengan pemain manusia. (2) Krisis Era 2 belum menimbulkan kegagalan sama sekali pada bot (terlalu ringan atau bot terlalu sehat saat itu). (3) Sinyal dini baru berupa satu baris laporan, belum kartu atau koran. (4) Dampak ke bursa saham dan portofolio pemain belum dimodelkan.
 
 Tes baru: `EraCrisisTest` (satu krisis per era, dalam batas era, deterministik; krisis tercatat di kronik).
+
+---
+
+## Build-24: konsekuensi menjadi perusahaan terbuka (Tahap 4)
+
+- Dua kartu pasar modal (dek kini 42 template): investor aktivis (peluang tinggi bila laba 3 bulan terakhir turun >15% dibanding 3 bulan sebelumnya) dan penjual-pendek (peluang naik dengan beban etika dan komposisi piutang berisiko). Keduanya hanya muncul bila `isPublicCompany`.
+- Peringatan pelunasan pokok obligasi/pinjaman bullet 6 dan 2 bulan sebelum jatuh tempo (sebelumnya pelunasan terjadi tanpa peringatan).
+- Tes: `identities_hold_inEra3And4_withCorporateActions` (3.390 giliran-permainan mulai giliran 232 dan 376, aksi acak termasuk IPO/obligasi/bank grup/akuisisi, semua identitas < 1e-6) dan `PublicCompanyTest` (43 IPO: kartu pasar modal diterima perusahaan publik 54 kali, perusahaan swasta 0 kali).
+- Belum ada: harga saham perusahaan pemain di bursa, dividen/pembelian kembali saham sebagai keputusan berkelanjutan, kepentingan nonpengendali, dan dampak dilusi ke kendali (`founderSharePct` hanya dicatat).

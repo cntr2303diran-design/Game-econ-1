@@ -1517,7 +1517,9 @@ class KapitalEngine(val seed: Long) {
         if (lastIncome.isEmpty()) 62.0 else dso(), if (totalAR() > 0) normalAR / totalAR() else 1.0,
         deferredMonths, dualSourcing, strikeMonthsLeft > 0, covenantBreaches, ethicsLoad, turn <= dumpingUntil,
         commodities.cotton.index, execs.filter { it.present }.map { it.id to it.name }, sc.workers,
-        loans.any { it.balance > 0.5 && it.floatingSpreadPct != null }, 0.0)
+        loans.any { it.balance > 0.5 && it.floatingSpreadPct != null }, 0.0,
+        isPublic = isPublicCompany,
+        profitFalling = ebitHist.size >= 6 && ebitHist.takeLast(3).average() < 0.85 * ebitHist.dropLast(3).takeLast(3).average())
 
     private fun doEventChoice(eventId: String, optionId: String): Boolean {
         val ev = openEvents.firstOrNull { it.id == eventId } ?: return false
@@ -2306,6 +2308,9 @@ class KapitalEngine(val seed: Long) {
                         val pay = l.balance; l.balance = 0.0; principal += pay * rsFactor
                         lines += ReportLine("${l.lender} menarik seluruh pinjaman: ${fmt(pay * rsFactor)} jt RS harus dibayar sekarang.", Tone.BAD)
                     }
+                }
+                if (l.bullet && l.balance > 0.5 && (l.maturityTurn - turn == 6 || l.maturityTurn - turn == 2)) {
+                    lines += ReportLine("Peringatan: pokok bullet ${l.lender} sebesar ${fmt(l.balance * rsFactor)} jt RS jatuh tempo ${l.maturityTurn - turn} bulan lagi. Siapkan kas atau refinancing (kas sekarang ${fmt(cash)} jt RS).", Tone.WARN)
                 }
                 if (l.bullet && l.maturityTurn == turn && l.balance > 0.5) {
                     val pay = l.balance; l.balance = 0.0; principal += pay * rsFactor

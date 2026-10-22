@@ -64,6 +64,27 @@ class StressCalibrationTest {
     }
 
     @Test
+    fun identities_hold_inEra3And4_withCorporateActions() {
+        var turns = 0
+        for (startTurn in listOf(232, 376)) {
+            for (seed in 1L..40L) {
+                val e = TestBots.playUntil(seed * 15485863L, startTurn) ?: continue
+                val r = java.util.Random(seed + startTurn)
+                for (t in 1..60) {
+                    if (e.gameOverReason != null) break
+                    TestBots.disciplinedStep(e, 100 + t)
+                    repeat(2) { randomAction(r, e)?.let { a -> e.apply(a) } }
+                    e.apply(Action.EndTurn)
+                    check(e, "era-mulai=$startTurn seed=$seed t=${e.turn}")
+                    turns++
+                }
+            }
+        }
+        println("STRESS ERA 3-4: $turns giliran-permainan diperiksa")
+        assertTrue("giliran teruji: $turns", turns > 500)
+    }
+
+    @Test
     fun sameSeedAndActions_giveIdenticalState() {
         fun run(): String {
             val e = KapitalEngine(31337L); val r = java.util.Random(5)
@@ -140,5 +161,30 @@ class EraCrisisTest {
         val plans = e.crisisPlans()
         assertTrue("Krisis Era 2 tercatat", e.chronicle.any { it.title == plans[0].title })
         assertTrue("Krisis Era 3 belum dimulai bila giliran < start", e.turn < plans[1].start || e.chronicle.any { it.title == plans[1].title })
+    }
+}
+
+class PublicCompanyTest {
+    @Test
+    fun publicCompanyFacesActivistsAndShortSellers_privateDoesNot() {
+        var pubSeen = 0; var privSeen = 0; var ipos = 0
+        for (seed in 1L..60L) {
+            for (goPublic in listOf(true, false)) {
+                val e = TestBots.playUntil(seed * 15485863L, 232) ?: continue
+                if (goPublic) {
+                    if (e.ipoBlock() == null && e.apply(Action.ExecuteIpo(20, false))) ipos++ else continue
+                }
+                for (t in 1..100) {
+                    if (e.gameOverReason != null) break
+                    TestBots.disciplinedStep(e, 100 + t)
+                    e.apply(Action.EndTurn)
+                }
+                val n = e.eventHistory.count { it.title.contains("aktivis") || it.title.contains("Penjual-pendek") }
+                if (goPublic) pubSeen += n else privSeen += n
+            }
+        }
+        println("PUBLIK: IPO=$ipos kartu pasar modal diterima: publik=$pubSeen swasta=$privSeen")
+        assertEquals(0, privSeen)
+        assertTrue("perusahaan publik harus menerima kartu pasar modal", ipos == 0 || pubSeen > 0)
     }
 }

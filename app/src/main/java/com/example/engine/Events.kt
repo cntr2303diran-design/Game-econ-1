@@ -61,7 +61,9 @@ class EventCtx(
     val presentExecs: List<Pair<String, String>>,
     val workers: Int,
     val hasFloatingDebt: Boolean,
-    val bankRelation: Double
+    val bankRelation: Double,
+    val isPublic: Boolean = false,
+    val profitFalling: Boolean = false
 ) {
     fun m(x: Double) = x * size * costIndex
     val wu: Double get() = 24.6 * size * costIndex
@@ -563,6 +565,35 @@ object EventDeck {
                 ), t, 2, "b")
         },
         // ------------------------------------------------------------------ Kartu baru berdiri sendiri
+        Template("activist_investor", "Pasar modal", 30, { c -> if (c.isPublic) (if (c.profitFalling) 0.7 else 0.12) else 0.0 }) { c, r, id, t ->
+            ev(id, "activist_investor", "Pasar modal", "Investor aktivis membeli saham dan menuntut perubahan",
+                "Dana aktivis mengumumkan kepemilikan 6% dan menuntut pembelian kembali saham, penjualan unit yang lemah, serta kursi dewan.",
+                "Harga saham tertinggal dari pesaing sejak laba menurun.",
+                listOf(
+                    o("a", "Beli kembali saham dan beri kursi dewan", 2, "±${fmt(c.m(900.0))} jt RS; aktivis tenang", "menurut penasihat bank investasi", Tone.INFO,
+                        sure("Aktivis puas; kas terpakai untuk pembelian kembali.", Effect("dividend", c.m(900.0)), Effect("board_trust", -4.0))),
+                    o("b", "Lawan dengan pertahanan racun pil", 2, "±${fmt(c.m(250.0))} jt RS; pertarungan proksi", "menurut penasihat hukum", Tone.WARN,
+                        Outcome(0.5, "Pemegang saham lain mendukung manajemen.", listOf(Effect("cost", c.m(250.0)), Effect("board_trust", 3.0))),
+                        Outcome(0.5, "Kampanye aktivis menang di rapat umum; reputasi dan kepercayaan dewan turun.", listOf(Effect("cost", c.m(250.0)), Effect("board_trust", -12.0), Effect("lostcust", 0.01)))),
+                    o("c", "Abaikan", 0, "Tekanan berlanjut", "menurut Anda", Tone.BAD,
+                        sure("Aktivis menggalang dukungan publik.", Effect("board_trust", -8.0)))
+                ), t, 2, "c")
+        },
+        Template("short_seller", "Pasar modal", 36, { c -> if (c.isPublic) 0.08 + 0.18 * min(c.ethicsLoad, 4.0) + (if (c.arShare < 0.9) 0.25 else 0.0) else 0.0 }) { c, r, id, t ->
+            ev(id, "short_seller", "Pasar modal", "Penjual-pendek menerbitkan laporan tuduhan akuntansi",
+                "Sebuah firma riset yang bertaruh melawan saham Anda menerbitkan laporan 60 halaman yang mempertanyakan piutang, hubungan dengan pihak terkait, dan kualitas laba.",
+                "Beberapa tuduhan menyinggung praktik yang memang pernah dipertimbangkan manajemen.",
+                listOf(
+                    o("a", "Minta audit independen dan terbitkan hasilnya", 2, "±${fmt(c.m(380.0))} jt RS; transparan", "menurut komite audit", Tone.GOOD,
+                        Outcome(0.7, "Audit membantah sebagian besar tuduhan; saham pulih.", listOf(Effect("cost", c.m(380.0)), Effect("board_trust", 4.0))),
+                        Outcome(0.3, "Audit menemukan sejumlah kelemahan pengendalian internal; koreksi laporan diperlukan.", listOf(Effect("cost", c.m(380.0)), Effect("writeoff", c.m(400.0)), Effect("ethics", 1.0, 0, "accounting_weakness"), Effect("board_trust", -6.0)))),
+                    o("b", "Bantah lewat siaran pers", 1, "Murah; tuduhan tetap beredar", "menurut humas", Tone.WARN,
+                        Outcome(0.5, "Pasar mereda.", emptyList()),
+                        Outcome(0.5, "Regulator pasar modal meminta klarifikasi; saham tertekan.", listOf(Effect("fine", c.m(200.0)), Effect("board_trust", -6.0)))),
+                    o("c", "Gugat firma riset", 1, "±${fmt(c.m(120.0))} jt RS; efek tidak pasti", "menurut pengacara", Tone.BAD,
+                        sure("Gugatan menarik perhatian media pada isi laporan.", Effect("cost", c.m(120.0)), Effect("lostcust", 0.01), Effect("board_trust", -4.0)))
+                ), t, 2, "b")
+        },
         Template("esg_activist", "Pasar", 30, { c -> 0.3 + (if (!c.dumping) 0.1 else 0.0) }) { c, r, id, t ->
             ev(id, "esg_activist", "Pasar", "Aktivis lingkungan menyoroti limbah pewarna",
                 "Kelompok aktivis memublikasikan foto saluran limbah dekat pabrik. Beberapa merek ritel mengutip laporan itu dalam penilaian pemasok.",
