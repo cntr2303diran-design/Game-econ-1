@@ -201,6 +201,15 @@ class KapitalEngine(val seed: Long) {
     private var dressedFreshRs = 0.0
     var restatements = 0; private set
     var shortReports = 0; private set
+    /** B5b: SPV di luar laporan resmi. */
+    private val pendingSpv = mutableListOf<Pair<Double, Double>>()
+    private val spvDisclosedIds = mutableSetOf<String>()
+    var spvRevealed = 0; private set
+    /** B5c: antimonopoli dan skandal tertunda. */
+    var antitrustFines = 0; private set
+    var antitrustBlocks = 0; private set
+    private var antitrustNextTurn = -1
+    var whistleblowerLeaks = 0; private set
     val derivs = mutableListOf<Deriv>()
     var derivNetRs = 0.0; private set
     var derivPremiumsRs = 0.0; private set
@@ -894,7 +903,7 @@ class KapitalEngine(val seed: Long) {
     fun projectedIcr(): Double {
         val est = estimateMonth()
         val e = ebitHist.takeLast(2).sum() + est.getValue("ebit")
-        val i = interestHist.takeLast(2).sum() + est.getValue("interest")
+        val i = interestHist.takeLast(2).sum() + est.getValue("interest") - 3.0 * spvMonthlyInterest()
         return if (i <= 0.0) 99.0 else e / i
     }
 
@@ -1226,6 +1235,7 @@ class KapitalEngine(val seed: Long) {
             is Action.BuyDerivative -> doBuyDerivative(action.kind, action.pct)
             is Action.WindowDress -> doWindowDress(action.pct)
             is Action.SetAuditor -> doSetAuditor(action.level)
+            is Action.OpenSpv -> doOpenSpv(action.amountRs)
         }
         if (ok) actionCount++
         return ok
@@ -1373,8 +1383,13 @@ class KapitalEngine(val seed: Long) {
         if (ap < 3) return "Butuh 3 AP untuk uji tuntas dan akuisisi."
         val cost = acquireRivalCostRs(rivalId)
         if (cash - cost < 1500.0) return "Kas tidak cukup untuk akuisisi (${fmt(cost)} jt RS)."
+        if (rv.active && postMergerShare(rivalId) >= ANTITRUST_BLOCK_SHARE) return "Komisi persaingan akan memblokir: pangsa gabungan ${fmt1(postMergerShare(rivalId) * 100)}% (batas ${(ANTITRUST_BLOCK_SHARE * 100).toInt()}%)."
         return null
     }
+
+    private fun relPriceNow(): Double = (1.0 + priceAdjPct / 100.0) * fxPassLevel()
+    /** Pangsa pasar gabungan seandainya pesaing ini diakuisisi (pangsa sekarang ditambah pangsa pesaing). */
+    fun postMergerShare(rivalId: String): Double = playerShare() + world.rivalShareOf(rivalId, relPriceNow())
 
     /**
      * Akuisisi Pesaing (M&A) dengan Uji Tuntas Forensik, Pengakuan Goodwill, dan Risiko Liabilitas Tersembunyi (Tahap 4).
@@ -1390,6 +1405,14 @@ class KapitalEngine(val seed: Long) {
         goodwill += acqGoodwill
         cash -= acqGoodwill
         periodInvestOut += acqGoodwill
+        val mergedShare = postMergerShare(rivalId)
+        if (mergedShare >= ANTITRUST_REMEDY_SHARE) {
+            val remedy = 0.06 * cost
+            oneOffOpex += remedy
+            chronicle += ChronicleItem(turn, "Syarat komisi persaingan",
+                "Pangsa gabungan ${fmt1(mergedShare * 100)}% melewati ${(ANTITRUST_REMEDY_SHARE * 100).toInt()}%: komisi menyetujui dengan syarat. Biaya konsesi dan pelepasan aset ${fmt(remedy)} jt RS.",
+                "Merger besar → telaah antimonopoli → persetujuan bersyarat → biaya konsesi.", actionCount)
+        }
         rv.active = false
         extraLines += 1
         demandBoost += rv.share0 * 0.45
@@ -1865,6 +1888,33 @@ class KapitalEngine(val seed: Long) {
         return true
     }
 
+    private fun isHiddenSpv(l: Loan) = l.id.startsWith("spv_") && l.id !in spvDisclosedIds
+    /** Saldo utang SPV yang masih tersembunyi (jt RS). */
+    fun spvHiddenRs(): Double = loans.filter { isHiddenSpv(it) && it.balance > 0.5 }.sumOf { loanBalanceRs(it) }
+    fun spvMonthlyInterest(): Double = loans.filter { isHiddenSpv(it) && it.balance > 0.5 }.sumOf { loanBalanceRs(it) * it.annualRatePct / 100.0 / 12.0 }
+    /** Utang yang tampak bagi kreditur dan analis: utang nyata dikurangi SPV yang belum terbongkar. */
+    fun reportedDebt(): Double = totalDebt() - spvHiddenRs()
+
+    fun spvBlock(amount: Int): String? {
+        eraBlock(3)?.let { return it }
+        if (amount !in 1000..20000) return "Jumlah SPV 1.000–20.000 jt RS."
+        if (pendingSpv.isNotEmpty()) return "Satu pencairan SPV pada satu waktu."
+        if (spvHiddenRs() + amount > 0.30 * totalAssets()) return "SPV tersembunyi tidak boleh lebih dari 30% aset."
+        if (ap < 2) return "AP tidak cukup (butuh 2)."
+        return null
+    }
+
+    private fun doOpenSpv(amount: Int): Boolean {
+        if (spvBlock(amount) != null || !spend(2)) return false
+        pendingSpv += amount.toDouble() to (policyRate + 5.5)
+        oneOffOpex += 0.03 * amount
+        recordEthicsEvidence("spv", 1.5, "exec_cfo", "sundara")
+        chronicle += ChronicleItem(turn, "Pendanaan lewat SPV",
+            "Pinjaman ${fmt(amount.toDouble())} jt RS disalurkan lewat SPV di luar laporan resmi (biaya struktur 3%, bunga ${fmt1(policyRate + 5.5)}%). Kreditur melihat utang lebih kecil, tetapi utangnya nyata dan bisa terbongkar.",
+            "SPV → utang tersembunyi → metrik kreditur membaik → terbongkar oleh auditor atau saat krisis → denda dan skandal.", actionCount)
+        return true
+    }
+
     /** Skor-M terkini (null sebelum 24 bulan riwayat) dan apakah ia menandai kemungkinan manipulasi. */
     fun mScore(): Double? = forensics.mScore()
     fun mScoreFlag(): Boolean = (forensics.mScore() ?: Double.NEGATIVE_INFINITY) > ForensicBook.THRESHOLD
@@ -1897,6 +1947,59 @@ class KapitalEngine(val seed: Long) {
                 chronicle += ChronicleItem(turn, "Koreksi laporan oleh auditor", "Kapitalisasi biaya yang tidak wajar dikoreksi; denda ${fmt(fine)} jt RS.",
                     "Percantikan laporan → temuan auditor → koreksi dini dengan denda kecil (lebih ringan daripada skandal).", actionCount)
                 dressedSinceCleanRs = 0.0
+            }
+        }
+        // Antimonopoli: pangsa dominan menarik penyelidikan berkala
+        val share = playerShare()
+        if (share >= ANTITRUST_WATCH_SHARE && turn >= antitrustNextTurn) {
+            val pHit = (0.03 + (share - ANTITRUST_WATCH_SHARE) * 0.5) * (if (lobbyCount > 0) 0.6 else 1.0)
+            if (rng(118).nextDouble() < pHit) {
+                val fine = 0.35 * (lastIncome["revenue"] ?: 0.0)
+                oneOffOpex += fine
+                antitrustFines++; antitrustNextTurn = turn + 12
+                boardTrust = (boardTrust - 8).coerceAtLeast(0)
+                lines += ReportLine("Komisi persaingan menyelidiki dominasi pasar Anda (pangsa ${fmt1(share * 100)}%): denda ${fmt(fine)} jt RS.", Tone.BAD)
+                chronicle += ChronicleItem(turn, "Denda antimonopoli", "Pangsa ${fmt1(share * 100)}% menarik penyelidikan; denda ${fmt(fine)} jt RS.",
+                    "Pangsa dominan → penyelidikan → denda berkala (lobi parlemen menurunkan peluangnya).", actionCount)
+            }
+        }
+        // Bukti menua: peluang bocor naik bersama umur (maks. 36 bulan), saksi yang sudah keluar melipatgandakannya; setelah 60 bulan bukti kedaluwarsa
+        val rLeak = rng(119)
+        for (ev in ethicsEvidences.toList()) {
+            val age = turn - ev.turnCommitted
+            if (age > 60) {
+                ethicsEvidences.remove(ev); ethicsLoad = max(0.0, ethicsLoad - 0.3 * ev.severity)
+                continue
+            }
+            val departed = execs.any { it.id == ev.witnessExecId && !it.present }
+            val hazard = 0.0025 * ev.severity * (1.0 + min(age, 36) / 24.0) * (if (departed) 3.0 else 1.0) * (if (mediaOwned) 0.72 else 1.0)
+            if (rLeak.nextDouble() < hazard) {
+                val cost = 400.0 * sc.size * costIndex * ev.severity
+                oneOffOpex += cost
+                whistleblowerLeaks++
+                boardTrust = (boardTrust - 10).coerceAtLeast(0)
+                ethicsEvidences.remove(ev); ethicsLoad = max(0.0, ethicsLoad - ev.severity)
+                lines += ReportLine("Pembocor mengungkap praktik lama ($age bulan lalu, ${ev.kind}): denda dan biaya hukum ${fmt(cost)} jt RS.", Tone.BAD)
+                chronicle += ChronicleItem(turn, "Skandal tertunda terbongkar", "Bukti ${ev.kind} dari $age bulan lalu bocor; biaya ${fmt(cost)} jt RS.",
+                    "Jalan pintas → bukti menua tersimpan → bocor bertahun kemudian → denda dan kepercayaan dewan turun.", actionCount)
+            }
+        }
+        // SPV terbongkar: auditor, skor-M, atau uji covenant yang gagal memperbesar peluangnya
+        val hidden = loans.filter { isHiddenSpv(it) && it.balance > 0.5 }
+        if (hidden.isNotEmpty()) {
+            val p = 0.02 + 0.03 * auditorLevel + (if (flagged) 0.03 else 0.0) + (if (covenantBreaches > 0) 0.04 else 0.0)
+            if (r.nextDouble() < p) {
+                val bal = spvHiddenRs()
+                val fine = 0.20 * bal
+                oneOffOpex += fine
+                spvRevealed++; scandalsTriggered++
+                boardTrust = (boardTrust - 20).coerceAtLeast(0)
+                creditShock += 0.3
+                hidden.forEach { spvDisclosedIds += it.id }
+                recordEthicsEvidence("spv_exposed", 1.0, "exec_cfo", "sundara")
+                lines += ReportLine("SPV terbongkar: utang tersembunyi ${fmt(bal)} jt RS kini terlihat. Denda ${fmt(fine)} jt RS, kreditur memperketat syarat, kepercayaan dewan anjlok.", Tone.BAD)
+                chronicle += ChronicleItem(turn, "Skandal SPV", "Pendanaan di luar laporan resmi terbongkar; denda ${fmt(fine)} jt RS.",
+                    "SPV → metrik kreditur menipu → terbongkar → denda, premi kredit naik, reputasi rusak.", actionCount)
             }
         }
         if (isPublicCompany && flagged && r.nextDouble() < 0.10) {
@@ -2119,7 +2222,7 @@ class KapitalEngine(val seed: Long) {
         val coll = 0.55 * fixedAssets * (if (deferredMonths >= 3) 0.9 else 1.0) + 0.70 * normalAR + 0.50 * inventory + 0.50 * portfolioValue()
         val kd = if (kursHist.size >= 6) (kurs / kursHist[kursHist.size - 6] - 1.0) * 100.0 else 0.0
         val pd = policyRate - policyHist.first()
-        return CreditMetrics(ebit12, ebit12 + dep12, int12, totalDebt(), cash, cash + totalAR() + inventory, due,
+        return CreditMetrics(ebit12, ebit12 + dep12, max(0.0, int12 - 12.0 * spvMonthlyInterest()), reportedDebt(), cash, cash + totalAR() + inventory, due,
             max(0.0, coll - totalDebt()), covenantBreaches, dso(), world.unemployment, policyRate, pd, kd, deferredMonths >= 3,
             max(1000.0, (lastIncome["cogs"] ?: sc.baseRevenue * 0.68) + (lastIncome["opex"] ?: sc.baseOpex)),
             loans.filter { it.balance > 0.5 }.sumOf { 12.0 * it.amortPerMonth * (if (it.currencyAud) kurs else 1.0) },
@@ -3053,6 +3156,16 @@ class KapitalEngine(val seed: Long) {
         pendingCapex = 0.0
         fixedAssets += capex - dep
 
+        // Pencairan SPV (B5b): utang nyata, tercatat di neraca, tetapi tidak tampak di metrik kreditur
+        for ((amt, rate) in pendingSpv) {
+            loans += Loan("spv_${turn}_${loans.size + 1}", "SPV Kalimas Funding (di luar laporan resmi)", amt, rate,
+                currencyAud = false, amortPerMonth = 0.0, amortStartTurn = 9999, maturityTurn = turn + 36,
+                floatingSpreadPct = null, covenantIcr = 0.0, bullet = true)
+            newDebt += amt
+            lines += ReportLine("Dana SPV ${fmt(amt)} jt RS cair (bunga tetap ${fmt2(rate)}%, bullet 36 bulan). Utang ini tidak tampil pada metrik kreditur selama belum terbongkar.", Tone.INFO)
+        }
+        pendingSpv.clear()
+
         // Pencairan obligasi korporasi baru (Era 3)
         for ((amt, couponPct, tenorMonths) in pendingBonds) {
             loans += Loan("bond_${turn}_${loans.size + 1}", "Obligasi Korporasi PT Benang Sundara", amt, couponPct,
@@ -3252,9 +3365,9 @@ class KapitalEngine(val seed: Long) {
         interestHist += interest
         if (turn % 3 == 0 && gameOverReason == null) {
             val th = covenantThreshold()
-            val icr = ebitHist.takeLast(3).sum() / max(1.0, interestHist.takeLast(3).sum())
+            val icr = ebitHist.takeLast(3).sum() / max(1.0, interestHist.takeLast(3).sum() - 3.0 * spvMonthlyInterest())
             val ebitdaAnnual = (ebitHist.takeLast(3).sum() + 3 * dep) * 4.0
-            val netDebtRatio = (totalDebt() - cash) / max(1.0, ebitdaAnnual)
+            val netDebtRatio = (reportedDebt() - cash) / max(1.0, ebitdaAnnual)
             val breach = (th > 0 && icr < th) || netDebtRatio > 3.5
             if (breach) {
                 covenantBreaches++
@@ -3646,6 +3759,10 @@ class KapitalEngine(val seed: Long) {
     companion object {
         /** Biaya L/C bulanan (jt RS pada skala 1), tarif sewa kembali per bulan, dan batas aset yang boleh disewa kembali. */
         const val LC_FEE = 31.0
+        /** B5c: ambang antimonopoli: telaah bersyarat, blokir, dan pengawasan dominasi (pangsa gabungan atau organik). */
+        const val ANTITRUST_REMEDY_SHARE = 0.33
+        const val ANTITRUST_BLOCK_SHARE = 0.45
+        const val ANTITRUST_WATCH_SHARE = 0.35
         const val LEASE_RATE = 0.0095
         const val LEASEBACK_MAX = 0.40
         val INVEST = listOf(

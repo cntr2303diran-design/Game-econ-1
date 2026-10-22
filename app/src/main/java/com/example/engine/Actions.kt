@@ -87,6 +87,8 @@ sealed class Action {
     data class WindowDress(val pct: Int) : Action()
     /** B5: auditor eksternal (0 tanpa, 1 regional, 2 internasional). */
     data class SetAuditor(val level: Int) : Action()
+    /** B5: pendanaan lewat SPV di luar laporan resmi (jt RS, 1.000..20.000). Menyembunyikan utang dari kreditur sampai terbongkar. */
+    data class OpenSpv(val amountRs: Int) : Action()
 
     fun encode(): String = when (this) {
         EndTurn -> "END"
@@ -145,6 +147,7 @@ sealed class Action {
         is BuyDerivative -> "DRV|${esc(kind)}|$pct"
         is WindowDress -> "WDR|$pct"
         is SetAuditor -> "EAU|$level"
+        is OpenSpv -> "SPV|$amountRs"
     }
 
     companion object {
@@ -211,6 +214,7 @@ sealed class Action {
                     "DRV" -> BuyDerivative(p[1], p[2].toInt())
                     "WDR" -> WindowDress(p[1].toInt())
                     "EAU" -> SetAuditor(p[1].toInt())
+                    "SPV" -> OpenSpv(p[1].toInt())
                     else -> null
                 }
             } catch (_: Exception) {

@@ -295,7 +295,10 @@ data class OperationsView(
     val mScoreText: String = "",
     val mScoreFlag: Boolean = false,
     val dressText: String = "",
-    val dressBlocks: List<String?> = emptyList()
+    val dressBlocks: List<String?> = emptyList(),
+    val spvText: String = "",
+    val spvBlocks: List<String?> = emptyList(),
+    val lawText: String = ""
 )
 
 data class GanttTask(

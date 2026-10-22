@@ -261,7 +261,8 @@ fun KapitalAppScaffold(
                     onBuyDerivative = { k, p -> viewModel.buyDerivative(k, p) },
                     onSellStake = { c, p, a -> viewModel.sellSubStake(c, p, a) },
                     onWindowDress = { viewModel.windowDress(it) },
-                    onSetAuditor = { viewModel.setAuditor(it) }
+                    onSetAuditor = { viewModel.setAuditor(it) },
+                    onOpenSpv = { viewModel.openSpv(it) }
                 )
             }
 

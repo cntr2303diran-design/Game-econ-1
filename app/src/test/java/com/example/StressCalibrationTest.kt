@@ -38,7 +38,8 @@ class StressCalibrationTest {
         if (r.nextInt(5) != 0) return randomAction(r, e)
         val kinds = listOf("sektor", "negara", "pesaing", "segmen", "xx")
         val kind = kinds[r.nextInt(kinds.size)]
-        return when (r.nextInt(15)) {
+        return when (r.nextInt(16)) {
+            15 -> Action.OpenSpv(listOf(500, 1000, 5000, 20000)[r.nextInt(4)])
             13 -> Action.WindowDress(listOf(10, 25, 50, 30)[r.nextInt(4)])
             14 -> Action.SetAuditor(r.nextInt(4))
             12 -> Action.BuyDerivative(listOf("fxo", "ctf", "swp", "zzz")[r.nextInt(4)], listOf(25, 50, 100, 30)[r.nextInt(4)])

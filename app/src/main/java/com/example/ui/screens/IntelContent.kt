@@ -217,7 +217,8 @@ fun OperasiTabContent(
     onBuyDerivative: (String, Int) -> Unit = { _, _ -> },
     onSellStake: (String, Int, Int) -> Unit = { _, _, _ -> },
     onWindowDress: (Int) -> Unit = {},
-    onSetAuditor: (Int) -> Unit = {}
+    onSetAuditor: (Int) -> Unit = {},
+    onOpenSpv: (Int) -> Unit = {}
 ) {
     var hireTier by rememberSaveable { mutableStateOf(2) }
     Text("Operasi: karyawan kunci, R&D, logistik", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -305,6 +306,15 @@ fun OperasiTabContent(
             }
         }
         view.dressBlocks.filterNotNull().firstOrNull()?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        Text(view.spvText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(2000, 5000, 10000).forEachIndexed { i, amt ->
+                OutlinedButton(onClick = { onOpenSpv(amt) }, enabled = view.spvBlocks.getOrNull(i) == null, shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier.heightIn(min = 48.dp).testTag("spv_$amt")) { Text("SPV $amt") }
+            }
+        }
+        view.spvBlocks.filterNotNull().firstOrNull()?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        Text(view.lawText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     if (view.stockSeries.size >= 2) StockChartCard(view.stockSeries, view.stockText)
     if (view.stakes.isNotEmpty()) StakeCard(view.stakes, ap, onSellStake)

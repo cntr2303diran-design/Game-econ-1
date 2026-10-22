@@ -138,6 +138,7 @@ class GameRepository(
     fun buyDerivative(kind: String, pct: Int) = perform(Action.BuyDerivative(kind, pct))
     fun windowDress(pct: Int) = perform(Action.WindowDress(pct))
     fun setAuditor(level: Int) = perform(Action.SetAuditor(level))
+    fun openSpv(amountRs: Int) = perform(Action.OpenSpv(amountRs))
     fun sellSubStake(countryId: String, pct: Int, askDiscountPct: Int) = perform(Action.SellSubStake(countryId, pct, askDiscountPct))
     fun buyIntel(kind: String, subject: String, tier: Int) = perform(Action.BuyIntel(kind, subject, tier))
     fun answerBoard(claim: String) = perform(Action.BoardAnswer(claim))
@@ -339,6 +340,9 @@ class GameRepository(
             mScoreFlag = e.mScoreFlag(),
             dressText = "Percantikan laporan: kapitalisasi biaya operasi ke persediaan menaikkan laba bulan ini (membantu ICR dan harga saham) lalu berbalik sebagai beban dalam beberapa bulan; pajak dibayar lebih awal, kas tidak berubah. Meninggalkan bukti etika. Sisa belum berbalik ${fmt(e.dressedRs)} jt RS.",
             dressBlocks = listOf(10, 25, 50).map { e.windowDressBlock(it) },
+            spvText = "SPV di luar laporan resmi: utang tersembunyi ${fmt(e.spvHiddenRs())} jt RS (utang nyata ${fmt(e.totalDebt())}, tampak bagi kreditur ${fmt(e.reportedDebt())}). Biaya struktur 3%, bunga kebijakan + 5,5%, bullet 36 bulan, maks. 30% aset. Tiap bulan ada peluang terbongkar (lebih besar dengan auditor, skor-M tinggi, atau covenant gagal): denda 20% utang, skandal, kredit mengetat. Terbongkar ${e.spvRevealed}x.",
+            spvBlocks = listOf(2000, 5000, 10000).map { e.spvBlock(it) },
+            lawText = "Pangsa pasar ${fmt1(e.playerShare() * 100)}% (penyelidikan dominasi mulai ${(KapitalEngine.ANTITRUST_WATCH_SHARE * 100).toInt()}%, merger bersyarat ≥ ${(KapitalEngine.ANTITRUST_REMEDY_SHARE * 100).toInt()}%, diblokir ≥ ${(KapitalEngine.ANTITRUST_BLOCK_SHARE * 100).toInt()}%). Denda antimonopoli ${e.antitrustFines}x. Pembocor mengungkap bukti lama ${e.whistleblowerLeaks}x; bukti makin mudah bocor seiring umur dan kedaluwarsa setelah 60 bulan. Bukti aktif: ${e.ethicsEvidences.size}.",
             derivs = DerivKind.values().map { k ->
                 val a = e.derivs.firstOrNull { it.kind == k }
                 DerivRowView(
