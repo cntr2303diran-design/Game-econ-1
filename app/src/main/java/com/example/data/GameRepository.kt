@@ -427,7 +427,11 @@ class GameRepository(
             "Anak usaha, M&A, transfer pricing" to (e.eraBlock(2) ?: "Terbuka"),
             "Obligasi, IPO, bank grup, lobi" to (e.eraBlock(3) ?: "Terbuka"),
             "Karbon dan suksesi CEO" to (e.eraBlock(4) ?: "Terbuka")
-        ) + e.subsidiaries.values.map { sb ->
+        ) + (if (e.isPublicCompany) listOf(
+            "Harga saham" to "${fmt(e.stockPrice)} RS (${fmt1(e.sharesOutM)} juta lembar; kapitalisasi ${fmt(e.stockPrice * e.sharesOutM)} jt RS)",
+            "Dividen/saham terakhir dan buyback" to "${fmt1(e.lastDividendPerShare)} RS; total buyback ${fmt(e.buybackTotalRs)} jt RS (${fmt1(e.sharesRetiredM)} juta lembar ditarik)",
+            "Porsi pendiri" to "${fmt1(e.founderSharePct)}%"
+        ) else emptyList()) + e.subsidiaries.values.map { sb ->
             "Anak usaha ${sb.spec.countryName}" to when {
                 sb.nationalized -> "Dinasionalisasi"
                 sb.active -> "Aktif ${sb.monthsActive} bln; laba kumulatif ${fmt(sb.cumulativeTranslatedNiRs)} jt RS"

@@ -351,6 +351,17 @@ class KapitalEngine(val seed: Long) {
     var founderSharePct: Double = 100.0; private set
     val publicFloatPct: Double get() = (100.0 - founderSharePct) / 100.0
     var dualClassShares: Boolean = false; private set
+    /** Saham beredar (juta lembar), harga (RS/saham), sentimen pasar (log-premi), dan riwayat harga. */
+    var sharesOutM = 0.0; private set
+    var stockPrice = 0.0; private set
+    var stockSentiment = 0.0; private set
+    val stockHistory = mutableListOf<Double>()
+    private var emaNi = 0.0
+    var buybackTotalRs = 0.0; private set
+    var sharesRetiredM = 0.0; private set
+    var lastDividendPerShare = 0.0; private set
+    private var pendingBuyback = 0.0
+    private var founderSharesM = 0.0
     var captiveBankActive: Boolean = false; private set
     var captiveBankCapitalRs: Double = 0.0; private set
     var mediaOwned: Boolean = false; private set
@@ -839,6 +850,18 @@ class KapitalEngine(val seed: Long) {
      * warisan yang dibawa: rapor kuat menurunkan tekanan kredit (kreditur percaya), rapor rapuh
      * menaikkannya (kreditur menuntut premi) dan memicu pengawasan.
      */
+    /** Harga saham = nilai fundamental (kelipatan laba dan nilai buku) x sentimen yang kembali ke rata-rata. */
+    private fun updateStockPrice(ni: Double) {
+        emaNi = 0.9 * emaNi + 0.1 * ni
+        val fair = max(max(0.6 * equity, 11.0 * 12.0 * emaNi), 0.25 * max(equity, 1.0)).coerceAtLeast(1.0)
+        val r = rng(60)
+        stockSentiment = 0.9 * stockSentiment + (r.nextDouble() * 2 - 1) * 0.045
+        stockSentiment = stockSentiment.coerceIn(-0.9, 0.6)
+        stockPrice = fair * Math.exp(stockSentiment) / sharesOutM
+        stockHistory += stockPrice
+        if (stockHistory.size > 480) stockHistory.removeAt(0)
+    }
+
     private fun eraTransitionReview(endingEra: Int, out: MutableList<ReportLine>) {
         val g = evaluateCampaign().totalScore
         eraGrades += g
@@ -1055,6 +1078,8 @@ class KapitalEngine(val seed: Long) {
             is Action.AcquireRival -> eraBlock(2) == null && doAcquireRival(action.rivalId)
             is Action.BorrowForeignSub -> eraBlock(2) == null && doBorrowForeignSub(action.countryId, action.amountLocal)
             is Action.IssueCorporateBond -> eraBlock(3) == null && doIssueCorporateBond(action.amountRs, action.tenorMonths)
+            is Action.Buyback -> isPublicCompany && action.amountRs in 100..20000 && pendingBuyback == 0.0 &&
+                cash - action.amountRs >= 3000.0 * sc.size * costIndex && spend(1).also { if (it) pendingBuyback = action.amountRs.toDouble() }
             is Action.ExecuteIpo -> eraBlock(3) == null && ipoBlock() == null && doExecuteIpo(action.floatPct, action.dualClassShares)
             Action.OpenCaptiveBank -> eraBlock(3) == null && doOpenCaptiveBank()
             is Action.MediaLobby -> eraBlock(3) == null && doMediaLobby(action.kind)
@@ -1267,6 +1292,12 @@ class KapitalEngine(val seed: Long) {
         isPublicCompany = true
         dualClassShares = useDualClass
         founderSharePct = (100.0 - floatPct).coerceIn(50.0, 90.0)
+        sharesOutM = 1000.0
+        founderSharesM = sharesOutM * founderSharePct / 100.0
+        stockPrice = valuation / sharesOutM
+        stockSentiment = 0.0
+        emaNi = max(0.0, ebitHist.takeLast(3).average() * 0.65)
+        stockHistory += stockPrice
         cash += netProceeds
         equity += netProceeds
         periodCureIn += netProceeds
@@ -1594,6 +1625,8 @@ class KapitalEngine(val seed: Long) {
             "income" -> pendingIncome += f.a
             "invloss" -> pendingInvLoss += f.a
             "dividend" -> pendingDividend += f.a
+            "buyback" -> if (isPublicCompany) pendingBuyback += f.a else pendingDividend += f.a
+            "sentiment" -> if (isPublicCompany) stockSentiment += f.a
             "ethics" -> {
                 val kindLabel = f.s.ifEmpty { "shortcut" }
                 val witness = execs.firstOrNull { it.present }?.id ?: "exec_coo"
@@ -2411,6 +2444,23 @@ class KapitalEngine(val seed: Long) {
             val d = min(pendingDividend, max(0.0, cash + ni + dep - 1500.0))
             dividend += d; equity -= d; pendingDividend = 0.0
             if (d > 0.0) lines += ReportLine("Dividen khusus dibayar ${fmt(d)} jt RS.", Tone.INFO)
+        }
+
+        var bbThisTurn = 0.0
+        if (pendingBuyback > 0.0) {
+            val b = min(pendingBuyback, max(0.0, cash + ni + dep - dividend - 1500.0))
+            pendingBuyback = 0.0
+            if (b > 0.0 && isPublicCompany && stockPrice > 0.0) {
+                val retired = b / stockPrice
+                sharesOutM -= retired; sharesRetiredM += retired; buybackTotalRs += b
+                founderSharePct = (founderSharesM / sharesOutM * 100.0).coerceAtMost(100.0)
+                dividend += b; equity -= b; bbThisTurn = b
+                lines += ReportLine("Pembelian kembali saham ${fmt(b)} jt RS: ${fmt1(retired)} juta lembar ditarik di harga ${fmt(stockPrice)} RS.", Tone.INFO)
+            }
+        }
+        if (isPublicCompany && sharesOutM > 0.0) {
+            lastDividendPerShare = (dividend - bbThisTurn) / sharesOutM
+            updateStockPrice(ni)
         }
 
         // ---- 6. Kas Induk ----

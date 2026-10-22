@@ -8,7 +8,8 @@ import kotlin.math.abs
 /** Uji tekanan identitas akuntansi dengan aksi acak (termasuk aksi multinasional/korporasi) dan uji determinisme. */
 class StressCalibrationTest {
 
-    private fun randomAction(r: java.util.Random, e: KapitalEngine): Action? = when (r.nextInt(16)) {
+    private fun randomAction(r: java.util.Random, e: KapitalEngine): Action? = when (r.nextInt(18)) {
+        15, 16 -> Action.Buyback(300 + r.nextInt(3000))
         0 -> Action.AdjustPrice(r.nextInt(9) - 4)
         1 -> Action.HedgeCotton
         2 -> Action.HedgeFx
@@ -352,5 +353,41 @@ class EraReviewTest {
         assertEquals(a, b)
         assertTrue("rapor Era 1 dan 2 tercatat", a.size >= 2)
         assertTrue(a.all { it in 0..100 })
+    }
+}
+
+class StockTest {
+    @Test
+    fun buybackRetiresSharesRaisesFounderStake_andKeepsBooksBalanced() {
+        var tested = 0; var priced = 0
+        for (seed in 1L..40L) {
+            val e = TestBots.playUntil(seed * 15485863L, 232) ?: continue
+            if (e.ipoBlock() != null || !e.apply(Action.ExecuteIpo(20, false))) continue
+            assertEquals(1000.0, e.sharesOutM, 1e-9)
+            assertTrue(e.stockPrice > 0.0)
+            val founder0 = e.founderSharePct
+            for (t in 1..60) {
+                if (e.gameOverReason != null) break
+                TestBots.disciplinedStep(e, 100 + t)
+                if (t % 12 == 5) e.apply(Action.Buyback(1000))
+                e.apply(Action.EndTurn)
+                assertTrue("harga positif", e.stockPrice > 0.0 && !e.stockPrice.isNaN())
+                assertTrue(abs(e.totalAssets() - e.totalLiabilities() - e.equity) < 1e-6)
+            }
+            if (e.buybackTotalRs > 0) {
+                assertTrue(e.sharesOutM < 1000.0)
+                assertTrue("porsi pendiri naik", e.founderSharePct > founder0)
+                tested++
+            }
+            if (e.stockHistory.size > 20) priced++
+        }
+        println("SAHAM: seed dengan buyback terlaksana=$tested, dengan riwayat harga=$priced")
+        assertTrue(priced > 0)
+    }
+
+    @Test
+    fun privateCompanyCannotBuyback() {
+        val e = KapitalEngine(5L)
+        assertFalse(e.apply(Action.Buyback(500)))
     }
 }

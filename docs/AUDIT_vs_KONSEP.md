@@ -244,3 +244,9 @@ Tes baru: `EraCrisisTest` (satu krisis per era, dalam batas era, deterministik; 
 - **Pesaing belajar**: tes 40 seed menunjukkan profil pemain yang dipelajari berbeda untuk gaya potong-harga vs premium (40/40), agresivitas pesaing lebih tinggi pada potong-harga (4,77 vs 3,21).
 - **Rapor transisi era**: era tetap berganti menurut kalender dunia, tetapi nilai kampanye pada akhir era menentukan syarat kredit era berikutnya (≥75 melonggarkan, <55 menaikkan premi). Tersimpan di `eraGrades` dan kronik.
 - **Belum**: UI belum pernah dilihat di perangkat; keseimbangan belum diuji manusia; 42 kartu vs ±600 target.
+
+## Build-29 — Tahap 4a: saham perusahaan Anda setelah IPO (jujur)
+- Setelah IPO: 1.000 juta lembar beredar, harga = nilai fundamental (maks. 0,6x buku atau 11x laba tahunan yang dihaluskan) x sentimen acak yang kembali ke rata-rata; riwayat harga disimpan; dividen per saham dihitung.
+- **Buyback** (`Action.Buyback`): menarik saham di harga berjalan, menaikkan porsi pendiri, diperlakukan sebagai distribusi ekuitas sehingga neraca, arus kas dan ekuitas konsolidasi tetap cocok (diuji dalam tes tekanan acak 7.700+ giliran).
+- Kartu aktivis dan penjual-pendek kini menggeser sentimen harga; pilihan "beli kembali saham" memakai buyback sungguhan.
+- **Belum**: kepentingan non-pengendali (anak usaha kepemilikan sebagian) dan pembelian saham oleh pemegang lain; harga saham belum memengaruhi biaya modal atau penerbitan saham lanjutan (SPO); tidak ada grafik harga di UI.

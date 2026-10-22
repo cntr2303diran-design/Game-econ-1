@@ -258,6 +258,7 @@ fun InvestTabContent(
             "Forward valas 6 bulan" to "HFX",
             "Terbitkan obligasi 3.000 jt RS, 36 bulan" to "BND|3000|36",
             "IPO 20% saham" to "IPO|20|false",
+            "Beli kembali saham 1.500 jt RS" to "BYB|1500",
             "Dirikan bank dan asuransi grup" to "CBK"
         )
         actions.forEach { (label, code) ->
