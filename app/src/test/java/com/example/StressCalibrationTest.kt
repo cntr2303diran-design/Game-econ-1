@@ -483,7 +483,7 @@ class BalanceTest {
             val reasons = mutableMapOf<String, Int>()
             for (seed in 1L..n) {
                 val e = campaign(seed * 2654435761L % 100000007L, active)
-                if (e.isVictory) { win++; gradeSum += e.evaluateCampaign().totalScore } else { deathEra[KapitalEngine.era(e.turn)]++; reasons.merge("E${KapitalEngine.era(e.turn)}:" + (e.gameOverReason ?: "?").take(14), 1, Int::plus) }
+                if (e.isVictory) { win++; gradeSum += e.evaluateCampaign().totalScore } else { if (KapitalEngine.era(e.turn) == 4 || KapitalEngine.era(e.turn) == 1) println("  MATI e${KapitalEngine.era(e.turn)} giliran=${e.turn} krisis=${e.crisisPlans().map { it.start }} aktif=$active"); deathEra[KapitalEngine.era(e.turn)]++; reasons.merge("E${KapitalEngine.era(e.turn)}:" + (e.gameOverReason ?: "?").take(14), 1, Int::plus) }
             }
             println("BALANS ${if (active) "AKTIF" else "PASIF"}: menang=$win/$n mati per era=${deathEra.toList().drop(1)} skor rata2 menang=${if (win == 0) 0 else gradeSum / win} sebab=$reasons")
             res[if (active) "a" else "p"] = win to n

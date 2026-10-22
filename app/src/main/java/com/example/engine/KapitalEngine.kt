@@ -862,7 +862,7 @@ class KapitalEngine(val seed: Long) {
     private fun updateStockPrice(ni: Double) {
         emaNi = 0.9 * emaNi + 0.1 * ni
         val fair = max(max(0.6 * equity, 11.0 * 12.0 * emaNi), 0.25 * max(equity, 1.0)).coerceAtLeast(1.0)
-        val r = rng(60)
+        val r = rng(61)
         stockSentiment = 0.9 * stockSentiment + (r.nextDouble() * 2 - 1) * 0.045
         stockSentiment = stockSentiment.coerceIn(-0.9, 0.6)
         stockPrice = fair * Math.exp(stockSentiment) / sharesOutM
