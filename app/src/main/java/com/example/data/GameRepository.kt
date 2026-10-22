@@ -594,6 +594,66 @@ class GameRepository(
             "Jebakan akrual: laba bersih ${signed(ni)} jt RS, tetapi arus kas operasi ${signed(cfo)} jt RS karena kas tertahan di piutang dan persediaan."
         else null
 
+        // ---- Laporan konsolidasi grup dan per entitas (hanya bila ada anak usaha) ----
+        val anySub = e.subsidiaries.values.any { it.active || it.nationalized }
+        val groupRows = mutableListOf<FinancialRowItem>()
+        val entityRows = mutableListOf<FinancialRowItem>()
+        if (anySub) {
+            val gi = e.lastConsolidatedIncome; val gb = e.lastConsolidatedBalance; val gc = e.lastConsolidatedCashFlow; val ge = e.lastConsolidatedEquity
+            val gOrigin = origin("Laporan konsolidasi grup", "Bulan $closed", "Akuntansi grup", closed,
+                "Induk ditambah anak usaha aktif (kurs penutupan), dengan eliminasi pendapatan, beban dan dividen antar-entitas. Selisih kurs translasi (CTA) masuk ekuitas, bukan laba rugi.",
+                "Angka dalam jt RS; anak usaha dihitung dari pembukuan mata uang lokalnya.", ConfidenceTier.HIGH)
+            fun g(label: String, v: Double, note: String = "", total: Boolean = false, neg: Boolean = false) =
+                FinancialRowItem(label, money(v, neg && v != 0.0), "", note, total, SemanticTone.NEUTRAL_GRAY, gOrigin)
+            fun head(label: String) = FinancialRowItem(label, "", "", "", true, SemanticTone.NEUTRAL_GRAY, gOrigin)
+            fun m(map: Map<String, Double>, k: String) = map[k] ?: 0.0
+            groupRows += head("LABA RUGI KONSOLIDASI")
+            groupRows += g("Pendapatan grup", m(gi, "revenue"), "Setelah eliminasi pendapatan antar-entitas ${fmt(-m(gi, "elim_intercompany_rev"))} jt RS")
+            groupRows += g("Harga pokok penjualan", m(gi, "cogs"), "", neg = true)
+            groupRows += g("Beban operasional", m(gi, "opex"), "Setelah eliminasi beban antar-entitas", neg = true)
+            groupRows += g("EBIT grup", m(gi, "ebit"), "", total = true)
+            groupRows += g("Beban bunga", m(gi, "interest"), "", neg = true)
+            groupRows += g("Pajak penghasilan", m(gi, "tax"), "Pajak withholding dividen: ${fmt(m(gi, "wht_tax"))} jt RS", neg = true)
+            groupRows += g("Laba bersih grup", m(gi, "ni"), "", total = true)
+            groupRows += head("NERACA KONSOLIDASI")
+            groupRows += g("Kas grup", m(gb, "cash")); groupRows += g("Piutang", m(gb, "ar")); groupRows += g("Persediaan", m(gb, "inv"))
+            groupRows += g("Aset tetap", m(gb, "fa")); groupRows += g("Goodwill", m(gb, "goodwill"))
+            groupRows += g("Total aset", m(gb, "assets"), "Investasi pada anak usaha dieliminasi: ${fmt(-m(gb, "elim_inv_subs"))} jt RS", total = true)
+            groupRows += g("Total liabilitas", m(gb, "liab"), "", total = true)
+            groupRows += g("Selisih kurs translasi (CTA)", m(gb, "cta_equity"), "Komponen ekuitas dari translasi anak usaha")
+            groupRows += g("Ekuitas grup", m(gb, "equity"), "Aset = liabilitas + ekuitas", total = true)
+            groupRows += head("ARUS KAS KONSOLIDASI")
+            groupRows += g("Operasi", m(gc, "cfo")); groupRows += g("Investasi", m(gc, "cfi"), "Termasuk pembangunan anak usaha, dikurangi kas anak usaha yang diperoleh")
+            groupRows += g("Pendanaan", m(gc, "cff"), "Dividen internal dieliminasi")
+            groupRows += g("Pengaruh kurs atas kas anak usaha", m(gc, "fx_cash"))
+            if (m(gc, "seized_cash") != 0.0) groupRows += g("Kas disita (nasionalisasi)", m(gc, "seized_cash"))
+            groupRows += g("Perubahan kas grup", m(gc, "net"), "Cocok dengan selisih kas grup antar bulan", total = true)
+            groupRows += head("PERUBAHAN EKUITAS KONSOLIDASI")
+            groupRows += g("Ekuitas awal", m(ge, "open")); groupRows += g("Laba bersih grup", m(ge, "ni"))
+            groupRows += g("Penambahan modal, dividen, dan komponen langsung lain", m(ge, "direct"))
+            groupRows += g("Perubahan CTA", m(ge, "cta"))
+            if (m(ge, "deconsol") != 0.0) groupRows += g("Pelepasan anak usaha yang disita", m(ge, "deconsol"))
+            groupRows += g("Ekuitas akhir", m(ge, "close"), "", total = true)
+            // Per entitas (mata uang lokal)
+            val eOrigin = origin("Anak usaha per entitas", "Bulan $closed", "Akuntansi anak usaha", closed,
+                "Pembukuan tiap anak usaha dalam mata uang lokal; laba dan ekuitas diterjemahkan ke jt RS pada kurs penutupan.",
+                "Pendapatan anak usaha dihitung dari operasinya sendiri, tidak dari rumus tetap.", ConfidenceTier.HIGH)
+            for ((cid, sb) in e.subsidiaries) {
+                val fx = e.foreignMeta.getValue(cid).fxToRs
+                val cur = sb.spec.currencyCode
+                entityRows += FinancialRowItem(sb.spec.title, "", "", if (sb.nationalized) "Dinasionalisasi" else if (sb.active) "Aktif ${sb.monthsActive} bulan · kurs ${fmt2(fx)} RS/$cur" else "Dalam pembangunan", true, SemanticTone.NEUTRAL_GRAY, eOrigin)
+                if (sb.active && !sb.nationalized) {
+                    val li = sb.lastIncomeLocal
+                    fun lv(k: String) = li[k] ?: 0.0
+                    entityRows += FinancialRowItem("    Pendapatan bulan ini", "${fmt(lv("revenue"))} jt $cur", money(lv("revenue") * fx), "Utilisasi ${fmt1(sb.lastUtilization * 100)}%", false, SemanticTone.NEUTRAL_GRAY, eOrigin)
+                    entityRows += FinancialRowItem("    EBIT", "${fmt(lv("ebit"))} jt $cur", money(lv("ebit") * fx), "", false, SemanticTone.NEUTRAL_GRAY, eOrigin)
+                    entityRows += FinancialRowItem("    Laba bersih", "${fmt(lv("ni"))} jt $cur", money(lv("ni") * fx), "Laba kumulatif ${fmt(sb.cumulativeTranslatedNiRs)} jt RS vs investasi ${fmt(sb.spentRs)} jt RS", false, SemanticTone.NEUTRAL_GRAY, eOrigin)
+                    entityRows += FinancialRowItem("    Ekuitas lokal", "${fmt(sb.localEquity)} jt $cur", money(sb.localEquity * fx), "Utang bank lokal ${fmt(sb.localDebt)} jt $cur", false, SemanticTone.NEUTRAL_GRAY, eOrigin)
+                    entityRows += FinancialRowItem("    Dividen siap ditarik", "${fmt(sb.retainedForeign)} jt $cur", money(sb.retainedForeign * fx), "Pajak withholding berlaku saat repatriasi", false, SemanticTone.NEUTRAL_GRAY, eOrigin)
+                }
+            }
+        }
+
         // ---- Eksekutif ----
         val agedAR = e.stuffedBuckets.filter { turn - it.first >= 3 }.sumOf { it.second }
         val executives = e.execs.map { x ->
@@ -874,6 +934,8 @@ class GameRepository(
             cashFlowRows = cashFlowRows,
             equityRows = eqRows,
             notesRows = notesRows,
+            groupRows = groupRows,
+            entityRows = entityRows,
             investments = investItems,
             investSummary = investSummary,
             executives = executives,

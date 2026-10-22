@@ -230,3 +230,11 @@ Tes baru: `EraCrisisTest` (satu krisis per era, dalam batas era, deterministik; 
 **Tes:** `checkConsolidated` kini dipanggil di uji tekanan Era 2 dan Era 3–4 (≈7.470 giliran-permainan dengan aksi acak, termasuk repatriasi, pinjaman lokal, transfer pricing, nasionalisasi): semua selisih < 1e-6. Satu kasus tepi (nasionalisasi anak usaha dengan laba ditahan) sempat gagal dan diperbaiki lewat baris pelepasan.
 
 **Masih belum:** laporan konsolidasi belum tampil di layar (hanya induk), dan laporan per entitas belum ada di UI.
+
+---
+
+## Build-27: laporan grup di layar dan audit transfer pricing berbasis laba yang digeser (Tahap 3)
+
+- Tab Laporan Keuangan menampilkan dua kartu baru bila ada anak usaha: "6. Laporan konsolidasi grup" (laba rugi, neraca, arus kas, perubahan ekuitas, dengan CTA dan pengaruh kurs) dan "7. Anak usaha per entitas" (pendapatan, EBIT, laba bersih, ekuitas lokal, dividen siap ditarik, dalam mata uang lokal dan RS). Terkompilasi di JVM untuk data/model; kartu Compose hanya terbukti lolos CI, belum dilihat di perangkat. Tes `GroupStatementsUiTest`: baris grup kosong tanpa anak usaha, 30 baris grup dan 6 baris entitas setelah anak usaha dibuka.
+- Peluang audit transfer pricing kini `0,001 + 70 × (laba digeser / pendapatan)^2,5` per bulan (maks 15%), dan denda ikut skala laba digeser. Sebelumnya peluang tetap 4,5% hanya untuk mode agresif. Hasil `TransferPricingAuditTest` (44 permainan × 80 giliran, Meridia): wajar 0 audit, optimal 34, agresif 119.
+- Rasio fee/pendapatan terukur (`tools/sim/Tp.kt`): optimal ±2,7%, agresif ±4,5% (bukan 3,2%/6,8% nominal, karena pendapatan sebenarnya lebih besar dari basis nominal).

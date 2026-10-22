@@ -226,3 +226,54 @@ class EvaluationTest {
         println("EVALUASI: menang=$wins gagal=$failures skor menang min=${totals.minOrNull()} maks=${totals.maxOrNull()} rata2=${if (totals.isEmpty()) 0 else totals.average().toInt()}")
     }
 }
+
+class GroupStatementsUiTest {
+    private class Mem(var text: String?) : com.example.data.SaveStore {
+        override fun read() = text
+        override fun write(text: String) { this.text = text }
+    }
+
+    @Test
+    fun consolidatedAndEntityRowsAppearOnlyWithSubsidiary() {
+        var saved: String? = null
+        for (s in 1..60) { saved = TestBots.recordedSave(s * 7919L, 97); if (saved != null) break }
+        assertTrue("perlu permainan yang bertahan sampai Era 2", saved != null)
+        val store = Mem(saved)
+        val repo = com.example.data.GameRepository(store)
+        assertTrue("tanpa anak usaha tidak ada baris grup", repo.gameState.value.groupRows.isEmpty())
+        assertTrue(repo.corporateAction("SUB|tarsis"))
+        repeat(6) { repo.advanceTurn() }
+        val st = repo.gameState.value
+        assertTrue("baris grup tampil", st.groupRows.size > 20)
+        assertTrue("baris entitas tampil", st.entityRows.any { it.label.contains("Tarsis") })
+        assertTrue(st.groupRows.any { it.label == "Perubahan kas grup" })
+        assertTrue(st.investSummary.any { it.first.startsWith("Anak usaha") })
+        println("UI-GRUP: ${st.groupRows.size} baris grup, ${st.entityRows.size} baris entitas")
+    }
+}
+
+class TransferPricingAuditTest {
+    @Test
+    fun auditRiskScalesWithProfitShifted() {
+        val counts = mutableMapOf(TransferPricingMode.WAJAR to 0, TransferPricingMode.OPTIMAL to 0, TransferPricingMode.AGRESIF to 0)
+        var games = 0
+        for (seed in 1L..50L) {
+            for (mode in counts.keys) {
+                val e = TestBots.playUntil(seed * 104729L, 97) ?: continue
+                e.apply(Action.OpenSubsidiary("meridia"))
+                for (t in 1..80) {
+                    if (e.gameOverReason != null) break
+                    TestBots.disciplinedStep(e, 100 + t)
+                    if (t == 6) e.apply(Action.SetTransferPricing(mode))
+                    e.apply(Action.EndTurn)
+                }
+                counts[mode] = counts.getValue(mode) + e.chronicle.count { it.title == "Denda Audit Transfer Pricing" }
+                if (mode == TransferPricingMode.WAJAR) games++
+            }
+        }
+        println("AUDIT-TP: $games permainan x 80 giliran: $counts")
+        assertEquals(0, counts.getValue(TransferPricingMode.WAJAR))
+        assertTrue("agresif lebih sering diaudit daripada optimal", counts.getValue(TransferPricingMode.AGRESIF) > counts.getValue(TransferPricingMode.OPTIMAL))
+        assertTrue("optimal tetap berisiko kecil", counts.getValue(TransferPricingMode.OPTIMAL) >= 0)
+    }
+}

@@ -2052,14 +2052,18 @@ class KapitalEngine(val seed: Long) {
             sub.periodDivPaidLocal = 0.0
         }
 
-        // Audit Transfer Pricing lintas batas jika memakai mode AGRESIF
-        if (transferPricingMode == TransferPricingMode.AGRESIF && rOps.nextDouble() < 0.045) {
-            val tpPenalty = 620.0 * sc.size * costIndex
-            oneOffOpex += tpPenalty
-            recordEthicsEvidence("transfer_pricing_audit", 1.2, "exec_cfo", "meridia")
-            lines += ReportLine("Otoritas pajak gabungan mengaudit skema Transfer Pricing Agresif Meridia Anda: denda kurang bayar ${fmt(tpPenalty)} jt RS.", Tone.BAD)
-            chronicle += ChronicleItem(turn, "Denda Audit Transfer Pricing", "Skema pengalihan laba ke Meridia dikoreksi kantor pajak.",
-                "Transfer pricing agresif → audit lintas batas → denda pajak.")
+        // Audit transfer pricing: peluang bergantung pada seberapa besar laba yang digeser dibanding pendapatan induk (bukan peluang tetap)
+        val shiftRatio = periodIntercompanyFeeToSubRs / max(1.0, baseNormalRevenue(1.0))
+        if (transferPricingMode != TransferPricingMode.WAJAR && shiftRatio > 0.0) {
+            val auditP = (0.001 + 70.0 * Math.pow(shiftRatio, 2.5)).coerceAtMost(0.15)
+            if (rOps.nextDouble() < auditP) {
+                val tpPenalty = 620.0 * sc.size * costIndex * (shiftRatio / 0.045).coerceIn(0.25, 1.5)
+                oneOffOpex += tpPenalty
+                recordEthicsEvidence("transfer_pricing_audit", if (transferPricingMode == TransferPricingMode.AGRESIF) 1.2 else 0.4, "exec_cfo", "meridia")
+                lines += ReportLine("Otoritas pajak mengaudit skema transfer pricing (${transferPricingMode.label}); laba digeser ${fmt1(shiftRatio * 100)}% dari pendapatan. Koreksi dan denda ${fmt(tpPenalty)} jt RS.", Tone.BAD)
+                chronicle += ChronicleItem(turn, "Denda Audit Transfer Pricing", "Skema pengalihan laba ke yurisdiksi pajak rendah dikoreksi kantor pajak.",
+                    "Transfer pricing → laba digeser besar dibanding aktivitas → audit lintas batas → denda pajak.")
+            }
         }
 
         // Operasi Unit Bank/Asuransi Grup & Uji Penurunan Nilai Goodwill (Era 3)

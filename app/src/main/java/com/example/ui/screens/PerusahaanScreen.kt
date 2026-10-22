@@ -214,6 +214,20 @@ private fun LaporanKeuanganTabContent(
                     rows = gameState.notesRows,
                     onInspectOrigin = onInspectOrigin
                 )
+                if (gameState.groupRows.isNotEmpty()) {
+                    FinancialStatementTableCard(
+                        title = "6. Laporan konsolidasi grup",
+                        subtitle = "Induk + anak usaha, setelah eliminasi · jt RS",
+                        rows = gameState.groupRows,
+                        onInspectOrigin = onInspectOrigin
+                    )
+                    FinancialStatementTableCard(
+                        title = "7. Anak usaha per entitas",
+                        subtitle = "Pembukuan mata uang lokal dan terjemahan ke RS",
+                        rows = gameState.entityRows,
+                        onInspectOrigin = onInspectOrigin
+                    )
+                }
             }
         }
     } else {
@@ -247,6 +261,20 @@ private fun LaporanKeuanganTabContent(
             rows = gameState.notesRows,
             onInspectOrigin = onInspectOrigin
         )
+        if (gameState.groupRows.isNotEmpty()) {
+            FinancialStatementTableCard(
+                title = "6. Laporan konsolidasi grup",
+                subtitle = "Induk + anak usaha, setelah eliminasi · jt RS",
+                rows = gameState.groupRows,
+                onInspectOrigin = onInspectOrigin
+            )
+            FinancialStatementTableCard(
+                title = "7. Anak usaha per entitas",
+                subtitle = "Pembukuan mata uang lokal dan terjemahan ke RS",
+                rows = gameState.entityRows,
+                onInspectOrigin = onInspectOrigin
+            )
+        }
     }
 }
 

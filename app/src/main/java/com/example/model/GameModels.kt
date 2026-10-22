@@ -366,6 +366,8 @@ data class GameState(
     val cashFlowRows: List<FinancialRowItem>,
     val equityRows: List<FinancialRowItem> = emptyList(),
     val notesRows: List<FinancialRowItem> = emptyList(),
+    val groupRows: List<FinancialRowItem> = emptyList(),
+    val entityRows: List<FinancialRowItem> = emptyList(),
     val investments: List<InvestItem> = emptyList(),
     val investSummary: List<Pair<String, String>> = emptyList(),
     val executives: List<Executive>,
