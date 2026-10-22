@@ -471,6 +471,7 @@ class KapitalEngine(val seed: Long) {
     var factoringUsedCount = 0; private set
     private val eventLastFired = HashMap<String, Int>()
     private var eventCounter = 0
+    var eventsRaised = 0; private set
     var ethicsLoad = 0.0; private set
     var lastEventResult = ""; private set
     var dumpingUntil = -1; private set
@@ -1000,8 +1001,8 @@ class KapitalEngine(val seed: Long) {
                 if (target != priceAdjPct && spend(1)) { priceAdjPct = target; true } else false
             }
             is Action.SetDifficulty -> {
-                difficulty = action.difficulty
-                true
+                // Hanya sah sebagai tindakan pertama permainan; mengganti kesulitan di tengah jalan = curang.
+                if (actionCount == 0 && turn == sc.turn0) { difficulty = action.difficulty; true } else false
             }
             is Action.OpenSubsidiary -> eraBlock(2) == null && doOpenSubsidiary(action.countryId)
             is Action.SetTransferPricing -> {
@@ -1667,7 +1668,7 @@ class KapitalEngine(val seed: Long) {
         val d = EventDeck.draw(eventCtx(), r, openEvents.map { it.templateId }.toSet(), eventLastFired, eventCounter++, difficulty.eventRateMult)
         d.event?.let { ev ->
             if (openEvents.size < 3) {
-                openEvents += ev; eventLastFired[ev.templateId] = turn
+                openEvents += ev; eventsRaised++; eventLastFired[ev.templateId] = turn
                 lines += ReportLine("Kartu keputusan baru: ${ev.title}.", Tone.WARN)
             }
         }
@@ -2690,6 +2691,10 @@ class KapitalEngine(val seed: Long) {
     // =====================================================================
     // Koran pagi: satu topik, lima sudut pandang dengan akurasi berbeda
     // =====================================================================
+    /** Angka di kabar media bisnis meleset sesuai kesulitan (Magang: akurat; Krisis Abadi: ±21%). */
+    private fun noisy(v: Double, r: Random): Double =
+        v * (1.0 + (r.nextDouble() * 2 - 1) * 0.12 * (difficulty.noiseMult - 0.25).coerceAtLeast(0.0))
+
     private fun generateNews(r: Random): List<NewsPiece> {
         val topics = mutableListOf<String>()
         if (turn < electionTurn) topics += listOf("pemilu", "bunga")
@@ -2720,7 +2725,7 @@ class KapitalEngine(val seed: Long) {
         }
         return when (topic) {
             "upah" -> listOf(
-                piece("BISNIS", "Survei: upah pabrik tekstil naik rata-rata ${fmt1(inflationAnnual * 0.8)}% tahun ini", "Asosiasi pengusaha mencatat tekanan upah di kawasan industri.", 1),
+                piece("BISNIS", "Survei: upah pabrik tekstil naik rata-rata ${fmt1(noisy(inflationAnnual * 0.8, r))}% tahun ini", "Asosiasi pengusaha mencatat tekanan upah di kawasan industri.", 1),
                 piece("PRO_PEMERINTAH", "Pemerintah: kenaikan upah akan 'terukur dan adil'", "Menteri tenaga kerja menolak tuntutan di atas inflasi.", 0),
                 piece("OPOSISI", "Harga pangan melonjak, buruh tekstil makin terjepit", "Mimbar Rakyat: upah riil menurun sejak tahun lalu.", 1),
                 piece("SENSASIONAL", "MOGOK NASIONAL TEKSTIL SEBULAN LAGI?!", "Sumber anonim di grup pesan pekerja.", 0, true),
@@ -2728,7 +2733,7 @@ class KapitalEngine(val seed: Long) {
                     "Analisis data upah dan wawancara pengurus serikat.", 2)
             )
             "kapas" -> listOf(
-                piece("BISNIS", if (cot > 1.0) "Harga kapas naik, margin pabrik tertekan" else "Harga kapas turun, peluang menekan HPP", "Indeks kapas ${fmt2(cot)} dari basis 1,00.", 1),
+                piece("BISNIS", if (cot > 1.0) "Harga kapas naik, margin pabrik tertekan" else "Harga kapas turun, peluang menekan HPP", "Indeks kapas ${fmt2(noisy(cot, r))} dari basis 1,00.", 1),
                 piece("PRO_PEMERINTAH", "Pasokan kapas nasional aman", "Kementerian perdagangan menyebut stok cukup.", 0),
                 piece("OPOSISI", "Petani kapas dan pabrik sama-sama dirugikan tengkulak", "Wawancara di sentra Tarsis.", 1),
                 piece("SENSASIONAL", if (cot > 1.0) "KAPAS LANGKA! Harga bisa dobel bulan depan!" else "Kapas anjlok, pasar kolaps!", "Spekulasi di grup pedagang.", 0, true),
@@ -2749,7 +2754,7 @@ class KapitalEngine(val seed: Long) {
                 piece("INDEPENDEN", "Data bank: kredit macet tekstil naik, bank mengetatkan syarat dan menaikkan spread", "Laporan statistik perbankan.", 2)
             )
             "pesaing" -> listOf(
-                piece("BISNIS", "Perang harga kain di kalangan produsen menengah", "Rata-rata harga pesaing turun ${fmt1((1.0 - world.rivalAveragePrice()) * 100)}%.", 1),
+                piece("BISNIS", "Perang harga kain di kalangan produsen menengah", "Rata-rata harga pesaing turun ${fmt1(noisy((1.0 - world.rivalAveragePrice()) * 100, r))}%.", 1),
                 piece("PRO_PEMERINTAH", "Persaingan sehat menguntungkan konsumen", "Pejabat memuji harga lebih murah.", 0),
                 piece("OPOSISI", "Perang harga tekan upah pekerja", "Serikat khawatir PHK.", 1),
                 piece("SENSASIONAL", "PESAING BANTING HARGA 50%!", "Pesan dari agen penjualan yang melebih-lebihkan.", 0, true),

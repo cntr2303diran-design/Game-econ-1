@@ -1,6 +1,7 @@
 package com.example.data
 
 import com.example.engine.Action
+import com.example.engine.Difficulty
 import com.example.engine.FactoryScheme
 import com.example.engine.KapitalEngine
 import com.example.engine.KapitalEngine.Companion.dateText
@@ -171,10 +172,12 @@ class GameRepository(
         perform(Action.EndTurn)
     }
 
-    fun newGame() {
+    fun newGame(difficulty: Difficulty = Difficulty.MANAJER) {
         seed = System.currentTimeMillis()
         log.clear()
         engine = KapitalEngine(seed)
+        val first = Action.SetDifficulty(difficulty)
+        if (engine.apply(first)) log += first.encode()
         ui = UiFlags(isDarkTheme = ui.isDarkTheme)
         persist()
         publish()
@@ -185,6 +188,7 @@ class GameRepository(
      * tindakan nomor [actionIndex]. Dunia (cuaca, pemilu, rumor) identik; hanya pilihan Anda berbeda.
      */
     fun runCounterfactual(actionIndex: Int) {
+        if (engine.difficulty.ironman) return
         val alt = KapitalEngine(seed)
         log.forEachIndexed { i, line ->
             if (i == actionIndex) return@forEachIndexed
@@ -826,7 +830,7 @@ class GameRepository(
 
         val chronicles = e.chronicle.reversed().map {
             ChronicleEntry(it.turn, dateText(it.turn), "Era ${KapitalEngine.era(it.turn)}", it.title, it.description, it.causalChain,
-                canReplayCounterfactual = it.actionIndex != null && turn - it.turn >= 12, actionIndex = it.actionIndex)
+                canReplayCounterfactual = !engine.difficulty.ironman && it.actionIndex != null && turn - it.turn >= 12, actionIndex = it.actionIndex)
         }
 
         // ---- Pesaing dan pasar produk (estimasi intel ±1,5%, bukan angka pasti) ----

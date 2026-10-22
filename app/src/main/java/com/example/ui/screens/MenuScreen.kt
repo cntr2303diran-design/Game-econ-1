@@ -25,13 +25,14 @@ import com.example.ui.theme.NotoSerifFontFamily
 fun MenuScreen(
     gameState: GameState,
     onContinue: () -> Unit,
-    onNewGame: () -> Unit,
+    onNewGame: (com.example.engine.Difficulty) -> Unit,
     onToggleTheme: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showHow by rememberSaveable { mutableStateOf(false) }
     var showAbout by rememberSaveable { mutableStateOf(false) }
     var confirmNew by rememberSaveable { mutableStateOf(false) }
+    var pickDifficulty by rememberSaveable { mutableStateOf(false) }
 
     Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(
@@ -93,7 +94,7 @@ fun MenuScreen(
                 ) { Text("Permainan baru", style = MaterialTheme.typography.titleMedium) }
             } else {
                 Button(
-                    onClick = onNewGame,
+                    onClick = { pickDifficulty = true },
                     shape = RoundedCornerShape(6.dp),
                     modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("menu_new_game")
                 ) { Text("Mulai permainan", style = MaterialTheme.typography.titleMedium) }
@@ -117,8 +118,32 @@ fun MenuScreen(
             onDismissRequest = { confirmNew = false },
             title = { Text("Mulai permainan baru?") },
             text = { Text("Permainan tersimpan pada ${gameState.dateText} akan dihapus dan diganti dunia baru dengan seed berbeda.") },
-            confirmButton = { Button(onClick = { confirmNew = false; onNewGame() }) { Text("Ya, mulai baru") } },
+            confirmButton = { Button(onClick = { confirmNew = false; pickDifficulty = true }) { Text("Ya, lanjut") } },
             dismissButton = { OutlinedButton(onClick = { confirmNew = false }) { Text("Tidak") } }
+        )
+    }
+    if (pickDifficulty) {
+        AlertDialog(
+            onDismissRequest = { pickDifficulty = false },
+            title = { Text("Pilih tingkat kesulitan") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    com.example.engine.Difficulty.values().forEach { d ->
+                        OutlinedButton(
+                            onClick = { pickDifficulty = false; onNewGame(d) },
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.fillMaxWidth().testTag("difficulty_${d.name}")
+                        ) {
+                            Column(Modifier.fillMaxWidth()) {
+                                Text(d.label, style = MaterialTheme.typography.titleSmall)
+                                Text(d.description, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { OutlinedButton(onClick = { pickDifficulty = false }) { Text("Batal") } }
         )
     }
     if (showHow) {

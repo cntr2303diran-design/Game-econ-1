@@ -191,8 +191,8 @@ fun KapitalAppScaffold(
                             launchSingleTop = true
                         }
                     },
-                    onNewGame = {
-                        viewModel.newGame()
+                    onNewGame = { dif ->
+                        viewModel.newGame(dif)
                         navController.navigate(ROUTE_MARKAS) {
                             popUpTo(ROUTE_MENU) { inclusive = true }
                             launchSingleTop = true

@@ -277,3 +277,68 @@ class TransferPricingAuditTest {
         assertTrue("optimal tetap berisiko kecil", counts.getValue(TransferPricingMode.OPTIMAL) >= 0)
     }
 }
+
+class RivalLearningTest {
+    private fun run(seed: Long, style: String): Pair<String, Double> {
+        val e = KapitalEngine(seed)
+        val profiles = mutableSetOf<String>()
+        for (t in 1..40) {
+            if (e.gameOverReason != null) break
+            TestBots.disciplinedStep(e, t)
+            when (style) {
+                "cut" -> e.apply(Action.AdjustPrice(-3))
+                "premium" -> { e.apply(Action.AdjustPrice(3)); if (t == 3) e.apply(Action.Invest("brand")) }
+            }
+            e.apply(Action.EndTurn)
+            profiles += e.world.learnedPlayerProfile
+        }
+        return profiles.filter { it.isNotBlank() }.joinToString(" | ") to e.world.rivals.sumOf { it.learnedAggressionMod }
+    }
+
+    @Test
+    fun rivalsReactDifferentlyToDifferentPlayStyles_sameSeed() {
+        var different = 0; var cutAggr = 0.0; var premAggr = 0.0; var n = 0
+        for (seed in 1L..40L) {
+            val (pc, ac) = run(seed * 6151L, "cut")
+            val (pp, ap) = run(seed * 6151L, "premium")
+            if (pc != pp) different++
+            cutAggr += ac; premAggr += ap; n++
+        }
+        println("RIVAL: profil berbeda di $different/$n seed; agresivitas total rata2: potong harga=${"%.2f".format(cutAggr / n)} premium=${"%.2f".format(premAggr / n)}")
+        assertTrue("pesaing harus membaca gaya berbeda", different >= n * 0.6)
+        assertTrue("potong harga memicu agresivitas lebih tinggi", cutAggr > premAggr)
+    }
+}
+
+class DifficultyTest {
+    @Test
+    fun difficultyOnlyAsFirstAction_andSurvivesReplay() {
+        val e = KapitalEngine(77L)
+        assertTrue(e.apply(Action.SetDifficulty(Difficulty.DIREKTUR)))
+        assertEquals(Difficulty.DIREKTUR, e.difficulty)
+        e.apply(Action.EndTurn)
+        assertFalse("ganti kesulitan di tengah jalan ditolak", e.apply(Action.SetDifficulty(Difficulty.MAGANG)))
+        assertEquals(Difficulty.DIREKTUR, e.difficulty)
+        val e2 = KapitalEngine(77L)
+        for (l in listOf(Action.SetDifficulty(Difficulty.DIREKTUR).encode(), Action.EndTurn.encode())) Action.decode(l)?.let { e2.apply(it) }
+        assertEquals(Difficulty.DIREKTUR, e2.difficulty)
+    }
+
+    @Test
+    fun harderDifficultyMeansMoreEventsAndLowerSurvival() {
+        fun stats(d: Difficulty): Pair<Double, Double> {
+            var ev = 0; var alive = 0; val n = 30
+            for (seed in 1L..n) {
+                val e = KapitalEngine(seed * 4421L); e.apply(Action.SetDifficulty(d))
+                var raised = 0
+                for (t in 1..48) { if (e.gameOverReason != null) break; TestBots.disciplinedStep(e, t); e.apply(Action.EndTurn) }
+                ev += e.eventsRaised; if (e.gameOverReason == null) alive++
+            }
+            return ev.toDouble() / n to alive.toDouble() / n
+        }
+        val m = stats(Difficulty.MAGANG); val k = stats(Difficulty.KRISIS_ABADI)
+        println("DIFF: magang kejadian=${"%.1f".format(m.first)} hidup=${"%.2f".format(m.second)} | krisis kejadian=${"%.1f".format(k.first)} hidup=${"%.2f".format(k.second)}")
+        assertTrue(k.first > m.first)
+        assertTrue(k.second <= m.second)
+    }
+}
