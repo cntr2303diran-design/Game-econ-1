@@ -46,3 +46,8 @@ Catatan jujur tiap mekanik ada di `docs/AUDIT_vs_KONSEP.md` (baris B4a–B9).
 `engine/EventCards.kt` (arketipe, pemicu, pembangun kartu, undian) + `CardData1–14.kt` (tabel; format baris di `EventCards.parse`, kolom 15–16 opsional: lama jendela, jeda). 621 kartu, 106 berantai. Kartu generator diundi dari aliran acak 125 (peluang `CardTuning.drawChance`=0,20 per giliran, skala `CardTuning.severityScale`); dek lama (`EventDeck.baseTemplates`) tidak menyentuh kartu generator. Menambah kartu: tambah baris ke tabel, jalankan `CardDeckTest ChainCardsTest`; kartu berantai harus dirujuk satu aturan rantai di baris kartu pemicunya (`target:pilihan:peluang:tunda:sebab`).
 Keseimbangan dengan kartu (200 seed): pasif 35%, cakap 62%; tanpa kartu 40%/64%. Kematian Era 1 masih di atas target (C3).
 
+## Tahap C — C2 (UI) dan C3 (keseimbangan) — status
+- C2: kartu "Riwayat perusahaan" (grafik kas, ekuitas, laba; `IntelContent.kt`, `OperationsView.cashSeries/equitySeries/niSeries`), butir tutorial kartu dan Intel, deskripsi aksesibilitas untuk grafik saham dan riwayat. **UI belum diverifikasi di perangkat/emulator**; hanya kompilasi CI. Daftar uji manual: `docs/UJI_MANUAL_UI.md`.
+- C3: `BalanceTuning.covenantScale`=0,6 (di `KapitalEngine.kt`). Bot: `TestBots.disciplinedStep` (pasif), `ActiveBot` (cakap), `RecklessBot` (sembrono). Seed baru 1001–1250: pasif 40% (Era 1: 20%), cakap 66% (16%), sembrono 0%. Umpan balik pemain manusia: isi `docs/UMPAN_BALIK_PLAYTEST.md`.
+- Tes yang menonaktifkan sakelar demi mengisolasi sifat yang diuji: `ForensicsTest.windowDress...` (kartu dan covenant dimatikan).
+
