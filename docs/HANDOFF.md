@@ -28,7 +28,7 @@ Bot pasif disiplin menang 132/300 (44%); bot aktif 192/300 (64%). Rincian dan ca
 
 ## Belum dikerjakan / risiko
 1. Tampilan Compose belum pernah dilihat di perangkat; hanya terbukti kompilasi di CI.
-2. Kartu kejadian 42 dari target ±600 — kekurangan konten terbesar. Cara menambah: templat baru di `Events.kt`, ikuti pola `Template(id, kategori, jeda, bobot) { ... }`; tes `ChainCardsTest` memvalidasi semua kartu.
+2. Kartu kejadian: 621 (selesai di C1, lihat bagian Tahap C); menambah lagi = baris baru di `engine/CardData*.kt`.
 3. Multiplayer belum dimulai (sesuai desain, terakhir).
 4. Derivatif: opsi valas, futures kapas, swap suku bunga sudah ada (B4b); CDS dan opsi jual belum. Withholding NCI dan grafik harga saham selesai (B4c); tag-along belum.
 5. Transisi era berbasis kalender; kinerja hanya memengaruhi syarat kredit.
@@ -41,3 +41,8 @@ Tes baru: `DerivativesTest`, `MinorityTest`, `ForensicsTest`, `LawTest`, `Actors
 Simpanan: `GameRepository(store, seedOverride, slots: SlotStore?)`; lima slot autosave bergilir tiap 6 giliran (baris `META:` setelah `SEED:`), tidak ada pada Ironman; "Permainan baru" tanpa argumen mewarisi kesulitan.
 Bot uji: `ActiveBot` (di `TestBots.kt`) mengatur harga, cadangan kas untuk belanja non-produktif, batas leverage, lindung nilai, asuransi; sakelar `ActiveBotTuning` untuk eksperimen. Keseimbangan terukur: pasif ±41% (300 seed), aktif ±64% (200 seed).
 Catatan jujur tiap mekanik ada di `docs/AUDIT_vs_KONSEP.md` (baris B4a–B9).
+
+## Tahap C — C1 (dek kartu) — status
+`engine/EventCards.kt` (arketipe, pemicu, pembangun kartu, undian) + `CardData1–14.kt` (tabel; format baris di `EventCards.parse`, kolom 15–16 opsional: lama jendela, jeda). 621 kartu, 106 berantai. Kartu generator diundi dari aliran acak 125 (peluang `CardTuning.drawChance`=0,20 per giliran, skala `CardTuning.severityScale`); dek lama (`EventDeck.baseTemplates`) tidak menyentuh kartu generator. Menambah kartu: tambah baris ke tabel, jalankan `CardDeckTest ChainCardsTest`; kartu berantai harus dirujuk satu aturan rantai di baris kartu pemicunya (`target:pilihan:peluang:tunda:sebab`).
+Keseimbangan dengan kartu (200 seed): pasif 35%, cakap 62%; tanpa kartu 40%/64%. Kematian Era 1 masih di atas target (C3).
+
