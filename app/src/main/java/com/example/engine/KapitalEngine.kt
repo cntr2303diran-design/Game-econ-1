@@ -819,7 +819,7 @@ class KapitalEngine(val seed: Long) {
 
     fun monthlyInterest(): Double = loans.sumOf { loanBalanceRs(it) * it.annualRatePct / 100.0 / 12.0 }
 
-    fun covenantThreshold(): Double = loans.filter { it.balance > 0.5 }.maxOfOrNull { it.covenantIcr } ?: 0.0
+    fun covenantThreshold(): Double = (loans.filter { it.balance > 0.5 }.maxOfOrNull { it.covenantIcr } ?: 0.0) * BalanceTuning.covenantScale
 
     fun estimateMonth(): Map<String, Double> {
         val normalRev = baseNormalRevenue(1.0)
@@ -4051,4 +4051,11 @@ class KapitalEngine(val seed: Long) {
         fun fmt2(x: Double): String = String.format(idLocale, "%.2f", x)
         fun signed(x: Double): String = (if (x >= 0) "+" else "−") + fmt(abs(x))
     }
+}
+
+
+/** C3: sakelar keseimbangan global yang disetel lewat simulasi besar (lihat docs/AUDIT_vs_KONSEP.md, baris C3). */
+object BalanceTuning {
+    /** Pengali batas ICR covenant bank (1,0 = nilai skenario apa adanya). */
+    @JvmField var covenantScale = 1.0
 }
