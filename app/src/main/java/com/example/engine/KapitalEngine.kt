@@ -4056,6 +4056,6 @@ class KapitalEngine(val seed: Long) {
 
 /** C3: sakelar keseimbangan global yang disetel lewat simulasi besar (lihat docs/AUDIT_vs_KONSEP.md, baris C3). */
 object BalanceTuning {
-    /** Pengali batas ICR covenant bank (1,0 = nilai skenario apa adanya). */
-    @JvmField var covenantScale = 1.0
+    /** Pengali batas ICR covenant bank (1,0 = nilai skenario apa adanya). 0,6 hasil sapuan C3: kematian Era 1 pasif 34%→18%, cakap 23%→13%. */
+    @JvmField var covenantScale = 0.6
 }

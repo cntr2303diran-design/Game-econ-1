@@ -142,7 +142,7 @@ class MinorityTest {
     @Test
     fun deterministic_sameActionsSameResult() {
         fun run(): Double {
-            val e = withSub(4L) ?: withSub(5L)!!
+            val e = (4L..14L).firstNotNullOf { withSub(it) } // bukan semua seed bertahan sampai giliran 130 (keseimbangan berubah di C3)
             e.apply(Action.SellSubStake("tarsis", 10, 25))
             repeat(3) { TestBots.disciplinedStep(e, 500 + it); e.apply(Action.EndTurn) }
             e.apply(Action.SellSubStake("tarsis", 10, 30))

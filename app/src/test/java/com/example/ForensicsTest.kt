@@ -32,9 +32,11 @@ class ForensicsTest {
     fun windowDress_isTimingOnly_cashNeutralNowAndProfitNeutralLater() {
         // Kartu generator dipicu keadaan dunia (kas, laba), jadi percantikan menggeser kartu yang muncul dan
         // mengaburkan selisih yang diuji. Undian kartu dimatikan agar hanya efek percantikan yang terukur.
-        val oldDraw = CardTuning.drawChance
-        CardTuning.drawChance = 0.0
-        try { windowDressBody() } finally { CardTuning.drawChance = oldDraw }
+        // Uji covenant juga dimatikan: percantikan memang dapat menggeser lulus/gagalnya uji covenant (manfaat nyata
+        // yang dikejar dan dihukum auditor), dan itu bukan 'uang gratis' yang sedang diuji di sini.
+        val oldDraw = CardTuning.drawChance; val oldCov = BalanceTuning.covenantScale
+        CardTuning.drawChance = 0.0; BalanceTuning.covenantScale = 0.0
+        try { windowDressBody() } finally { CardTuning.drawChance = oldDraw; BalanceTuning.covenantScale = oldCov }
     }
 
     private fun windowDressBody() {
