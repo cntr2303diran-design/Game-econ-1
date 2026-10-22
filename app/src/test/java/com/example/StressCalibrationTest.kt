@@ -27,6 +27,22 @@ class StressCalibrationTest {
         else -> null
     }
 
+    /** Pemeriksaan laporan konsolidasi: arus kas = perubahan kas grup, laba rugi dan ekuitas konsolidasi cocok. Mengembalikan kas grup akhir. */
+    private fun checkConsolidated(e: KapitalEngine, prevCash: Double, ctx: String): Double {
+        val tol = 1e-6
+        val cash = e.lastConsolidatedBalance["cash"] ?: return prevCash
+        val net = e.lastConsolidatedCashFlow["net"] ?: return cash
+        if (!prevCash.isNaN()) assertTrue("arus kas konsolidasi $ctx: dKas=${cash - prevCash} net=$net", abs((cash - prevCash) - net) < tol)
+        val ci = e.lastConsolidatedIncome
+        if (ci.isNotEmpty()) {
+            assertTrue("NI konsolidasi $ctx", abs((ci["ebt"] ?: 0.0) - (ci["tax"] ?: 0.0) - (ci["ni"] ?: 0.0)) < tol)
+            assertTrue("EBIT konsolidasi $ctx", abs((ci["revenue"] ?: 0.0) - (ci["cogs"] ?: 0.0) - (ci["opex"] ?: 0.0) - (ci["maint"] ?: 0.0) - (ci["dep"] ?: 0.0) - (ci["baddebt"] ?: 0.0) - (ci["ebit"] ?: 0.0)) < tol)
+        }
+        val eqr = e.lastConsolidatedEquity["resid"] ?: 0.0
+        assertTrue("ekuitas konsolidasi $ctx resid=$eqr", abs(eqr) < tol)
+        return cash
+    }
+
     private fun check(e: KapitalEngine, ctx: String) {
         val tol = 1e-6
         assertTrue("induk $ctx", abs(e.totalAssets() - (e.totalLiabilities() + e.equity)) < tol)
@@ -49,12 +65,14 @@ class StressCalibrationTest {
             // Maju dulu ke Era 2 (giliran 100) dengan bot disiplin supaya fitur lintas batas terbuka; lewati bila perusahaan sudah gagal
             val e = TestBots.playUntil(seed * 104729L, 100) ?: continue
             val r = java.util.Random(seed)
+            var prevCons = e.lastConsolidatedBalance["cash"] ?: Double.NaN
             for (t in 1..60) {
                 if (e.gameOverReason != null) break
                 repeat(2) { randomAction(r, e)?.let { a -> e.apply(a) } }
                 for (ev in e.openEvents.toList()) e.apply(Action.EventChoice(ev.id, ev.options[r.nextInt(ev.options.size)].id))
                 e.apply(Action.EndTurn)
                 check(e, "seed=$seed t=${e.turn}")
+                prevCons = checkConsolidated(e, prevCons, "seed=$seed t=${e.turn}")
                 worst = maxOf(worst, abs(e.totalAssets() - e.totalLiabilities() - e.equity))
                 turns++
             }
@@ -70,12 +88,14 @@ class StressCalibrationTest {
             for (seed in 1L..40L) {
                 val e = TestBots.playUntil(seed * 15485863L, startTurn) ?: continue
                 val r = java.util.Random(seed + startTurn)
+                var prevCons = e.lastConsolidatedBalance["cash"] ?: Double.NaN
                 for (t in 1..60) {
                     if (e.gameOverReason != null) break
                     TestBots.disciplinedStep(e, 100 + t)
                     repeat(2) { randomAction(r, e)?.let { a -> e.apply(a) } }
                     e.apply(Action.EndTurn)
                     check(e, "era-mulai=$startTurn seed=$seed t=${e.turn}")
+                    prevCons = checkConsolidated(e, prevCons, "era-mulai=$startTurn seed=$seed t=${e.turn}")
                     turns++
                 }
             }

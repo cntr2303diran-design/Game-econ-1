@@ -313,6 +313,7 @@ class KapitalEngine(val seed: Long) {
         var periodCapitalInjectedLocal: Double = 0.0
         var periodNewDebtLocal: Double = 0.0
         var periodDivPaidLocal: Double = 0.0
+        var lastDivPaidLocal: Double = 0.0
 
         var lastIncomeLocal: Map<String, Double> = emptyMap()
         var lastBalanceLocal: Map<String, Double> = emptyMap()
@@ -338,6 +339,9 @@ class KapitalEngine(val seed: Long) {
     val subsidiaryInvestmentRs: Double get() = investmentInSubsRs
     var goodwill: Double = 0.0; private set
     var ctaEquity: Double = 0.0; private set
+    var lastConsolidatedEquity: Map<String, Double> = emptyMap(); private set
+    private var consEquityPrev: Double = Double.NaN
+    private var ctaPrev: Double = 0.0
     var lastConsolidatedIncome: Map<String, Double> = emptyMap(); private set
     var lastConsolidatedBalance: Map<String, Double> = emptyMap(); private set
     var lastConsolidatedCashFlow: Map<String, Double> = emptyMap(); private set
@@ -358,6 +362,10 @@ class KapitalEngine(val seed: Long) {
 
     private var pendingWithholdingTaxRs: Double = 0.0
     private var periodSubInvestOutRs: Double = 0.0
+    private var periodSubCashAcquiredRs: Double = 0.0
+    private var periodSubSeizedCashRs: Double = 0.0
+    private var periodSubDeconsolRs: Double = 0.0
+    private val subCashSnap = mutableMapOf<String, Pair<Double, Double>>()
     private var periodSubDivInGrossRs: Double = 0.0
     private var periodGoodwillImpairmentRs: Double = 0.0
     private var periodIntercompanyFeeToSubRs: Double = 0.0
@@ -1416,6 +1424,7 @@ class KapitalEngine(val seed: Long) {
             sub.invLocal = capLocal * 0.12
             sub.arLocal = capLocal * 0.08
             sub.cashLocal = capLocal * 0.08
+            periodSubCashAcquiredRs += sub.cashLocal * foreignMeta.getValue(cid).fxToRs
             if (cid == "kestrel") dualSourcing = true
             lines += ReportLine("Anak usaha luar negeri resmi beroperasi: ${sub.spec.title} di ${sub.spec.countryName}. ${sub.spec.benefitText}", Tone.GOOD)
             chronicle += ChronicleItem(turn, "Anak Usaha Beroperasi: ${sub.spec.title}", sub.spec.benefitText,
@@ -1953,6 +1962,8 @@ class KapitalEngine(val seed: Long) {
             }
             if (meta.tensionScore >= 86 && rOps.nextDouble() < 0.03) {
                 sub.nationalized = true
+                subCashSnap.remove(cid)?.let { periodSubSeizedCashRs += it.first * it.second }
+                periodSubDeconsolRs -= sub.retainedEarningsHistoricalRs()
                 val lostInvRs = sub.paidInCapitalHistoricalRs
                 investmentInSubsRs = max(0.0, investmentInSubsRs - lostInvRs)
                 equity -= lostInvRs
@@ -2037,6 +2048,7 @@ class KapitalEngine(val seed: Long) {
                 "net" to (subCfoLocal + subCfiLocal + subCffLocal)
             )
             sub.periodNewDebtLocal = 0.0
+            sub.lastDivPaidLocal = sub.periodDivPaidLocal
             sub.periodDivPaidLocal = 0.0
         }
 
@@ -2558,6 +2570,14 @@ class KapitalEngine(val seed: Long) {
             val consTax = tax + sumSubInc("tax")
             val consNi = ni + sumSubInc("ni")
             ctaEquity = computeCtaEquity()
+            val consEqClose = consolidatedEquity()
+            val parentDirect = (periodCureIn - periodTradeFees - periodSubWriteOffRs - periodGoodwillImpairmentRs + mtm + divInCash - factorDiscount - eqFx - dividend)
+            val consOpen = if (consEquityPrev.isNaN()) consEqClose - consNi - parentDirect - (ctaEquity - ctaPrev) else consEquityPrev
+            lastConsolidatedEquity = mapOf(
+                "open" to consOpen, "ni" to consNi, "direct" to parentDirect, "cta" to (ctaEquity - ctaPrev), "deconsol" to periodSubDeconsolRs,
+                "close" to consEqClose, "resid" to (consEqClose - consOpen - consNi - parentDirect - (ctaEquity - ctaPrev) - periodSubDeconsolRs)
+            )
+            consEquityPrev = consEqClose; ctaPrev = ctaEquity
             lastConsolidatedIncome = mapOf(
                 "revenue" to consRev, "cogs" to consCogs, "opex" to consOpex, "maint" to maint,
                 "dep" to consDep, "baddebt" to writeOff, "ebit" to consEbit, "interest" to consInt,
@@ -2566,18 +2586,32 @@ class KapitalEngine(val seed: Long) {
             )
             lastConsolidatedBalance = consolidatedBalanceSnapshot()
             val consCfo = cfo + sumSubCf("cfo")
-            // Eliminasi arus kas suntikan modal induk ke anak usaha & dividen anak usaha ke induk pada level grup
-            val consCfi = (-capex - periodInvestOut + periodInvestIn + divInCash) + sumSubCf("cfi")
-            val consCff = (newDebt - principal + rcfFlow - forcedPay + factorProceeds - dividend + periodCureIn) + sumSubCf("cff") + icDivElim
+            // Dividen internal dieliminasi pada nilai penutupan yang dipakai di sisi anak usaha; selisih kurs dividen dalam perjalanan masuk ke pengaruh kurs
+            val icDivElimClose = validSubs.sumOf { it.lastDivPaidLocal * foreignMeta.getValue(it.spec.countryId).fxToRs }
+            // Investasi: belanja modal induk + pembangunan anak usaha (kas keluar grup) - kas anak usaha yang diperoleh saat aktivasi + investasi saham + CFI lokal
+            val consCfi = (-capex - periodSubInvestOutRs - periodInvestOut + periodInvestIn + divInCash) + sumSubCf("cfi") + periodSubCashAcquiredRs
+            val consCff = (newDebt - principal + rcfFlow - forcedPay + factorProceeds - dividend + periodCureIn) + sumSubCf("cff") + icDivElimClose
+            // Pengaruh kurs terhadap kas: saldo kas awal anak usaha (dikurangi dividen yang ditarik) dinilai ulang ke kurs penutupan
+            var fxCash = 0.0
+            for ((cid, snap) in subCashSnap) {
+                val sub = subsidiaries[cid] ?: continue
+                if (!sub.active || sub.nationalized) continue
+                fxCash += (snap.first - sub.lastDivPaidLocal) * (foreignMeta.getValue(cid).fxToRs - snap.second)
+            }
+            val consNet = consCfo + consCfi + consCff + fxCash - periodSubSeizedCashRs
             lastConsolidatedCashFlow = mapOf(
                 "cfo" to consCfo, "cfi" to consCfi, "cff" to consCff,
-                "elim_div" to -icDivElim, "net" to (consCfo + consCfi + consCff)
+                "fx_cash" to fxCash, "seized_cash" to -periodSubSeizedCashRs, "sub_cash_acquired" to periodSubCashAcquiredRs,
+                "elim_div" to -icDivElimClose, "net" to consNet
             )
+            subCashSnap.clear()
+            for ((cid, sub) in subsidiaries) if (sub.active && !sub.nationalized) subCashSnap[cid] = Pair(sub.cashLocal, foreignMeta.getValue(cid).fxToRs)
         }
 
         periodInvestIn = 0.0; periodInvestOut = 0.0; periodStartCash = cash
         periodCureIn = 0.0; periodTradeFees = 0.0; periodStartEquity = equity
         periodSubInvestOutRs = 0.0; periodSubDivInGrossRs = 0.0; periodGoodwillImpairmentRs = 0.0
+        periodSubCashAcquiredRs = 0.0; periodSubSeizedCashRs = 0.0; periodSubDeconsolRs = 0.0
         revenueHist += revenue
         cashHist += cash
         kursHist += kurs

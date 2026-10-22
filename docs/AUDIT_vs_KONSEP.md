@@ -215,3 +215,18 @@ Tes baru: `EraCrisisTest` (satu krisis per era, dalam batas era, deterministik; 
 - Panel akhir permainan (`GameOverPanel`) kini menampilkan kelas, arketipe, skor total dan 5 pilar (nilai riil 30%, ketahanan 20%, kalibrasi keputusan 20%, etika 15%, sosial 15%) dari `evaluateCampaign()` lewat `GameState.evaluationTitle/evaluationRows`. Sebelumnya hanya teks ringkas di laporan bulanan.
 - Tes `EvaluationTest` (40 seed, bot disiplin sampai akhir): semua skor dalam 0..100; kegagalan selalu Kelas F, pemenang tidak pernah F. Hasil: 15 menang, 25 gagal; skor pemenang 53–87, rata-rata 74.
 - Belum ada: grafik atau tabel pembanding antar kampanye, post-mortem naratif yang menautkan keputusan ke skor, dan kalibrasi rumus skor terhadap pemain manusia (bobot dan konstanta adalah perkiraan).
+
+---
+
+## Build-26: laporan konsolidasi yang benar-benar cocok (Tahap 3)
+
+**Temuan:** arus kas konsolidasi (`lastConsolidatedCashFlow`) tidak cocok dengan perubahan kas grup: selisih terbesar **3.870 jt RS** pada 2.928 giliran uji (`tools/sim/Cons.kt`). Penyebab: pembangunan anak usaha tidak dihitung sebagai kas keluar grup, kas awal anak usaha saat aktivasi muncul tanpa baris arus kas, pengaruh kurs atas kas anak usaha tidak ada, dan dividen internal dieliminasi pada kurs yang berbeda. Pernyataan "Selesai" dan "identitas lulus" di dokumen Argon untuk konsolidasi hanya berlaku untuk neraca (aset = liabilitas + ekuitas), yang memang tidak menguji arus kas.
+
+**Perbaikan** (`KapitalEngine.kt`):
+- Arus kas konsolidasi kini punya baris: operasi, investasi (termasuk pembangunan anak usaha dan kas anak usaha yang diperoleh saat aktivasi), pendanaan (dividen internal dieliminasi), pengaruh kurs atas kas, dan kas disita (nasionalisasi). Selisih terhadap perubahan kas grup: 2e-11.
+- Laporan perubahan ekuitas konsolidasi baru (`lastConsolidatedEquity`): saldo awal + laba bersih konsolidasi + komponen langsung ke ekuitas induk + perubahan CTA + pelepasan anak usaha yang disita = saldo akhir. Sisa: 1e-10.
+- Laba rugi konsolidasi: pemecahan EBIT dan NI cocok (1e-11).
+
+**Tes:** `checkConsolidated` kini dipanggil di uji tekanan Era 2 dan Era 3–4 (≈7.470 giliran-permainan dengan aksi acak, termasuk repatriasi, pinjaman lokal, transfer pricing, nasionalisasi): semua selisih < 1e-6. Satu kasus tepi (nasionalisasi anak usaha dengan laba ditahan) sempat gagal dan diperbaiki lewat baris pelepasan.
+
+**Masih belum:** laporan konsolidasi belum tampil di layar (hanya induk), dan laporan per entitas belum ada di UI.
