@@ -342,3 +342,15 @@ class DifficultyTest {
         assertTrue(k.second <= m.second)
     }
 }
+
+class EraReviewTest {
+    @Test
+    fun eraReviewRecordedAtEachBoundary_andDeterministic() {
+        val a = TestBots.firstSurvivor(240).eraGrades.toList()
+        val b = TestBots.firstSurvivor(240).eraGrades.toList()
+        println("ERAGRADES: $a")
+        assertEquals(a, b)
+        assertTrue("rapor Era 1 dan 2 tercatat", a.size >= 2)
+        assertTrue(a.all { it in 0..100 })
+    }
+}

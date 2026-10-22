@@ -476,6 +476,8 @@ class KapitalEngine(val seed: Long) {
     var lastEventResult = ""; private set
     var dumpingUntil = -1; private set
     private var creditShock = 0.0
+    /** Nilai rapor (0–100) pada akhir tiap era; indeks 0 = akhir Era 1. */
+    val eraGrades = mutableListOf<Int>()
     private var pendingCapex = 0.0
     private var pendingPrepay = 0.0
     private var pendingWriteoff = 0.0
@@ -832,6 +834,25 @@ class KapitalEngine(val seed: Long) {
     }
 
     /** Evaluasi 5 komponen kemenangan kampanye sesuai Bagian 19 Dokumen Desain. */
+    /**
+     * Rapor akhir era: era berganti menurut kalender dunia, tetapi kinerja Anda menentukan
+     * warisan yang dibawa: rapor kuat menurunkan tekanan kredit (kreditur percaya), rapor rapuh
+     * menaikkannya (kreditur menuntut premi) dan memicu pengawasan.
+     */
+    private fun eraTransitionReview(endingEra: Int, out: MutableList<ReportLine>) {
+        val g = evaluateCampaign().totalScore
+        eraGrades += g
+        val label = when { g >= 75 -> "Cemerlang"; g >= 55 -> "Memadai"; else -> "Rapuh" }
+        val effect = when {
+            g >= 75 -> { creditShock = (creditShock - 0.25).coerceAtLeast(-0.25); "Kreditur dan pemasok memperlonggar syarat memasuki era berikutnya." }
+            g >= 55 -> "Tidak ada perubahan syarat kredit."
+            else -> { creditShock += 0.35; "Kreditur menuntut premi risiko lebih tinggi memasuki era berikutnya." }
+        }
+        val title = "Rapor Era $endingEra (${ERA_NAMES[endingEra - 1]}): $label ($g/100)"
+        out += ReportLine("$title. $effect", if (g >= 75) Tone.GOOD else if (g >= 55) Tone.INFO else Tone.BAD)
+        chronicle += ChronicleItem(turn, title, effect, "Kinerja era → rapor → syarat kredit era berikutnya.")
+    }
+
     fun evaluateCampaign(): CampaignEvaluation {
         // 1. Nilai perusahaan riil disesuaikan inflasi (30%) — menggunakan Ekuitas Konsolidasi Grup
         val realEquityMultiple = (consolidatedEquity() / max(0.5, priceIndex)) / max(1000.0, initialEquity)
@@ -2637,6 +2658,7 @@ class KapitalEngine(val seed: Long) {
                 "$gameOverReason ${eval.summaryText}", "Lihat post-mortem dan evaluasi 5 komponen.")
         }
 
+        if (gameOverReason == null && era(turn + 1) != era(turn)) eraTransitionReview(era(turn), lines)
         turn += 1
         currentEra = era(turn)
         ap = apMax
