@@ -124,3 +124,29 @@ object ActiveBot {
         }
     }
 }
+
+/**
+ * C3: bot sembrono. Mewakili pemain yang mengabaikan peringatan: selalu memilih opsi paling berisiko pada kartu,
+ * mengekspansi tanpa memeriksa kas atau covenant, menurunkan harga terus, memoles laporan tiap bulan, tanpa
+ * lindung nilai, asuransi, auditor, ataupun suntikan modal. Dipakai hanya untuk mengukur keseimbangan: strategi
+ * ceroboh harus jarang menang.
+ */
+object RecklessBot {
+    fun step(e: KapitalEngine, t: Int) {
+        if (e.gameOverReason != null) return
+        val era = KapitalEngine.era(e.turn)
+        val n = e.sc.size
+        for (ev in e.openEvents.toList()) {
+            val o = ev.options.lastOrNull() ?: continue
+            e.apply(Action.EventChoice(ev.id, o.id))
+        }
+        if (e.priceAdjPct > -15) e.apply(Action.AdjustPrice(-3))
+        if (e.cash > 6000.0 * n && e.extraLines < 3) e.apply(Action.Invest("line"))
+        if (t % 12 == 5) e.apply(Action.WindowDress(50))
+        if (era >= 2 && t % 6 == 3 && e.cash > 8000.0 * n) for (c in listOf("tarsis", "kestrel")) e.apply(Action.OpenSubsidiary(c))
+        if (era >= 3) {
+            if (!e.isPublicCompany && e.ipoBlock() == null) e.apply(Action.ExecuteIpo(30, true))
+            if (e.isPublicCompany && e.cash > 10000.0 * n) e.apply(Action.Buyback((e.cash * 0.5).toInt().coerceAtLeast(1000)))
+        }
+    }
+}
