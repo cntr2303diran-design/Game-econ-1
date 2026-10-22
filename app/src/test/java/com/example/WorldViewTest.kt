@@ -30,4 +30,24 @@ class WorldViewTest {
         val s1 = repo.gameState.value
         assertTrue(s1.countries.filter { it.id != "sundara" }.all { it.electionCountdown.isNotBlank() })
     }
+
+    @Test
+    fun straitClosures_occurNaturally_rareEarly_andMoreOftenLater() {
+        val n = 20
+        var seedsWith = 0; var months = 0; var total = 0; val perEra = IntArray(5)
+        for (seed in 1L..n) {
+            val e = KapitalEngine(seed * 2654435761L % 100000007L)
+            var t = 0; var any = false
+            while (e.gameOverReason == null && e.turn < 481) {
+                t++; TestBots.disciplinedStep(e, t); if (e.gameOverReason != null) break
+                e.apply(Action.EndTurn); total++
+                val closed = e.dunia.geo.straits.any { e.dunia.geo.strait(it.id) > 0.0 }
+                if (closed) { months++; any = true; perEra[KapitalEngine.era(e.turn)]++ }
+            }
+            if (any) seedsWith++
+        }
+        assertTrue("selat harus menutup secara alami pada sebagian seed ($seedsWith/$n)", seedsWith >= 5)
+        assertTrue("penutupan harus langka, bukan keadaan normal: $months/$total", months < 0.15 * total)
+        assertTrue("era akhir lebih sering daripada era 1: ${perEra.toList()}", perEra[3] + perEra[4] > perEra[1])
+    }
 }

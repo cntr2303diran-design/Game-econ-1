@@ -17,14 +17,14 @@ Toleransi 1e-6, diuji tiap giliran oleh `StressCalibrationTest`: aset = liabilit
 ## Menjalankan
 - CI: `.github/workflows/build-apk.yml` membangun APK pada tiap push.
 - Tes lokal tanpa Android: kompilasi `engine/`, `data/`, `model/` dengan kotlinc JVM + stub JUnit; kelas tes ada di `app/src/test`. Simulasi tambahan di `tools/sim/`.
-- Skrip `tools/run-tests.sh` (set `KOTLINC_HOME`) menjalankan seluruh suite tanpa Android SDK (±3–6 menit). Tes Tahap A: `AgentScaleTest`, `WorldLayerTest`, `MacroPlusTest`, `MarketTest`, `CreditSystemTest`, `LongCyclesTest`, `PerformanceTest`, `StageAStressTest` (≥5.000 giliran acak, semua lapisan).
+- Skrip `tools/run-tests.sh` (set `KOTLINC_HOME`) menjalankan seluruh suite tanpa Android SDK (±3–6 menit). Tes Tahap A: `AgentScaleTest`, `WorldLayerTest`, `MacroPlusTest`, `MarketTest`, `CreditSystemTest`, `LongCyclesTest`, `PerformanceTest`, `StageAStressTest` (≥5.000 giliran acak, semua lapisan), `WorldViewTest` (tampilan dunia hidup, selat menutup alami).
 - Tes kunci: `StressCalibrationTest` (identitas, determinisme), `NciTest`, `StockTest`, `BalanceTest` (bot pasif vs aktif), `RivalLearningTest`, `DifficultyTest`, `EraReviewTest`, `SuccessionTest`.
 
 ## Fitur yang selesai (terbukti oleh tes)
 Pilihan kesulitan (4 tingkat, tersimpan sebagai aksi pertama); pesaing belajar dari gaya pemain; kartu berantai; krisis makro per era; anak usaha multi-mata-uang + CTA + transfer pricing + tarif/risiko politik; laporan konsolidasi + per entitas; IPO, harga saham, dividen/saham, buyback, SPO; kepentingan non-pengendali; obligasi, bank grup, media/lobi, karbon; suksesi CEO dengan serah terima Desember 2068; evaluasi 5 komponen.
 
 ## Keseimbangan terukur (akhir Tahap A: 300 seed, 480 giliran)
-Bot pasif disiplin menang 133/300 (44%); bot aktif 189/300 (63%). Rincian dan catatan kalibrasi: `docs/AUDIT_vs_KONSEP.md`. (Angka lama 60 seed: pasif 28/60, aktif 33–34/60.) Kematian Era 1 ±20% (fase bertahan hidup, disengaja), Era 4 ±15% (sisa guncangan Era 3 dan serah terima darurat). Selisih aktif vs pasif masih tipis: bot aktif belum mengelola leverage. **Belum disetel oleh manusia.**
+Bot pasif disiplin menang 132/300 (44%); bot aktif 192/300 (64%). Rincian dan catatan kalibrasi: `docs/AUDIT_vs_KONSEP.md`. (Angka lama 60 seed: pasif 28/60, aktif 33–34/60.) Kematian Era 1 ±20% (fase bertahan hidup, disengaja), Era 4 ±15% (sisa guncangan Era 3 dan serah terima darurat). Selisih aktif vs pasif masih tipis: bot aktif belum mengelola leverage. **Belum disetel oleh manusia.**
 
 ## Belum dikerjakan / risiko
 1. Tampilan Compose belum pernah dilihat di perangkat; hanya terbukti kompilasi di CI.
