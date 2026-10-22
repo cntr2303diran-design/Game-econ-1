@@ -174,7 +174,9 @@ class SectorModel {
         rateDrag: Double,
         geo: Geopolitics,
         climateStress: Double,
-        notes: MutableList<DuniaNote>
+        notes: MutableList<DuniaNote>,
+        /** Ketahanan energi 0..0,4 (energi terbarukan): meredam dampak sanksi dan selat energi. */
+        energyResilience: Double = 0.0
     ): SectorResult {
         // 1. Kapasitas: pulih bertahap dari guncangan; guncangan acak sektoral; sanksi; selat.
         val tension = geo.meanTension()
@@ -191,10 +193,10 @@ class SectorModel {
         val capHit = DoubleArray(n)
         for (i in 0 until n) capHit[i] = shockSize[i]
         for (sn in geo.sanctions) for (sec in sn.sectors) {
-            capHit[sec.ordinal] += 0.28 * sn.severity * supplyShare(sec, sn.target)
+            capHit[sec.ordinal] += 0.28 * sn.severity * supplyShare(sec, sn.target) * (if (sec == Sector.ENERGI) 1.0 - energyResilience else 1.0)
         }
         val closureEnergi = geo.strait("selat_energi"); val closureChip = geo.strait("selat_chip"); val closurePangan = geo.strait("selat_pangan")
-        capHit[Sector.ENERGI.ordinal] += 0.30 * closureEnergi
+        capHit[Sector.ENERGI.ordinal] += 0.30 * closureEnergi * (1.0 - energyResilience)
         capHit[Sector.TEKNOLOGI.ordinal] += 0.35 * closureChip
         capHit[Sector.MANUFAKTUR.ordinal] += 0.30 * closureChip
         capHit[Sector.PANGAN.ordinal] += 0.25 * closurePangan

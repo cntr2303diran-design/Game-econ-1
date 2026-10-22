@@ -7,6 +7,7 @@ Status per commit terakhir di cabang `claude/simulasi-era1` (PR #1). Dokumen ini
 - `engine/Actions.kt` — semua aksi pemain + encode/decode. Menambah aksi: tambah `data class`, kode di `encode()`, `decode()`, cabang di `apply`.
 - `engine/Events.kt` — dek kartu kejadian (42 templat, 9 hanya-berantai), `chainRules`, `Effect(kind, a, b, s)` yang ditangani `applyEffect` di mesin.
 - `engine/World.kt` (pesaing yang belajar), `Bourse.kt`, `Credit.kt`, `Commodities.kt`, `Scenario.kt` (awal permainan acak).
+- **Lapisan dunia (Tahap A)**, dikendalikan `engine/Dunia.kt` dan dipanggil sekali per `EndTurn` sebelum loop negara asing: `Countries.kt` (24 negara), `Geopolitics.kt` (ketegangan, sanksi, selat, pemilu), `Sectors.kt` (Leontief + rantai), `MacroPlus.kt` (fiskal, kurva, peringkat, bank sentral, panik), `Banking.kt` (2.000 perusahaan, 120 bank), `Market.kt` (buku pesanan 5.000 investor), `DataDesk.kt` (rilis data), `LongCycles.kt` (demografi, iklim, teknologi), `Agents.kt` (kohort rumah tangga). Aliran acak 101–108 dipakai lapisan dunia; jangan memakai ulang. Prinsip: lapisan ini **tidak membuat arus kas**; ia hanya mengubah permintaan, biaya pemain (`cogsRatio`), kurs, premi kredit, dan bias Taylor.
 - `data/GameRepository.kt` — jembatan mesin ke UI: menyusun semua baris laporan, menyimpan log aksi. `viewmodel/`, `ui/` — Compose.
 - Era: 4 era (giliran 1–96, 97–228, 229–372, 373–480). Fitur dikunci lewat `eraBlock(n)`. Rapor akhir era menggeser syarat kredit era berikutnya.
 
@@ -16,13 +17,14 @@ Toleransi 1e-6, diuji tiap giliran oleh `StressCalibrationTest`: aset = liabilit
 ## Menjalankan
 - CI: `.github/workflows/build-apk.yml` membangun APK pada tiap push.
 - Tes lokal tanpa Android: kompilasi `engine/`, `data/`, `model/` dengan kotlinc JVM + stub JUnit; kelas tes ada di `app/src/test`. Simulasi tambahan di `tools/sim/`.
+- Skrip `tools/run-tests.sh` (set `KOTLINC_HOME`) menjalankan seluruh suite tanpa Android SDK (±3–6 menit). Tes Tahap A: `AgentScaleTest`, `WorldLayerTest`, `MacroPlusTest`, `MarketTest`, `CreditSystemTest`, `LongCyclesTest`, `PerformanceTest`, `StageAStressTest` (≥5.000 giliran acak, semua lapisan).
 - Tes kunci: `StressCalibrationTest` (identitas, determinisme), `NciTest`, `StockTest`, `BalanceTest` (bot pasif vs aktif), `RivalLearningTest`, `DifficultyTest`, `EraReviewTest`, `SuccessionTest`.
 
 ## Fitur yang selesai (terbukti oleh tes)
 Pilihan kesulitan (4 tingkat, tersimpan sebagai aksi pertama); pesaing belajar dari gaya pemain; kartu berantai; krisis makro per era; anak usaha multi-mata-uang + CTA + transfer pricing + tarif/risiko politik; laporan konsolidasi + per entitas; IPO, harga saham, dividen/saham, buyback, SPO; kepentingan non-pengendali; obligasi, bank grup, media/lobi, karbon; suksesi CEO dengan serah terima Desember 2068; evaluasi 5 komponen.
 
-## Keseimbangan terukur (60 seed, 480 giliran)
-Bot pasif disiplin menang 28/60; bot aktif 33–34/60. Kematian Era 1 ±20% (fase bertahan hidup, disengaja), Era 4 ±15% (sisa guncangan Era 3 dan serah terima darurat). Selisih aktif vs pasif masih tipis: bot aktif belum mengelola leverage. **Belum disetel oleh manusia.**
+## Keseimbangan terukur (akhir Tahap A: 300 seed, 480 giliran)
+Bot pasif disiplin menang 133/300 (44%); bot aktif 189/300 (63%). Rincian dan catatan kalibrasi: `docs/AUDIT_vs_KONSEP.md`. (Angka lama 60 seed: pasif 28/60, aktif 33–34/60.) Kematian Era 1 ±20% (fase bertahan hidup, disengaja), Era 4 ±15% (sisa guncangan Era 3 dan serah terima darurat). Selisih aktif vs pasif masih tipis: bot aktif belum mengelola leverage. **Belum disetel oleh manusia.**
 
 ## Belum dikerjakan / risiko
 1. Tampilan Compose belum pernah dilihat di perangkat; hanya terbukti kompilasi di CI.

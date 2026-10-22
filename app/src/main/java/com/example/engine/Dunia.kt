@@ -34,7 +34,11 @@ class DuniaEffects(
     val policyBias: Double,
     val notes: List<DuniaNote>,
     /** Bias aturan Taylor bank sentral negara inti asing. */
-    val foreignBias: Map<String, Double> = emptyMap()
+    val foreignBias: Map<String, Double> = emptyMap(),
+    /** Kejutan berita dari rilis data resmi untuk pasar saham (-0,05..0,05). */
+    val news: Double = 0.0,
+    /** Tekanan risk-off 0..1 untuk institusi (panik perbankan, ketegangan geopolitik). */
+    val riskOff: Double = 0.0
 ) {
     companion object {
         val NEUTRAL = DuniaEffects(0.0, 1.0, 0.0, 0.0, 0.0, emptyList())
@@ -64,6 +68,9 @@ class Dunia(seed: Long, sundaraElectionTurn: Int, sundaraBaseTension: Map<String
     val secondary = SecondaryWorld()
     val sectors = SectorModel()
     val macro = MacroPlus(seed)
+    val data = DataDesk()
+    val credit = CreditSystem(seed)
+    val cycles = LongCycles(seed)
 
     private val discovered = HashSet<String>()
     private var lastCostBand = 0
@@ -80,7 +87,8 @@ class Dunia(seed: Long, sundaraElectionTurn: Int, sundaraBaseTension: Map<String
         val crisisPressure = if (ctx.crisisActive) 0.30 else 0.0
         geo.step(ctx.turn, rng(101), crisisPressure, ctx.macro, notes)
         secondary.step(ctx.turn, rng(102), ctx.linkedBlocks, ctx.anchorGrowth, ctx.oilIndex, notes)
-        val sr = sectors.step(rng(103), ctx.gap, ctx.rateDrag, geo, 0.0, notes)
+        val lc = cycles.step(ctx.turn, rng(108), sectors, notes)
+        val sr = sectors.step(rng(103), ctx.gap, ctx.rateDrag, geo, lc.climateStress, notes, lc.energyResilience)
 
         // Paparan sanksi tersembunyi baru terungkap saat sanksi sudah menyentuhnya (bom waktu rantai pasok).
         if (!sectors.chainAudited) {
@@ -100,7 +108,7 @@ class Dunia(seed: Long, sundaraElectionTurn: Int, sundaraBaseTension: Map<String
 
         val k = DuniaTuning.effectScale * (if (KapitalEngine.era(ctx.turn) == 1) DuniaTuning.era1Gate else 1.0)
         val demand = ((sr.demandAdj + exportAdj) * k).coerceIn(-0.03, 0.01)
-        val cost = 1.0 + (sr.playerCostMult.coerceIn(0.97, 1.25) - 1.0) * k
+        val cost = 1.0 + ((sr.playerCostMult * lc.costMult).coerceIn(0.94, 1.25) - 1.0) * k
         val band = if (cost >= 1.10) 2 else if (cost >= 1.04) 1 else 0
         if (band > lastCostBand) {
             notes += DuniaNote("Biaya rantai pasok Anda naik sekitar ${((cost - 1.0) * 100).toInt()}% akibat sanksi, kelangkaan sektor, atau gangguan hulu.",
@@ -110,12 +118,20 @@ class Dunia(seed: Long, sundaraElectionTurn: Int, sundaraBaseTension: Map<String
 
         val mx = macro.step(
             ctx.turn, rng(104), ctx.macroInput, geo,
-            if (linked.isEmpty()) 1.0 else linked.average(), ctx.oilIndex, ctx.crisisActive, notes
+            if (linked.isEmpty()) 1.0 else linked.average(), ctx.oilIndex, ctx.crisisActive, notes,
+            credit.countries.getValue("sundara").fragileShare, { id -> credit.countries[id]?.recapCost ?: 0.0 },
+            { id -> cycles.agingCost(id, ctx.turn) }
         )
-        val demandAll = (demand + mx.demandAdd * k).coerceIn(-0.04, 0.01)
+        credit.step(rng(106), ctx.macroInput, sr.playerCostMult, sectors.availability, macro.panic, notes)
+        val sc = credit.countries.getValue("sundara")
+        val creditStress = 0.03 * sc.weakShare + 0.0008 * (sc.defaultRate - 2.4).coerceAtLeast(0.0)
+        val dd = data.step(ctx.turn, rng(105), ctx.macroInput, notes)
+        val riskOff = (0.5 * macro.panic / 100.0 + 0.5 * ((geo.meanTensionOf("sundara") - 50.0) / 40.0).coerceIn(0.0, 1.0)).coerceIn(0.0, 1.0)
+        val demandAll = (demand + (mx.demandAdd - 0.004 * sc.weakShare + lc.demand) * k).coerceIn(-0.04, 0.01)
         val fx = DuniaEffects(
-            demandAll, cost, (sr.creditAdd * 0.2 + mx.creditAdd) * k, mx.kursDrift * k, mx.policyBias * k, notes,
-            mx.foreignBias.mapValues { it.value * k }
+            demandAll, cost, (sr.creditAdd * 0.2 + mx.creditAdd + creditStress) * k, mx.kursDrift * k, mx.policyBias * k, notes,
+            mx.foreignBias.mapValues { it.value * k },
+            dd.news, riskOff
         )
         lastEffects = fx
         return fx

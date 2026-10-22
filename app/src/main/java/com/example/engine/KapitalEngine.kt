@@ -257,6 +257,9 @@ class KapitalEngine(val seed: Long) {
         val m = LinkedHashMap<String, Int>()
         m["rumah_tangga"] = world.householdSector.agents + foreign.values.sumOf { it.householdSector.agents }
         // Pemerintah dan bank sentral: satu objek hidup per negara (24) di modul makro lanjut (A5).
+        m["perusahaan"] = dunia.credit.firmCount
+        m["bank"] = dunia.credit.bankCount
+        m["investor"] = InvestorPool.TOTAL
         m["pemerintah"] = dunia.macro.states.size
         m["bank_sentral"] = dunia.macro.states.size
         return m
@@ -381,6 +384,7 @@ class KapitalEngine(val seed: Long) {
     var stockSentiment = 0.0; private set
     val stockHistory = mutableListOf<Double>()
     private var emaNi = 0.0
+    private var stockFairMc = 0.0
     var buybackTotalRs = 0.0; private set
     var sharesRetiredM = 0.0; private set
     var lastDividendPerShare = 0.0; private set
@@ -886,8 +890,17 @@ class KapitalEngine(val seed: Long) {
         emaNi = 0.9 * emaNi + 0.1 * ni
         val fair = max(max(0.6 * equity, 11.0 * 12.0 * emaNi), 0.25 * max(equity, 1.0)).coerceAtLeast(1.0)
         val r = rng(61)
-        stockSentiment = 0.9 * stockSentiment + (r.nextDouble() * 2 - 1) * 0.045
-        stockSentiment = stockSentiment.coerceIn(-0.9, 0.6)
+        // Harga ditentukan buku pesanan 5.000 investor (A6). Kapitalisasi tersirat = nilai wajar bulan lalu x e^sentimen;
+        // kabar fundamental baru (nilai wajar bergeser) hanya masuk lewat arus pesanan investor nilai, bukan lompatan instan.
+        if (stockFairMc <= 0.0) stockFairMc = fair
+        // Kabar fundamental langsung sebagian tercermin (pengumuman); sisanya lewat arus pesanan (seperti emiten bursa).
+        val jump = 0.6 * Math.log(fair / stockFairMc).coerceIn(-0.5, 0.5)
+        val lnMis = Math.log(fair) - Math.log(stockFairMc) - stockSentiment - jump
+        val h = stockHistory
+        val ret3m = if (h.size >= 4 && h.last() > 0.0 && h[h.size - 4] > 0.0) Math.log(h.last() / h[h.size - 4]) / 3.0 else 0.0
+        val flow = bourse.book.trade("PLAYER", r, lnMis, ret3m, 1.0, bourse.mood + dunia.lastEffects.news, dunia.lastEffects.riskOff)
+        stockSentiment = (stockSentiment + jump + flow.dLnPrice + 0.03 * stdNormal(r) + Math.log(stockFairMc) - Math.log(fair)).coerceIn(-0.9, 0.6)
+        stockFairMc = fair
         stockPrice = fair * Math.exp(stockSentiment) / sharesOutM
         stockHistory += stockPrice
         if (stockHistory.size > 480) stockHistory.removeAt(0)
@@ -1410,6 +1423,7 @@ class KapitalEngine(val seed: Long) {
         founderSharesM = sharesOutM * founderSharePct / 100.0
         stockPrice = valuation / sharesOutM
         stockSentiment = 0.0
+        stockFairMc = valuation
         emaNi = max(0.0, ebitHist.takeLast(3).average() * 0.65)
         stockHistory += stockPrice
         cash += netProceeds
@@ -2109,7 +2123,8 @@ class KapitalEngine(val seed: Long) {
                 { id -> world.rivalShareOf(id, rpPlayer) },
                 { id -> world.rivals.first { it.id == id }.price },
                 { id -> world.rivals.first { it.id == id }.active },
-                { id -> world.rivals.first { it.id == id }.share0 }))
+                { id -> world.rivals.first { it.id == id }.share0 },
+                dunia.lastEffects.news, dunia.lastEffects.riskOff))
             var divIn = 0.0
             for ((id, lots) in holdings) {
                 val c = bourse.company(id) ?: continue

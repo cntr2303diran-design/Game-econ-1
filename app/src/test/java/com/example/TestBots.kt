@@ -33,7 +33,7 @@ object TestBots {
     }
 
     /** Teks simpanan (SEED + aksi) dari permainan disiplin sampai [targetTurn], untuk menguji GameRepository; null bila gagal. */
-    fun recordedSave(seed: Long, targetTurn: Int): String? {
+    fun recordedSave(seed: Long, targetTurn: Int, accept: (KapitalEngine) -> Boolean = { true }): String? {
         val eng = KapitalEngine(seed)
         val rec = mutableListOf<String>()
         var t = 0
@@ -43,12 +43,13 @@ object TestBots {
             disciplinedStep(eng, t, rec)
             if (eng.apply(Action.EndTurn)) rec.add(Action.EndTurn.encode())
         }
+        if (eng.gameOverReason != null || !accept(eng)) return null
         return (listOf("SEED:$seed") + rec).joinToString("\n")
     }
 
     /** Cari seed pertama yang bertahan sampai [targetTurn]. */
-    fun firstSurvivor(targetTurn: Int, maxSeeds: Int = 80): KapitalEngine {
-        for (s in 1..maxSeeds) playUntil(s * 7919L, targetTurn)?.let { return it }
+    fun firstSurvivor(targetTurn: Int, maxSeeds: Int = 80, accept: (KapitalEngine) -> Boolean = { true }): KapitalEngine {
+        for (s in 1..maxSeeds) playUntil(s * 7919L, targetTurn)?.let { if (accept(it)) return it }
         throw AssertionError("tidak ada seed yang bertahan sampai giliran $targetTurn dalam $maxSeeds percobaan")
     }
 }

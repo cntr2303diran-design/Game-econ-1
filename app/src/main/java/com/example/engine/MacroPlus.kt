@@ -130,7 +130,13 @@ class MacroPlus(private val seed: Long) {
         exportIndex: Double,
         oilIndex: Double,
         crisis: Boolean,
-        notes: MutableList<DuniaNote>
+        notes: MutableList<DuniaNote>,
+        /** Porsi bank rapuh (CAR < 6%) di Sundara, dari sistem kredit agen. */
+        bankFragile: Double = 0.0,
+        /** Biaya penyelamatan bank bulan ini (% PDB) per negara; menambah utang pemerintah. */
+        recapCost: (String) -> Double = { 0.0 },
+        /** Biaya penuaan dan kesehatan (% PDB per tahun) di atas level awal, dari modul demografi. */
+        agingCost: (String) -> Double = { 0.0 }
     ): MacroEffects {
         var creditAdd = 0.0
         var demandAdd = 0.0
@@ -155,11 +161,11 @@ class MacroPlus(private val seed: Long) {
 
             // ---- Fiskal: stabilisator otomatis + haluan pemilu + pengetatan bila utang melewati dasar ----
             val interest = s.debtGdp * s.yield10 / 100.0
-            val primary = 0.01 * s.debtBase - 0.4 * inp.gap * 100.0 + st.deficitAdd - 0.04 * (s.debtGdp - s.debtBase)
+            val primary = 0.01 * s.debtBase - 0.4 * inp.gap * 100.0 + st.deficitAdd + agingCost(id) - 0.04 * (s.debtGdp - s.debtBase)
             s.primaryDeficit = primary
             s.deficit = primary + interest // % PDB per tahun
             val nominal = inp.growthAnnual + inp.inflation
-            s.debtGdp = (s.debtGdp + (primary + interest - s.debtGdp * nominal / 100.0) / 12.0).coerceIn(10.0, 260.0)
+            s.debtGdp = (s.debtGdp + (primary + interest - s.debtGdp * nominal / 100.0) / 12.0 + recapCost(id)).coerceIn(10.0, 260.0)
 
             // ---- Peringkat: skor dihaluskan, perubahan satu anak tangga dengan histeresis 2 poin ----
             s.score += 0.12 * (rawScore(s, inp, geo) - s.score)
@@ -219,7 +225,8 @@ class MacroPlus(private val seed: Long) {
             15.0 * ((sin.inflation - 8.0) / 10.0).coerceIn(0.0, 1.0) +
             15.0 * ((tension - 55.0) / 35.0).coerceIn(0.0, 1.0) +
             10.0 * (-su.slope / 2.0).coerceIn(0.0, 1.0) +
-            10.0 * ((su.debtGdp - 90.0) / 60.0).coerceIn(0.0, 1.0) -
+            10.0 * ((su.debtGdp - 90.0) / 60.0).coerceIn(0.0, 1.0) +
+            15.0 * bankFragile.coerceIn(0.0, 1.0) -
             5.0 * su.guidanceCredibility
         downgradePulse *= 0.9
         panic = (0.85 * panic + 0.15 * stress.coerceIn(0.0, 100.0)).coerceIn(0.0, 100.0)

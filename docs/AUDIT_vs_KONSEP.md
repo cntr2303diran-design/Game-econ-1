@@ -1,28 +1,52 @@
 # Audit KAPITAL: kondisi game saat ini dibanding Dokumen Desain Induk Terpadu
 
-Tanggal audit: 21 Oktober 2026 (build setelah penambahan Bursa dan Meja Kredit).
+Tanggal audit: 22 Oktober 2026 (diperbarui setelah Tahap A; bagian bawah dokumen adalah catatan build lama yang dipertahankan sebagai riwayat).
 Dasar: PDF "KAPITAL: Dokumen Desain Induk Terpadu" (36 halaman) dibandingkan dengan kode di repo.
 
-## Kesimpulan jujur
+## Kesimpulan jujur (22 Oktober 2026)
 
-Game saat ini adalah **simulasi satu perusahaan di satu negara dengan dunia yang hidup sebagian**, bukan simulasi dunia penuh seperti di dokumen.
-Yang sungguh-sungguh disimulasikan: rumah tangga, pasar tenaga kerja, bank sentral (aturan Taylor), inflasi, kurs, tiga komoditas, empat pesaing, tujuh emiten bursa, dan kini proses kredit bank.
-Yang masih berupa skenario tertulis (skrip): tuntutan serikat, term sheet refinancing, proyek pemintalan, guncangan pemilu, dan kebanyakan perilaku eksekutif.
-Skala dokumen (207.000 agen, 8+16 negara, 40 subsektor, 600+ kartu event, 480 giliran) belum tercapai; angka sebenarnya ada di tabel di bawah.
-Dokumen menargetkan "10/10 realistis"; saya menilai kondisi sekarang sekitar 4 dari 10 terhadap dokumen tersebut. Ini bukan pembelajaran bisnis multinasional yang utuh, tetapi fondasi untuk Era 1 (bertahan hidup).
+Setelah Tahap A, game adalah **simulasi satu perusahaan pemain di dalam dunia 24 negara yang hidup** dengan geopolitik dinamis, rantai pasok Leontief 12 sektor, makro lanjut (fiskal, kurva imbal hasil, peringkat, bank sentral, bank run), 2.000 perusahaan dan 120 bank sebagai agen, pasar saham dari buku pesanan 5.000 investor, rilis data resmi yang terlambat/direvisi, serta demografi, iklim, dan adopsi teknologi.
+Namun lapisan dunia ini **tidak membuat arus kas baru**; ia hanya menekan perusahaan pemain lewat saluran lama (permintaan, biaya, kurs, kredit, bunga). Itu disengaja agar identitas akuntansi terjaga, tetapi artinya dunia belum punya pelaku yang bisa Anda "ajak transaksi" selain yang sudah ada.
+Belum selesai: UI untuk lapisan dunia baru (peta tegangan, peringkat, rilis data, tampilan adopsi), 600+ kartu event (ada 42), 40 subsektor (ada 12), mekanik pemain Tahap B, bot Tahap B, multiplayer, rilis. Kalibrasi keseimbangan hanya diukur dengan bot uji, belum oleh manusia.
+Saya tidak memberi skor "x dari 10" karena tidak ada ukuran yang bisa dipertanggungjawabkan; tabel di bawah dan bagian Tahap A memuat angka yang diukur.
+
+## Tahap A — fondasi dunia: bukti dan kekurangan jujur
+
+Semua angka dari kotak pasir ini (kotlinc 2.0.21 + JUnit stub; `tools/run-tests.sh`), bukan dari perangkat.
+
+| Butir | Yang dibuat | Bukti terukur | Kekurangan jujur |
+| :--- | :--- | :--- | :--- |
+| A1 skala agen | 200.000 rumah tangga (kohort kuantil pendapatan, ±400 agen per kohort, transisi binomial), 5.000 investor (4 kelas), 2.000 perusahaan, 120 bank, 24 pemerintah, 24 bank sentral = **207.168** (`agentCensus()` dihitung dari objek hidup, tes `CreditSystemTest.engineCensus_adds_to207168`) | `EndTurn` rata-rata 0,8 ms, p99 1,3 ms, maks 3,2 ms (`PerformanceTest`, 895–967 giliran); 5.749 giliran acak di stress test: rata-rata 0,83–1,29 ms, maks 8–16 ms | Rumah tangga adalah **agregat kohort**, bukan 200.000 objek bernegara sendiri. Investor ditarik sebagai jumlah binomial per kelas, tanpa portofolio individual. Perusahaan dan bank adalah objek individual tetapi sederhana (satu leverage, satu margin; satu CAR); tidak ada jaringan utang antar-perusahaan |
+| A2 16 negara sekunder | 4 blok × 4 negara; model ringkas, disimulasikan bulanan hanya bila bloknya terhubung dagang, kalau tidak per kuartal | 14 tes `WorldLayerTest` lulus | Tidak punya rumah tangga/perusahaan sendiri; hanya pertumbuhan, inflasi, bunga, risiko |
+| A3 sektor dan rantai pasok | 12 sektor (bukan 40 subsektor), matriks Leontief dengan kendala kapasitas, 12 simpul rantai Tier 1–3 (Tier 3 tersembunyi sampai uji tuntas), sanksi berlapis | Hawkins–Simon (jumlah kolom < 1) diuji; pengali biaya sanksi Kestrel 1,088 tanpa uji tuntas vs 1,055 dengan | Hanya 12 sektor; guncangan selat hanya teruji lewat dorongan langsung (blokade 0/25 seed pada skenario krisis alami) |
+| A4 geopolitik | Ketegangan 0–100 untuk 276 pasangan, 6 anak tangga, 3 selat, pemilu 4 tipe di 24 negara | Sanksi aktif di 19/25 seed saat krisis vs 3/25 tenang; pangsa pro-pasar pemilu 0,39 (inflasi tinggi) vs 0,26 | Tren eskalasi 0,035/giliran pada pasangan Sundara adalah **penyetel kalibrasi** agar Era 3–4 tidak mudah (lihat Catatan kalibrasi); sanksi hanya antar negara inti dan tidak menyasar Sundara |
+| A5 makro lanjut | Utang/PDB dan defisit 24 negara; kurva imbal hasil 10 tahun; peringkat 8 anak tangga dengan histeresis; bias Taylor dari haluan pemilu dan dominasi fiskal; QE + taper; panduan ke depan berkredibilitas; indeks panik dan bank run; kurs dari proksi neraca dagang | 9 tes `MacroPlusTest`; kurva terbalik pada 4–5% bulan; 4 kejadian bank run pada 40 seed bot disiplin (8 dalam 5.749 giliran stress acak) | Peringkat Sundara: 83 penurunan vs 3 kenaikan pada 60 seed, artinya tekanan turun satu arah (dari tren ketegangan dan krisis) hampir tanpa pemulihan; ini perlu ditinjau. QE hampir tidak pernah menyala pada bot uji (bunga jarang ≤2,5%) |
+| A6 informasi dan buku pesanan | Rilis data (inflasi, pengangguran jeda 1 bulan; PDB jeda 2 bulan; perkiraan awal berisik, revisi, final); harga 7 emiten dan saham pemain dari buku pesanan 5.000 investor (nilai, tren, ritel, institusi) | 9 tes `MarketTest`; simpangan baku return bulanan emiten 7,4% (lama 11%); korelasi serial return 0,62 (lama 0,73) | Metrik harga memotong sampel |ln(harga/nilai wajar)| > 0,6 (±4%) sehingga bukan perbandingan sempurna. Bank sentral dan pesaing masih memakai angka **benar**, bukan angka rilis; kejutan data hanya menggeser suasana pasar saham. Belum ada layar UI untuk rilis data |
+| A7 siklus panjang | Demografi 8 negara; iklim (suhu, kejadian ekstrem per blok jadi guncangan kapasitas sektor); 3 kurva adopsi teknologi dengan terobosan | 6 tes `LongCyclesTest`; kejadian iklim per seed per era 1,8 / 3,5 / 5,4 / 5,1; suhu akhir rata-rata 0,98 °C; Sundara menua 7% → 15,8% | Parameter dampak adalah **asumsi**, bukan data; dampak ke pemain kecil (permintaan ≤ −0,3%, biaya ≥ −1,5%); politik dalam negeri dan narasi jangka panjang belum ada |
+| A8 CI, kinerja, determinisme, audit | CI kini gagal bila tes gagal dan mengunggah log tes; `StageAStressTest` ≥ 5.000 giliran acak; tes determinisme seluruh lapisan dunia | Lokal: **103 tes lulus, 0 gagal**. Stress: 5.749 giliran, selisih neraca induk terbesar 1,6e-9 (batas 1e-6), arus kas dan konsolidasi tetap cocok. CI GitHub: langkah "Uji unit" sukses pada commit A5 | Log CI mentah tidak bisa diunduh dari lingkungan ini (host blob diblokir), jadi "log bersih" hanya disimpulkan dari status langkah, bukan dibaca |
+
+### Keseimbangan terukur (300 seed × 480 giliran, bot uji)
+Sebelum Tahap A (60 seed, mesin lama): pasif 45%, aktif 53%. Awal Tahap A: pasif 137/300 (45,7%), aktif 186/300 (62%). **Akhir Tahap A: pasif 133/300 (44%), kematian per era [77, 40, 29, 21]; aktif 189/300 (63%), [58, 36, 8, 9].** Galat baku ±2,9 poin persentase per angka. Ini hanya mengukur bot; belum ada uji manusia.
+
+### Catatan kalibrasi (agar tidak diulang)
+- Lapisan dunia sempat membuat permainan hampir mustahil (menang 1%) karena penuh dampak sejak Era 1; sekarang dampaknya diredam 0,35 di Era 1 (`DuniaTuning.era1Gate`) karena rantai pasok lintas negara baru relevan di Era 2.
+- Pengali biaya dunia hanya boleh masuk ke HPP pemain, bukan ke `costPressure` bersama (pesaing tidak bisa menaikkan harga dan bangkrut, pemain menang 72%).
+- Skor ketegangan lama adalah jalan acak dengan drift +0,04/bulan; dihilangkan murni membuat bot pasif menang 44/60 di Era 3–4, jadi tren eskalasi dipertahankan hanya pada pasangan Sundara.
+- Kegagalan bank pada sistem kredit sempat 16 per permainan karena bank yang lebih terkonsentrasi menanggung rugi lebih besar tanpa margin lebih tinggi; sudah diperbaiki. Sisa ekor: pada 2/40 seed, bank Sundara gagal berulang dalam krisis berkepanjangan (puluhan kegagalan per seed) — tidak berpengaruh pada keseimbangan terukur, tetapi tampak tidak realistis.
+- Tes bergantung pada "seed pertama yang bertahan" rapuh karena bot disiplin sering menahan kas hampir nol; dua tes kini memilih survivor yang punya kas untuk membuka anak usaha.
 
 ## Perbandingan per bagian dokumen
 
 | # | Bagian dokumen | Target dokumen | Kondisi sekarang | Status |
 |---|---|---|---|---|
 | 3 | Loop giliran, Poin Perhatian | 5 AP, eksekutif menambah AP, krisis mengunci AP | AP ada (maks 4 + eksekutif), aksi berbiaya AP | Sebagian |
-| 3 | Briefing koran, rumor, rilis data terlambat | 5 media, rumor, data terlambat dan direvisi | Koran dan rumor ada; rilis data tidak terlambat/direvisi; berita kurang informatif | Sebagian |
+| 3 | Briefing koran, rumor, rilis data terlambat | 5 media, rumor, data terlambat dan direvisi | Koran dan rumor ada; rilis data resmi terlambat dan direvisi di mesin (`DataDesk`), baru tampil sebagai baris laporan bulanan, belum ada layar | Sebagian |
 | 3 | Riset berbayar, intelijen | Beli riset dengan margin error | Tidak ada | Belum |
 | 3 | Rapat dewan kuartalan | Anggota dewan AI bertanya tajam | Tidak ada | Belum |
-| 4 | Dunia | 8 negara inti + 16 sekunder | 8 negara statis + 7 ekonomi asing dinamis (inflasi, kurs), tanpa 16 sekunder | Sebagian |
+| 4 | Dunia | 8 negara inti + 16 sekunder | 8 inti dinamis + 16 sekunder (model ringkas) dalam 4 blok | Ya (A2) |
 | 4 | Peta dan papan | Petak wilayah, selat, risiko iklim | Layar Peta dengan lapisan; tidak ada petak bidak | Sebagian |
-| 5 | Agen | 207.000 | 50.000 rumah tangga + 4 pesaing + 7 emiten + 4 bank + 4 eksekutif + 1 bank sentral | Sebagian |
-| 5 | Pembentukan harga dari buku pesanan | Harga dari order agen | Harga pesaing dari fungsi reaksi; harga saham dari nilai wajar + sentimen, bukan buku pesanan | Sebagian |
+| 5 | Agen | 207.000 | 207.168 menurut sensus mesin (200.000 rumah tangga sebagai kohort, 5.000 investor, 2.000 perusahaan, 120 bank, 24 pemerintah, 24 bank sentral) plus 4 pesaing, 7 emiten, 4 bankir, 4 eksekutif | Sebagian (agregat) |
+| 5 | Pembentukan harga dari buku pesanan | Harga dari order agen | Harga saham (emiten dan perusahaan pemain) dari buku pesanan 5.000 investor; harga produk pesaing masih dari fungsi reaksi | Sebagian (A6) |
 | 5 | Uang tertutup (stock-flow) | Tiap satuan tercatat | Neraca perusahaan pemain selalu seimbang (diuji 20 seed); sistem perbankan agregat belum tercatat | Sebagian |
 | 5 | Determinisme dan replay | Seed + keputusan sama = dunia sama | Ada, termasuk "Bagaimana Jika" | Ya |
 | 6 | Bot eksekutif egois | Manipulasi KPI, sembunyikan masalah, kickback | Tiga perilaku ada (obral kredit, tunda perawatan, kickback), dengan audit dan konfrontasi | Ya (terbatas) |
@@ -31,14 +55,14 @@ Dokumen menargetkan "10/10 realistis"; saya menilai kondisi sekarang sekitar 4 d
 | 6 | Bot pemasok | Hold-up opportunistik | Satu kejadian hold-up; dual sourcing sebagai pertahanan | Sebagian |
 | 6 | Bot investor aktivis | Greenmail, bear raid | Tidak ada; investor hanya membentuk harga saham | Belum |
 | 6 | Bot politisi | Siklus politik, pemerasan regulasi | Hanya guncangan pemilu dan sanksi | Sebagian kecil |
-| 6 | Rumah tangga dan serikat | Kepanikan kawanan, mogok | Mogok serikat ada (satu skrip); bank run tidak ada | Sebagian |
-| 7 | Bank sentral | Aturan Taylor + bias politik, QE, forward guidance | Taylor + depresiasi kurs; tanpa bias politik, QE, pidato | Sebagian |
-| 7 | Fiskal, kurva imbal hasil, peringkat negara | Defisit, spiral utang, peringkat | Tidak ada | Belum |
+| 6 | Rumah tangga dan serikat | Kepanikan kawanan, mogok | Mogok serikat ada (satu skrip); indeks panik dan bank run ada (A5) | Sebagian |
+| 7 | Bank sentral | Aturan Taylor + bias politik, QE, forward guidance | Taylor + depresiasi kurs + bias politik, QE, panduan ke depan berkredibilitas (A5) | Ya (sederhana) |
+| 7 | Fiskal, kurva imbal hasil, peringkat negara | Defisit, spiral utang, peringkat | Ada untuk 24 negara (A5); peringkat hanya memengaruhi kurs dan premi kredit | Ya (sederhana) |
 | 7 | Siklus bisnis endogen | Resesi dari perilaku agen | Ada (kesenjangan output dari rumah tangga) | Ya |
-| 7 | Kurs | Selisih bunga, neraca dagang, risiko politik | Paritas daya beli + premi risiko; tanpa neraca dagang | Sebagian |
-| 8 | Skor ketegangan dan tangga eskalasi | 0-100 per pasangan, 6 anak tangga | Data statis di layar Dunia, tidak bergerak oleh perilaku | Belum |
-| 8 | Matriks Leontief, rantai pasok Tier-3, sanksi berlapis | 40 subsektor | Tidak ada; hanya kapas, minyak, baja sebagai biaya | Belum |
-| 8 | Pemilu, donasi, blok dagang | Pemilu per negara | Satu pemilu Sundara tertulis | Sebagian kecil |
+| 7 | Kurs | Selisih bunga, neraca dagang, risiko politik | Paritas daya beli + proksi neraca dagang + denyut peringkat/panik | Sebagian |
+| 8 | Skor ketegangan dan tangga eskalasi | 0-100 per pasangan, 6 anak tangga | Dinamis untuk 276 pasangan, 6 anak tangga (A4); layar Dunia belum memakainya | Sebagian (mesin saja) |
+| 8 | Matriks Leontief, rantai pasok Tier-3, sanksi berlapis | 40 subsektor | 12 sektor, rantai Tier 1-3, sanksi berlapis (A3) | Sebagian |
+| 8 | Pemilu, donasi, blok dagang | Pemilu per negara | Pemilu dinamis di 24 negara (4 tipe hasil) memengaruhi tarif, defisit, bias bank sentral; donasi belum ada | Sebagian |
 | 9 | Tiga laporan keuangan, jebakan akrual, CCC | Lengkap, tak bisa disunting | Laba rugi, neraca, arus kas ada tetapi **kurang rinci** (belum ada rincian gaji, perubahan ekuitas, catatan); angka arus kas pendanaan belum menjumlah ke perubahan kas | Sebagian (perbaikan sedang berjalan) |
 | 9 | Utang teknis perawatan | Peluang rusak naik eksponensial | Ada (naik linear per bulan tertunda) | Ya |
 | 9 | SDM, R&D, logistik | Karyawan kunci, riset, gudang, armada | Hanya eksekutif dan serikat; tidak ada R&D, gudang, armada | Sebagian kecil |
@@ -50,14 +74,14 @@ Dokumen menargetkan "10/10 realistis"; saya menilai kondisi sekarang sekitar 4 d
 | 12 | Derivatif | Futures, forward, swap, opsi, CDS | Hanya lindung nilai kapas 6 bulan | Sebagian kecil |
 | 13 | Segmen konsumen, tren, merek | 5 segmen, kurva adopsi, pemasaran | Tidak ada; permintaan agregat satu produk | Belum |
 | 14 | Informasi tidak sempurna | Label keyakinan, bias per sumber, noise per kesulitan | Label keyakinan dan cross-check ada; noise per kesulitan tidak ada (tidak ada tingkat kesulitan) | Sebagian |
-| 15 | Event dari kondisi dunia | 600+ kartu, berantai | Sekitar 15 jenis kejadian dengan peluang dari kondisi; sebagian berantai | Sebagian kecil |
+| 15 | Event dari kondisi dunia | 600+ kartu, berantai | 42 template, 11 aturan rantai (Tahap C menargetkan ≥600) | Sebagian kecil |
 | 16 | Hukum, etika, skor rahasia | Skor etik, skandal tertunda, antimonopoli, ESG | Tidak ada skor etik dan skandal tertunda | Belum |
-| 17 | Sistem jangka panjang | Demografi, iklim, teknologi, politik dalam, narasi | Tidak ada | Belum |
+| 17 | Sistem jangka panjang | Demografi, iklim, teknologi, politik dalam, narasi | Demografi, iklim, adopsi teknologi (A7); politik dalam dan narasi belum | Sebagian |
 | 18 | Pengasah otak | Jurnal, Brier, pasar prediksi, detektor bias, post-mortem, counterfactual, rapat dewan | Jurnal, skor Brier, kronik/post-mortem, counterfactual ada; pasar prediksi, detektor bias, rapat dewan tidak ada | Sebagian |
-| 19 | Kampanye 40 tahun, 4 era, kondisi menang | 480 giliran; skor akhir 5 komponen | Hanya Era 1; skenario mulai Maret 2033, bukan 2030; tidak ada skor akhir | Sebagian kecil |
-| 19 | Tingkat kesulitan | 4 level | Satu level | Belum |
+| 19 | Kampanye 40 tahun, 4 era, kondisi menang | 480 giliran; skor akhir 5 komponen | 480 giliran, 4 era, evaluasi 5 komponen, suksesi (lihat HANDOFF) | Ya (belum diuji manusia) |
+| 19 | Tingkat kesulitan | 4 level | 4 tingkat tersimpan sebagai aksi pertama (`DifficultyTest`) | Ya |
 | 20 | Peran alternatif, multiplayer | CEO, gubernur, menteri, manajer dana | Hanya CEO | Belum |
-| 21 | Save, UI, skala | 5 slot autosave, ironman, <3 detik | Autosave satu slot, seed deterministik; proses giliran jauh di bawah 3 detik | Sebagian |
+| 21 | Save, UI, skala | 5 slot autosave, ironman, <3 detik | Autosave satu slot, seed deterministik; `EndTurn` rata-rata 0,8 ms (maks 3,2 ms pada uji kinerja) dengan 207.168 agen | Sebagian |
 
 ## Mengapa "pinjaman selalu langsung acc"
 

@@ -8,7 +8,7 @@ import kotlin.math.abs
 /** Uji tekanan identitas akuntansi dengan aksi acak (termasuk aksi multinasional/korporasi) dan uji determinisme. */
 class StressCalibrationTest {
 
-    private fun randomAction(r: java.util.Random, e: KapitalEngine): Action? = when (r.nextInt(23)) {
+    fun randomAction(r: java.util.Random, e: KapitalEngine): Action? = when (r.nextInt(23)) {
         17 -> Action.SellSubStake(listOf("tarsis", "kestrel", "halvenia", "meridia")[r.nextInt(4)], 5 + r.nextInt(21))
         18 -> Action.IssueShares(500 + r.nextInt(4000))
         19 -> Action.Repatriate(listOf("tarsis", "kestrel", "halvenia", "meridia")[r.nextInt(4)])
@@ -243,7 +243,7 @@ class GroupStatementsUiTest {
     @Test
     fun consolidatedAndEntityRowsAppearOnlyWithSubsidiary() {
         var saved: String? = null
-        for (s in 1..60) { saved = TestBots.recordedSave(s * 7919L, 97); if (saved != null) break }
+        for (s in 1..80) { saved = TestBots.recordedSave(s * 7919L, 97) { it.subsidiaryBlock("tarsis") == null }; if (saved != null) break }
         assertTrue("perlu permainan yang bertahan sampai Era 2", saved != null)
         val store = Mem(saved)
         val repo = com.example.data.GameRepository(store)

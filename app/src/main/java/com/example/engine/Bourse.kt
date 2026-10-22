@@ -34,7 +34,11 @@ class Bourse {
         val rivalShare: (String) -> Double,
         val rivalPrice: (String) -> Double,
         val rivalActive: (String) -> Boolean,
-        val rivalBase: (String) -> Double
+        val rivalBase: (String) -> Double,
+        /** Kejutan berita dari rilis data resmi (positif = kabar baik), -0,05..0,05. */
+        val news: Double = 0.0,
+        /** Tekanan risk-off 0..1 (panik perbankan dan ketegangan geopolitik). */
+        val riskOff: Double = 0.0
     )
 
     class Month(
@@ -81,7 +85,12 @@ class Bourse {
     class Company(val spec: Spec) {
         var cash = 0.0; var ar = 0.0; var inv = 0.0; var fa = 0.0; var ap = 0.0; var debt = 0.0; var equity = 0.0
         var sharesM = 1.0
+        /** ln(harga/nilai wajar) setelah bulan terakhir: selisih penilaian pasar (turunan buku pesanan). */
         var sentiment = 0.0
+        /** Informasi baru (kejutan laba) yang belum tercermin di harga; dipakai investor nilai. */
+        var info = 0.0
+        /** Nilai wajar bulan lalu; selisihnya ke bulan ini adalah kabar fundamental yang langsung sebagian tercermin. */
+        var lastFair = 0.0
         var price = 0.0
         var listed = true
         var weakMonths = 0
@@ -118,11 +127,22 @@ class Bourse {
             9500.0, 0.90, 1.5, 0.08, 0.35, 1.1, "agro", "Pendapatan mengikuti harga kapas; cuaca ekstrem memukul panen.")
     )
 
+    private companion object {
+        /** Porsi kabar fundamental yang langsung tercermin pada harga bulan itu. */
+        const val ANNOUNCE = 0.6
+        /** Derau berita idiosinkratik emiten per bulan. */
+        const val IDIO = 0.03
+    }
+
     val companies: List<Company> = specs.map { Company(it) }
     val index: Double get() = companies.filter { it.listed }.sumOf { it.marketCap() } / baseCap * 1000.0
     private var baseCap = 1.0
     private var marketFactor = 0.0
     val indexHist = ArrayDeque<Double>()
+    /** Buku pesanan 5.000 investor (A6) yang menggerakkan harga tujuh emiten dan saham perusahaan pemain. */
+    val book = InvestorBook()
+    /** Suasana pasar bersama bulan ini (faktor pasar). */
+    val mood: Double get() = marketFactor
     var lastEvents: List<String> = emptyList(); private set
 
     init {
@@ -208,7 +228,7 @@ class Bourse {
                     surprise < -0.10 -> "di bawah konsensus analis ${fmtPct(-surprise)}"
                     else -> "sesuai konsensus"
                 }
-                c.sentiment += (surprise * 0.5).coerceIn(-0.12, 0.12)
+                c.info += (surprise * 0.5).coerceIn(-0.12, 0.12)
                 events += "${s.name} (${s.ticker}) merilis laporan ${q.label}: pendapatan ${fmt(q.revenue)} jt RS, laba bersih ${fmt(q.ni)} jt RS, ${c.surpriseNote}."
                 // Dividen tahunan setelah laporan Desember
                 if (x.turn % 12 == 11) {
@@ -223,11 +243,17 @@ class Bourse {
         for (c in companies) {
             if (!c.listed) { continue }
             val fair = fairValue(c, pe)
-            c.sentiment = 0.92 * c.sentiment + c.spec.beta * marketFactor * 0.55 + gauss(r) * 0.035
-            c.sentiment = c.sentiment.coerceIn(-0.6, 0.6)
-            val target = fair * exp(c.sentiment)
-            // harga bergerak parsial menuju target (likuiditas dan inersia)
-            c.price = max(c.bvps * 0.15, c.price + 0.35 * (target - c.price))
+            c.info *= 0.92
+            val fairSafe = max(fair, 1.0) // nilai wajar bisa <= 0 pada emiten berekuitas negatif
+            // Kabar fundamental (laba dan buku berubah) langsung sebagian tercermin; sisanya lewat arus pesanan.
+            if (c.lastFair > 0.0) c.price *= exp(ANNOUNCE * ln(fairSafe / c.lastFair).coerceIn(-0.5, 0.5))
+            c.lastFair = fairSafe
+            val lnMis = ln(fairSafe / c.price) + c.info
+            val h = c.priceHist
+            val ret3m = if (h.size >= 4) ln(h.last() / h[h.size - 4]) / 3.0 else 0.0
+            val flow = book.trade(c.spec.id, r, lnMis, ret3m, c.spec.beta, marketFactor + x.news, x.riskOff)
+            c.price = max(max(c.bvps * 0.15, 1.0), c.price * exp(flow.dLnPrice + IDIO * gauss(r)))
+            c.sentiment = ln(c.price / fairSafe)
             c.priceHist.addLast(c.price); if (c.priceHist.size > 12) c.priceHist.removeFirst()
         }
         indexHist.addLast(index); if (indexHist.size > 12) indexHist.removeFirst()
@@ -261,7 +287,7 @@ class Bourse {
         c.monthly.clear()
         c.quarters.clear()
         repeat(12) { c.monthly += Month(x.turn - 11 + it, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, c.cash, c.ar, c.inv, c.fa, c.ap, c.debt, c.equity) }
-        c.sentiment = 0.0
+        c.sentiment = 0.0; c.info = 0.0; c.lastFair = 0.0
     }
 
     private fun simulateMonth(c: Company, x: Ctx, r: Random): Month {

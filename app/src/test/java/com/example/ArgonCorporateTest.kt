@@ -202,7 +202,8 @@ class ArgonCorporateTest {
         assertTrue("alasan penguncian tampil", early.subsidiaryBlock("meridia")!!.contains("Era 2"))
 
         // Era 2: bermain disiplin sampai giliran 97 lalu buka anak usaha
-        val engine = TestBots.firstSurvivor(97)
+        // Disiplin sering menahan kas nyaris nol; skenario ini butuh kas untuk tahap pertama anak usaha.
+        val engine = TestBots.firstSurvivor(97, accept = { it.subsidiaryBlock("meridia") == null && it.subsidiaryBlock("tarsis") == null })
         assertEquals(2, KapitalEngine.era(engine.turn))
         verifyIdentities(engine, "awal Era 2")
         assertTrue("Anak usaha Meridia harus bisa dibuka di Era 2", engine.apply(Action.OpenSubsidiary("meridia")))
