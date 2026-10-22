@@ -249,6 +249,16 @@ data class StaffRowView(
 )
 
 /** B3: tampilan tab Operasi (SDM, R&D, logistik, armada). */
+/** B4b: baris derivatif: jenis, ringkasan kontrak aktif (atau null), alasan terblokir per porsi 25/50/100%, dan premi per porsi. */
+data class DerivRowView(
+    val code: String,
+    val label: String,
+    val activeText: String?,
+    val blocks: List<String?>,
+    val premiums: List<Double>,
+    val hint: String
+)
+
 data class OperationsView(
     val staff: List<StaffRowView> = emptyList(),
     val hireCosts: List<String> = emptyList(),
@@ -264,7 +274,9 @@ data class OperationsView(
     val tradeFinance: Boolean = false,
     val tradeFinanceText: String = "",
     val leaseText: String = "",
-    val leaseBlocks: List<String?> = emptyList()
+    val leaseBlocks: List<String?> = emptyList(),
+    // B4b: derivatif
+    val derivs: List<DerivRowView> = emptyList()
 )
 
 data class GanttTask(

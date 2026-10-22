@@ -191,6 +191,10 @@ class KapitalEngine(val seed: Long) {
     /** Nilai aset tetap yang dijual dan disewa kembali (jt RS), dasar sewa bulanan. */
     var leasedBackRs = 0.0; private set
     val insuranceClaimTurns = mutableListOf<Int>()
+    /** B4b: derivatif aktif dan jumlah bersih (penyelesaian dikurangi premi) sejak awal, jt RS. */
+    val derivs = mutableListOf<Deriv>()
+    var derivNetRs = 0.0; private set
+    var derivPremiumsRs = 0.0; private set
 
     // ---------- Neraca ----------
     var cash = sc.cash; private set
@@ -1206,6 +1210,7 @@ class KapitalEngine(val seed: Long) {
             is Action.SetInsurance -> doSetInsurance(action.level)
             is Action.SetTradeFinance -> doSetTradeFinance(action.on)
             is Action.SaleLeaseback -> doSaleLeaseback(action.pct)
+            is Action.BuyDerivative -> doBuyDerivative(action.kind, action.pct)
         }
         if (ok) actionCount++
         return ok
@@ -1756,6 +1761,116 @@ class KapitalEngine(val seed: Long) {
             "Aset senilai ${fmt(proceeds)} jt RS dijual pada nilai buku lalu disewa kembali: sewa ${fmt(proceeds * LEASE_RATE)} jt RS per bulan, penyusutan berkurang. Tidak ada laba penjualan; agunan berkurang.",
             "Sale-leaseback → kas masuk sekarang → beban sewa tetap bulanan dan agunan kredit mengecil.", actionCount)
         return true
+    }
+
+    // =====================================================================
+    // B4b: derivatif lindung nilai (diselesaikan tunai)
+    // =====================================================================
+    /** Eksposur yang dapat dilindungi (jt RS): utang A$, pembelian kapas 6 bulan, atau utang RS berbunga mengambang. */
+    fun derivExposure(kind: DerivKind): Double = when (kind) {
+        // utang A$ ditambah porsi HPP yang peka kurs (bobot 0,2 pada tekanan biaya) selama 6 bulan
+        DerivKind.FXOPT -> loans.filter { it.currencyAud }.sumOf { loanBalanceRs(it) } + (estimateMonth()["cogs"] ?: 0.0) * 0.20 * 6.0
+        DerivKind.COTFUT -> (estimateMonth()["cogs"] ?: 0.0) * 0.50 * 0.78 * 6.0
+        DerivKind.SWAP -> loans.filter { !it.currencyAud && it.floatingSpreadPct != null }.sumOf { it.balance }
+    }
+
+    /** Pokok yang akan dibeli untuk [pct] persen dari eksposur yang belum dilindungi. */
+    fun derivNotional(kind: DerivKind, pct: Int): Double =
+        max(0.0, derivExposure(kind) - derivs.filter { it.kind == kind }.sumOf { it.notional }) * pct / 100.0
+
+    /**
+     * Nilai harapan (fraksi pokok) dari lonjakan kurs terjadwal dalam 6 bulan ke depan yang dikenal pasar: krisis makro
+     * (pasti bila peringatan dini sudah terbit, selain itu peluang prior) dan guncangan pemilu (peluang prior 60%, hasil tidak bocor).
+     * Dengan ini harga opsi mencerminkan risiko kejadian sehingga membeli sebelum krisis bukan uang gratis.
+     */
+    fun fxJumpExpected(): Double {
+        var e = 0.0
+        for (cp in crisisPlans()) if (cp.start >= turn && cp.start <= turn + 5) {
+            val p = if (turn >= cp.start - 3) 1.0 else 0.07
+            e += p * max(0.0, 1.0 + cp.fxHit - DerivPricing.FX_STRIKE)
+        }
+        if (electionTurn >= turn && electionTurn <= turn + 5) e += 0.6 * max(0.0, 1.12 - DerivPricing.FX_STRIKE)
+        return e
+    }
+
+    fun derivPremium(kind: DerivKind, pct: Int): Double {
+        val n = derivNotional(kind, pct)
+        return when (kind) {
+            DerivKind.FXOPT -> n * DerivPricing.fxPremiumPct(DerivPricing.monthlyVol(kursHist), fxJumpExpected())
+            DerivKind.COTFUT -> n * DerivPricing.COT_FEE
+            DerivKind.SWAP -> n * DerivPricing.SWAP_FEE
+        }
+    }
+
+    fun derivBlock(kindCode: String, pct: Int): String? {
+        val kind = DerivKind.fromCode(kindCode) ?: return "Jenis derivatif tidak dikenal."
+        if (pct != 25 && pct != 50 && pct != 100) return "Porsi harus 25, 50, atau 100% dari eksposur."
+        if (derivs.any { it.kind == kind }) return "Kontrak ${kind.label} masih berjalan."
+        val n = derivNotional(kind, pct)
+        if (n < 100.0) return when (kind) {
+            DerivKind.FXOPT -> "Tidak ada eksposur kurs yang cukup besar untuk dilindungi."
+            DerivKind.COTFUT -> "Tidak ada pembelian kapas yang cukup besar untuk dilindungi."
+            DerivKind.SWAP -> "Tidak ada utang RS berbunga mengambang yang perlu dilindungi."
+        }
+        if (cash < 2.0 * derivPremium(kind, pct)) return "Kas tidak cukup untuk membayar premi."
+        if (ap < 1) return "AP tidak cukup (butuh 1)."
+        return null
+    }
+
+    private fun doBuyDerivative(kindCode: String, pct: Int): Boolean {
+        if (derivBlock(kindCode, pct) != null || !spend(1)) return false
+        val kind = DerivKind.fromCode(kindCode)!!
+        val n = derivNotional(kind, pct)
+        val prem = derivPremium(kind, pct)
+        val (strike, ref0) = when (kind) {
+            DerivKind.FXOPT -> kurs * DerivPricing.FX_STRIKE to kurs
+            DerivKind.COTFUT -> DerivPricing.cottonStrike(commodities.cotton.index) to commodities.cotton.index
+            DerivKind.SWAP -> DerivPricing.swapFixedRate(policyRate, turn <= electionTurn && electionTurn <= turn + 12) to policyRate
+        }
+        val expiry = turn + kind.months - 1
+        derivs += Deriv(kind, turn, expiry, n, strike, prem, ref0)
+        oneOffOpex += prem
+        derivNetRs -= prem; derivPremiumsRs += prem
+        chronicle += ChronicleItem(turn, "Derivatif dibeli: ${kind.label}",
+            "Pokok ${fmt(n)} jt RS, premi ${fmt(prem)} jt RS, ${kind.months} bulan, diselesaikan tunai. " + when (kind) {
+                DerivKind.FXOPT -> "Membayar bila kurs naik lebih dari 3% (strike ${fmt(strike)})."
+                DerivKind.COTFUT -> "Membayar bila indeks kapas melampaui ${"%.3f".format(strike)}, dan Anda membayar selisih bila di bawahnya."
+                DerivKind.SWAP -> "Tetap ${"%.2f".format(strike)}% lawan suku bunga kebijakan bulanan."
+            },
+            "Derivatif → premi di muka → penyelesaian tunai saat jatuh tempo; lindung nilai, bukan spekulasi.", actionCount)
+        return true
+    }
+
+    /** Penyelesaian derivatif pada akhir giliran (setelah kurs, kapas, dan suku bunga bulan ini diketahui). */
+    private fun settleDerivatives(lines: MutableList<ReportLine>) {
+        if (derivs.isEmpty()) return
+        val done = mutableListOf<Deriv>()
+        for (d in derivs) {
+            when (d.kind) {
+                DerivKind.SWAP -> {
+                    val pay = d.notional * (policyRate - d.strike) / 100.0 / 12.0
+                    pendingIncome += pay; derivNetRs += pay
+                    if (turn >= d.expiryTurn) {
+                        done += d
+                        lines += ReportLine("Swap bunga berakhir; penyelesaian terakhir ${if (pay >= 0) "+" else ""}${fmt(pay)} jt RS.", Tone.INFO)
+                    }
+                }
+                DerivKind.FXOPT -> if (turn >= d.expiryTurn) {
+                    done += d
+                    val pay = d.notional * max(0.0, kurs / d.ref0 - DerivPricing.FX_STRIKE)
+                    pendingIncome += pay; derivNetRs += pay
+                    lines += ReportLine(if (pay > 0.5) "Opsi beli A$ jatuh tempo di dalam uang: menerima ${fmt(pay)} jt RS."
+                        else "Opsi beli A$ kedaluwarsa tanpa nilai (premi ${fmt(d.premium)} jt RS hangus).", if (pay > 0.5) Tone.GOOD else Tone.INFO)
+                }
+                DerivKind.COTFUT -> if (turn >= d.expiryTurn) {
+                    done += d
+                    val pay = d.notional * (commodities.cotton.index / d.strike - 1.0)
+                    pendingIncome += pay; derivNetRs += pay
+                    lines += ReportLine("Futures kapas jatuh tempo: ${if (pay >= 0) "menerima" else "membayar"} ${fmt(abs(pay))} jt RS.", if (pay >= 0) Tone.GOOD else Tone.WARN)
+                }
+            }
+        }
+        derivs.removeAll(done)
     }
 
     /** Akuisisi Media atau Lobi Parlemen (Era 3). */
@@ -2455,6 +2570,7 @@ class KapitalEngine(val seed: Long) {
         inflationAnnual = out.inflationAnnual
         policyRate = out.policyRate
         policyHist += policyRate; if (policyHist.size > 6) policyHist.removeAt(0)
+        settleDerivatives(lines)
         trendMonths++
         val monthlyInfl = (inflationAnnual / 12.0) / 100.0
         priceIndex *= 1.0 + monthlyInfl

@@ -4,6 +4,7 @@ import com.example.engine.Action
 import com.example.engine.Board
 import com.example.engine.Countries
 import com.example.engine.DataKind
+import com.example.engine.DerivKind
 import com.example.engine.Difficulty
 import com.example.engine.FactoryScheme
 import com.example.engine.KapitalEngine
@@ -134,6 +135,7 @@ class GameRepository(
     fun setInsurance(level: Int) = perform(Action.SetInsurance(level))
     fun setTradeFinance(on: Boolean) = perform(Action.SetTradeFinance(on))
     fun saleLeaseback(pct: Int) = perform(Action.SaleLeaseback(pct))
+    fun buyDerivative(kind: String, pct: Int) = perform(Action.BuyDerivative(kind, pct))
     fun buyIntel(kind: String, subject: String, tier: Int) = perform(Action.BuyIntel(kind, subject, tier))
     fun answerBoard(claim: String) = perform(Action.BoardAnswer(claim))
     fun applyCredit(bankId: String, amount: Int, tenor: Int, purpose: String, floating: Boolean, bullet: Boolean) =
@@ -316,7 +318,21 @@ class GameRepository(
             tradeFinance = e.tradeFinance,
             tradeFinanceText = if (e.tradeFinance) "L/C aktif: utang dagang 50 hari, biaya ${fmt(KapitalEngine.LC_FEE * e.sc.size * e.costIndex)} jt RS per bulan" else "L/C mati: utang dagang 35 hari. Mengaktifkan memperpanjang menjadi 50 hari (kas lebih longgar) dengan biaya bulanan.",
             leaseText = "Aset tetap disewa kembali ${fmt(e.leasedBackRs)} jt RS (sewa ${fmt(e.leasedBackRs * KapitalEngine.LEASE_RATE)} jt RS per bulan). Dijual pada nilai buku, batas ${(KapitalEngine.LEASEBACK_MAX * 100).toInt()}% aset tetap, tidak bisa dibeli kembali.",
-            leaseBlocks = listOf(5, 10, 20).map { e.saleLeasebackBlock(it) }
+            leaseBlocks = listOf(5, 10, 20).map { e.saleLeasebackBlock(it) },
+            derivs = DerivKind.values().map { k ->
+                val a = e.derivs.firstOrNull { it.kind == k }
+                DerivRowView(
+                    code = k.code, label = k.label,
+                    activeText = a?.let { "Pokok ${fmt(it.notional)} jt RS, jatuh tempo giliran ${it.expiryTurn}, premi dibayar ${fmt(it.premium)} jt RS" },
+                    blocks = listOf(25, 50, 100).map { e.derivBlock(k.code, it) },
+                    premiums = listOf(25, 50, 100).map { e.derivPremium(k, it) },
+                    hint = when (k) {
+                        DerivKind.FXOPT -> "Membayar bila kurs RS/A$ naik lebih dari 3% dalam 6 bulan. Melindungi utang A$ dan biaya impor. Rugi terbatas pada premi."
+                        DerivKind.COTFUT -> "Mengunci harga kapas 6 bulan: menerima selisih bila harga naik, membayar bila turun. Lindung nilai pembelian kapas."
+                        DerivKind.SWAP -> "Membayar bunga tetap, menerima suku bunga kebijakan selama 12 bulan, untuk utang rupiah berbunga mengambang."
+                    }
+                )
+            }
         )
     }
 

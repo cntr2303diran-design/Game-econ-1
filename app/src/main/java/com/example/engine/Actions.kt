@@ -80,6 +80,8 @@ sealed class Action {
     data class SetTradeFinance(val on: Boolean) : Action()
     /** B4: jual aset tetap pada nilai buku lalu sewa kembali (persen dari aset tetap sekarang, 5..20). */
     data class SaleLeaseback(val pct: Int) : Action()
+    /** B4b: beli derivatif lindung nilai ("fxo" opsi A$, "ctf" futures kapas, "swp" swap bunga) untuk 25/50/100% eksposur. */
+    data class BuyDerivative(val kind: String, val pct: Int) : Action()
 
     fun encode(): String = when (this) {
         EndTurn -> "END"
@@ -135,6 +137,7 @@ sealed class Action {
         is SetInsurance -> "INS|$level"
         is SetTradeFinance -> "LCR|$on"
         is SaleLeaseback -> "SLB|$pct"
+        is BuyDerivative -> "DRV|${esc(kind)}|$pct"
     }
 
     companion object {
@@ -198,6 +201,7 @@ sealed class Action {
                     "INS" -> SetInsurance(p[1].toInt())
                     "LCR" -> SetTradeFinance(p[1].toBoolean())
                     "SLB" -> SaleLeaseback(p[1].toInt())
+                    "DRV" -> BuyDerivative(p[1], p[2].toInt())
                     else -> null
                 }
             } catch (_: Exception) {

@@ -56,6 +56,7 @@ class KapitalViewModel(application: Application) : AndroidViewModel(application)
     fun setInsurance(level: Int) = repository.setInsurance(level)
     fun setTradeFinance(on: Boolean) = repository.setTradeFinance(on)
     fun saleLeaseback(pct: Int) = repository.saleLeaseback(pct)
+    fun buyDerivative(kind: String, pct: Int) = repository.buyDerivative(kind, pct)
     fun buyIntel(kind: String, subject: String, tier: Int) = repository.buyIntel(kind, subject, tier)
     fun answerBoard(claim: String) = repository.answerBoard(claim)
     fun applyCredit(bankId: String, amount: Int, tenor: Int, purpose: String, floating: Boolean, bullet: Boolean) =

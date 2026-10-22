@@ -158,7 +158,8 @@ fun OperasiTabContent(
     onSetLogistics: (Int) -> Unit,
     onSetInsurance: (Int) -> Unit = {},
     onSetTradeFinance: (Boolean) -> Unit = {},
-    onSaleLeaseback: (Int) -> Unit = {}
+    onSaleLeaseback: (Int) -> Unit = {},
+    onBuyDerivative: (String, Int) -> Unit = { _, _ -> }
 ) {
     var hireTier by rememberSaveable { mutableStateOf(2) }
     Text("Operasi: karyawan kunci, R&D, logistik", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -226,5 +227,25 @@ fun OperasiTabContent(
             }
         }
         view.leaseBlocks.filterNotNull().firstOrNull()?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    }
+    IntelCard {
+        Text("Derivatif lindung nilai", style = MaterialTheme.typography.titleMedium)
+        Text("Diselesaikan tunai saat jatuh tempo. Premi dibayar di muka dan sudah memuat marjin; derivatif bukan sumber untung rata-rata, tetapi meredam guncangan. Satu kontrak per jenis dan hanya sampai besar eksposur.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        view.derivs.forEach { d ->
+            Text(d.label, style = MaterialTheme.typography.titleSmall)
+            Text(d.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (d.activeText != null) {
+                Text("Aktif: ${d.activeText}", style = MaterialTheme.typography.bodySmall)
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(25, 50, 100).forEachIndexed { i, pct ->
+                        OutlinedButton(onClick = { onBuyDerivative(d.code, pct) }, enabled = d.blocks.getOrNull(i) == null, shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.heightIn(min = 48.dp).testTag("drv_${d.code}_$pct")) { Text("$pct% · premi ${"%.0f".format(d.premiums.getOrElse(i) { 0.0 })}") }
+                    }
+                }
+                d.blocks.filterNotNull().firstOrNull()?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+        }
     }
 }
