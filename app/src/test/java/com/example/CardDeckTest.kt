@@ -140,14 +140,14 @@ class CardDeckTest {
     fun cardsActuallyAppearInPlay() {
         var gen = 0; var chained = 0; var games = 0
         val genIds = cards.map { it.id }.toSet(); val chainIds = cards.filter { it.trig == null }.map { it.id }.toSet()
-        val seen = HashSet<String>()
+        val seen = HashSet<String>(); val perCard = HashMap<String, Int>()
         for (k in 1..60) {
             val e = KapitalEngine(k * 104729L)
             var t = 0
             while (e.gameOverReason == null && t < 250) {
                 t++
                 for (ev in e.openEvents.toList()) {
-                    if (ev.templateId in genIds) { gen++; seen += ev.templateId; if (ev.templateId in chainIds) chained++ }
+                    if (ev.templateId in genIds) { gen++; seen += ev.templateId; perCard.merge(ev.templateId, 1, Int::plus); if (ev.templateId in chainIds) chained++ }
                     e.apply(Action.EventChoice(ev.id, ev.options[0].id))
                 }
                 ActiveBot.step(e, t); e.apply(Action.EndTurn)
@@ -156,6 +156,9 @@ class CardDeckTest {
         }
         println("KARTU main: $games permainan, kartu generator muncul $gen kali (berantai $chained), ${seen.size} kartu berbeda")
         assertTrue("kartu generator muncul dalam permainan: $gen", gen >= games * 3)
+        val top = perCard.maxByOrNull { it.value }!!
+        println("KARTU dominasi: terbanyak ${top.key} = ${top.value}/$gen (${"%.1f".format(100.0 * top.value / gen)}%)")
+        assertTrue("tak ada kartu yang mendominasi undian (>4%): ${top.key} ${top.value}/$gen", top.value <= 0.04 * gen)
     }
 
     companion object {
