@@ -63,7 +63,20 @@ class EventCtx(
     val hasFloatingDebt: Boolean,
     val bankRelation: Double,
     val isPublic: Boolean = false,
-    val profitFalling: Boolean = false
+    val profitFalling: Boolean = false,
+    // C1: kondisi dunia tambahan untuk pemicu kartu
+    val panic: Double = 10.0,
+    val ratingIdx: Int = 3,
+    val tension: Double = 0.0,
+    val sanctioned: Boolean = false,
+    val blockade: Boolean = false,
+    val monthsToElection: Int = 99,
+    val util: Double = 0.8,
+    val priceAdj: Int = 0,
+    val sentiment: Double = 0.0,
+    val oilIndex: Double = 1.0,
+    val gapPct: Double = 0.0,
+    val era: Int = 1
 ) {
     fun m(x: Double) = x * size * costIndex
     val wu: Double get() = 24.6 * size * costIndex
@@ -98,7 +111,7 @@ object EventDeck {
                    turn: Int, window: Int, default: String) =
         GameEvent(id, tpl, cat, title, body, warning, options, turn, turn + window - 1, default)
 
-    val templates: List<Template> = listOf(
+    val baseTemplates: List<Template> = listOf(
         // ------------------------------------------------------------------ SDM dan serikat
         Template("union", "SDM", 14, { c -> 0.6 + max(0.0, c.inflation - 4.0) * 0.35 + (if (c.unemployment < 4.5) 0.5 else 0.0) }) { c, r, id, t ->
             val d = (2.0 + 1.6 * c.inflation).coerceIn(5.0, 14.0).roundToInt()
@@ -661,7 +674,7 @@ object EventDeck {
     /** Aturan rantai: setelah kartu [from] diselesaikan dengan salah satu pilihan [options] (kosong = semua), peluang [p] memicu kartu [to] setelah [delay] giliran. */
     class ChainRule(val from: String, val options: Set<String>, val p: Double, val to: String, val delay: Int, val cause: String)
 
-    val chainRules: List<ChainRule> = listOf(
+    val baseChainRules: List<ChainRule> = listOf(
         ChainRule("union", setOf("c", "z"), 0.70, "union_wildcat", 3, "Tuntutan upah serikat ditolak atau dibiarkan; pekerja melawan di luar serikat pusat."),
         ChainRule("accident", setOf("b"), 0.50, "labor_inspection", 3, "Operator dinyatakan lalai setelah kecelakaan; dinas ketenagakerjaan turun tangan."),
         ChainRule("accident", setOf("a"), 0.15, "labor_inspection", 4, "Kecelakaan kerja menarik perhatian inspektur."),
@@ -674,6 +687,10 @@ object EventDeck {
         ChainRule("cyber", setOf("a", "c", "z"), 0.40, "data_lawsuit", 3, "Data pelanggan ikut bocor saat serangan siber."),
         ChainRule("antidumping", emptySet(), 0.40, "tariff_retaliation", 3, "Bea antidumping memancing pembalasan tarif dari negara pengekspor.")
     )
+
+    /** Dek penuh: kartu tulisan tangan + kartu generator (C1). */
+    val templates: List<Template> by lazy { baseTemplates + EventCards.templates }
+    val chainRules: List<ChainRule> by lazy { baseChainRules + EventCards.chainRules }
 
     val notices: List<NoticeTemplate> = listOf(
         NoticeTemplate("vat_hike", 40, { 0.25 }) { c, r -> Notice("Pemerintah menaikkan PPN 1 poin. Permintaan ritel melemah sedikit selama beberapa bulan.", Tone.WARN, listOf(Effect("mod", 0.985, 4, "rev"))) },

@@ -2523,7 +2523,11 @@ class KapitalEngine(val seed: Long) {
         commodities.cotton.index, execs.filter { it.present }.map { it.id to it.name }, sc.workers,
         loans.any { it.balance > 0.5 && it.floatingSpreadPct != null }, 0.0,
         isPublic = isPublicCompany,
-        profitFalling = ebitHist.size >= 6 && ebitHist.takeLast(3).average() < 0.85 * ebitHist.dropLast(3).takeLast(3).average())
+        profitFalling = ebitHist.size >= 6 && ebitHist.takeLast(3).average() < 0.85 * ebitHist.dropLast(3).takeLast(3).average(),
+        panic = dunia.macro.panic, ratingIdx = dunia.macro.state("sundara").rating.ordinal, tension = dunia.geo.meanTensionOf("sundara"),
+        sanctioned = dunia.geo.activeSanctionsOn("sundara").isNotEmpty(), blockade = dunia.geo.anyBlockade(),
+        monthsToElection = dunia.geo.monthsToElection("sundara", turn), util = utilization(), priceAdj = priceAdjPct,
+        sentiment = stockSentiment, oilIndex = commodities.oil.index, gapPct = world.gap * 100.0, era = KapitalEngine.era(turn))
 
     private fun doEventChoice(eventId: String, optionId: String): Boolean {
         val ev = openEvents.firstOrNull { it.id == eventId } ?: return false
@@ -2664,6 +2668,13 @@ class KapitalEngine(val seed: Long) {
         // 2. Undi kartu kejadian reguler sesuai kondisi dunia & tingkat kesulitan
         val d = EventDeck.draw(eventCtx(), r, openEvents.map { it.templateId }.toSet(), eventLastFired, eventCounter++, difficulty.eventRateMult)
         d.event?.let { ev ->
+            if (openEvents.size < 3) {
+                openEvents += ev; eventsRaised++; eventLastFired[ev.templateId] = turn
+                lines += ReportLine("Kartu keputusan baru: ${ev.title}.", Tone.WARN)
+            }
+        }
+        // C1: kartu generator diundi terpisah (aliran acak sendiri) agar dek lama tidak bergeser
+        EventCards.draw(eventCtx(), rng(125), openEvents.map { it.templateId }.toSet(), eventLastFired, eventCounter++, difficulty.eventRateMult)?.let { ev ->
             if (openEvents.size < 3) {
                 openEvents += ev; eventsRaised++; eventLastFired[ev.templateId] = turn
                 lines += ReportLine("Kartu keputusan baru: ${ev.title}.", Tone.WARN)
