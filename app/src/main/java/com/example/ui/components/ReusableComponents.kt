@@ -15,6 +15,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -263,11 +265,25 @@ fun FanChart(
                 )
             }
 
+            val fanDescription = run {
+                fun f(v: Float) = String.format(java.util.Locale.forLanguageTag("id-ID"), "%.1f", v)
+                if (historyPoints.isEmpty() || medianFuturePoints.isEmpty()) "Grafik proyeksi $title belum punya data."
+                else {
+                    val last = medianFuturePoints.last()
+                    val s50 = spread50Points.lastOrNull(); val s90 = spread90Points.lastOrNull()
+                    "Grafik proyeksi $title, satuan $unitLabel. Nilai terakhir ${f(historyPoints.last())}. " +
+                        "Median di ujung proyeksi ${f(last)}" +
+                        (if (s50 != null) ", rentang 50 persen ${f(last - s50)} sampai ${f(last + s50)}" else "") +
+                        (if (s90 != null) ", rentang 90 persen ${f(last - s90)} sampai ${f(last + s90)}" else "") + "." +
+                        (if (dangerLevel != null) " Batas bahaya ${f(dangerLevel)}." else "")
+                }
+            }
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(130.dp)
                     .padding(vertical = 4.dp)
+                    .semantics { contentDescription = fanDescription }
             ) {
                 val w = size.width
                 val h = size.height
@@ -428,7 +444,14 @@ fun Sparkline(
     modifier: Modifier = Modifier
 ) {
     val strokeColor = semanticToneColor(tone)
-    Canvas(modifier = modifier) {
+    val sparkDescription = if (points.size < 2) "Grafik tren belum punya data."
+    else {
+        val first = points.first(); val last = points.last()
+        val change = if (kotlin.math.abs(first) > 1e-6f) (last - first) / kotlin.math.abs(first) * 100f else 0f
+        val dir = when { change > 0.05f -> "naik"; change < -0.05f -> "turun"; else -> "datar" }
+        "Grafik tren ${points.size} titik: dari ${String.format(java.util.Locale.forLanguageTag("id-ID"), "%.1f", first)} ke ${String.format(java.util.Locale.forLanguageTag("id-ID"), "%.1f", last)}, $dir ${String.format(java.util.Locale.forLanguageTag("id-ID"), "%.1f", kotlin.math.abs(change))} persen."
+    }
+    Canvas(modifier = modifier.semantics { contentDescription = sparkDescription }) {
         if (points.size < 2) return@Canvas
         val w = size.width
         val h = size.height

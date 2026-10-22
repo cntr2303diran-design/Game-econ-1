@@ -28,6 +28,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -236,6 +238,9 @@ private fun WorldPolygonCanvasCard(
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
+                .semantics {
+                    contentDescription = "Peta dunia dengan ${countries.size} negara inti. Peta hanya bisa dipilih dengan sentuhan; untuk detail tiap negara gunakan daftar negara di sebelah atau di bawah peta."
+                }
                 .pointerInput(countries) {
                     detectTapGestures { tapOffset ->
                         val w = size.width.toFloat().coerceAtLeast(1f)

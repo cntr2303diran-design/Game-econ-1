@@ -13,6 +13,9 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    env:
+      # Dipakai pada kondisi 'if' langkah penandatanganan; kosong bila rahasia tidak dipasang (mis. pada pull request dari fork).
+      RELEASE_KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
     steps:
       - uses: actions/checkout@v5
 
@@ -73,6 +76,37 @@ jobs:
             app/build/test-results/testDebugUnitTest/*.xml
           if-no-files-found: ignore
 
+      - name: Verifikasi build release (R8) dengan kunci sementara
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/ci-throwaway.jks
+          STORE_PASSWORD: ci-throwaway
+          KEY_PASSWORD: ci-throwaway
+        run: |
+          keytool -genkeypair -keystore "$KEYSTORE_PATH" -storepass "$STORE_PASSWORD" -alias upload \
+            -keypass "$KEY_PASSWORD" -keyalg RSA -keysize 2048 -validity 30 -dname "CN=CI Throwaway"
+          gradle :app:assembleRelease --stacktrace
+          apk=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          debug=$(ls app/build/outputs/apk/debug/*.apk | head -1)
+          {
+            echo "### Ukuran APK"
+            echo "- debug: $(stat -c%s "$debug") byte"
+            echo "- release (R8, kunci sementara, TIDAK diterbitkan): $(stat -c%s "$apk") byte"
+          } >> "$GITHUB_STEP_SUMMARY"
+          rm -f "$KEYSTORE_PATH"
+
+      - name: Build release bertanda tangan (hanya bila rahasia penandatanganan tersedia)
+        if: env.RELEASE_KEYSTORE_B64 != ''
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/release.jks
+          STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          echo "$RELEASE_KEYSTORE_B64" | base64 -d > "$KEYSTORE_PATH"
+          gradle :app:assembleRelease --stacktrace
+          mkdir -p dist
+          cp app/build/outputs/apk/release/*.apk dist/KAPITAL-${{ github.run_number }}-release.apk
+          rm -f "$KEYSTORE_PATH"
+
       - name: Beri nama APK
         run: |
           mkdir -p dist
@@ -92,6 +126,7 @@ jobs:
           name: KAPITAL build ${{ github.run_number }} (${{ github.ref_name }})
           prerelease: ${{ github.ref_name != 'main' }}
           body: |
-            APK debug otomatis dari commit ${{ github.sha }}.
+            APK debug otomatis dari commit ${{ github.sha }} (APK release bertanda tangan hanya muncul bila rahasia penandatanganan dipasang di repositori).
             Unduh file .apk di bawah, buka di HP Android, lalu izinkan "Instal aplikasi tidak dikenal" jika diminta.
+            Catatan rilis yang jujur (termasuk yang belum teruji): docs/RELEASE_NOTES.md.
           files: dist/*.apk
