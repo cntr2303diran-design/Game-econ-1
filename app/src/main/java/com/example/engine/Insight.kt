@@ -1,6 +1,5 @@
 package com.example.engine
 
-import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.random.Random
@@ -58,7 +57,7 @@ class PredictionMarket {
                 // bank sentral mengejar aturan Taylor
                 QKind.RATE -> 0.8 * (1.5 + o.inflation + 0.5 * (o.inflation - 3.0) + 0.5 * o.gapPct - o.policyRate)
                 // kurs: kerumunan mengekstrapolasi arah naik-turun 6 bulanan yang teramati
-                QKind.FX -> { val s = o.fxUpShare.coerceIn(0.05, 0.95); Math.log(s / (1.0 - s)) }
+                QKind.FX -> { val s = o.fxUpShare.coerceIn(0.05, 0.95); StrictMath.log(s / (1.0 - s)) }
                 // resesi (output gap negatif) cukup persisten
                 QKind.RECESSION -> -1.2 * o.gapPct
             }

@@ -1,7 +1,5 @@
 package com.example.engine
 
-import kotlin.math.exp
-import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.sqrt
 import kotlin.random.Random
@@ -40,7 +38,7 @@ class Commodities {
 
     private fun gauss(r: Random): Double {
         val u1 = max(r.nextDouble(), 1e-9)
-        return sqrt(-2.0 * ln(u1)) * kotlin.math.cos(2.0 * Math.PI * r.nextDouble())
+        return sqrt(-2.0 * ln(u1)) * cos(2.0 * Math.PI * r.nextDouble())
     }
 
     /** @param gap kesenjangan output global; @param kursChangeMonthly depresiasi RS (komoditas dihargai A$). */

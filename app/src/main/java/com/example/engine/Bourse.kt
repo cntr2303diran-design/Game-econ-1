@@ -1,7 +1,5 @@
 package com.example.engine
 
-import kotlin.math.exp
-import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -182,7 +180,7 @@ class Bourse {
 
     private fun gauss(r: Random): Double {
         val u1 = max(r.nextDouble(), 1e-9)
-        return sqrt(-2.0 * ln(u1)) * kotlin.math.cos(2.0 * Math.PI * r.nextDouble())
+        return sqrt(-2.0 * ln(u1)) * cos(2.0 * Math.PI * r.nextDouble())
     }
 
     // =====================================================================

@@ -4,6 +4,10 @@ import com.example.engine.Action
 import com.example.engine.BiasDetector
 import com.example.engine.PredictionMarket
 import com.example.engine.Board
+import com.example.engine.Challenge
+import com.example.engine.ChallengeVerifier
+import com.example.engine.Role
+import com.example.engine.Submission
 import com.example.engine.Countries
 import com.example.engine.DataKind
 import com.example.engine.DerivKind
@@ -66,6 +70,9 @@ private data class UiFlags(
     val selectedCountry: Country? = null,
     val counterfactualText: String? = null
 )
+
+/** Tantangan CEO selalu satu kampanye penuh (480 bulan) atau sampai perusahaan berakhir. */
+const val CEO_CHALLENGE_HORIZON = 480
 
 class GameRepository(
     private val store: SaveStore? = null,
@@ -269,6 +276,33 @@ class GameRepository(
         ui = UiFlags(isDarkTheme = ui.isDarkTheme)
         persist()
         publish()
+    }
+
+    /** Tantangan CEO: dunia dengan seed dan kesulitan yang sama dengan pemain lain (permainan sebelumnya diganti). */
+    fun newGameFromChallenge(c: Challenge) {
+        seed = c.seed
+        log.clear()
+        engine = KapitalEngine(seed)
+        val first = Action.SetDifficulty(c.difficulty)
+        if (engine.apply(first)) log += first.encode()
+        ui = UiFlags(isDarkTheme = ui.isDarkTheme)
+        persist()
+        publish()
+    }
+
+    /** True bila kampanye CEO sudah berakhir (kalah, menang, atau giliran terakhir tercapai). */
+    fun ceoFinished(): Boolean = engine.gameOverReason != null || engine.turn >= CEO_CHALLENGE_HORIZON + 1
+
+    /**
+     * Teks hasil tantangan CEO untuk dibagikan, atau null bila kampanye belum berakhir. Log dikirim tanpa baris kesulitan
+     * (kesulitan ada di kode tantangan), sehingga penerima memutar ulang dari seed yang sama dan menghitung skor sendiri.
+     */
+    fun ceoSubmission(player: String): String? {
+        if (!ceoFinished()) return null
+        val diff = engine.difficulty
+        val actions = log.filter { !it.startsWith("DIF|") }
+        val c = Challenge(Role.CEO, seed, CEO_CHALLENGE_HORIZON, diff)
+        return Submission(player, c, actions, ChallengeVerifier.ceoScore(engine)).encode()
     }
 
     /**
@@ -672,7 +706,7 @@ class GameRepository(
                         changeText = (if (ch >= 0) "+" else "") + "${fmt1(ch)}% bulan ini",
                         tone = if (abs(ch) > 4.0) SemanticTone.DANGER_RED else if (abs(ch) > 2.0) SemanticTone.WARNING_YELLOW else SemanticTone.GOOD_GREEN,
                         sparklineHistory = h.map { it.toFloat() },
-                        fanProjectionMedian = (1..4).map { (ser.base * Math.exp(ser.logDev * Math.pow(ser.rho, it.toDouble()))).toFloat() },
+                        fanProjectionMedian = (1..4).map { (ser.base * StrictMath.exp(ser.logDev * StrictMath.pow(ser.rho, it.toDouble()))).toFloat() },
                         fanProjectionSpread = (1..4).map { (ser.price * vol * 1.65 * sqrt(it.toDouble())).toFloat() },
                         originInfo = m.originInfo.copy(displayedValue = "${fmt1(ser.price)} $unit (${if (ch >= 0) "+" else ""}${fmt1(ch)}%)", dataDate = dateText(turn),
                             calculationMethod = "Proses mean-reverting (kecepatan ${fmt2(ser.rho)}/bulan) dengan guncangan pasokan dan permintaan global. Pita = 1,65 simpangan baku.")

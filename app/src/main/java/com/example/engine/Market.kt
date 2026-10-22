@@ -1,8 +1,6 @@
 package com.example.engine
 
 import kotlin.math.abs
-import kotlin.math.exp
-import kotlin.math.tanh
 import kotlin.random.Random
 
 /**

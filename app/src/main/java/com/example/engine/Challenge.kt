@@ -38,7 +38,7 @@ data class Submission(val player: String, val challenge: Challenge, val log: Lis
     }
 
     companion object {
-        fun safeName(n: String): String = n.replace("|", "").replace("\n", " ").trim().take(24).ifEmpty { "anonim" }
+        fun safeName(n: String): String = n.replace("|", "").replace("\n", " ").filter { !it.isISOControl() }.trim().take(24).ifEmpty { "anonim" }
 
         fun decode(text: String): Submission? {
             return try {
@@ -105,6 +105,20 @@ class Leaderboard(val challenge: Challenge) {
         val old = best[name]
         if (old == null || v.score > old.score) best[name] = LeaderboardEntry(name, v.score, sub.log.size)
         return v
+    }
+
+    /** Teks papan (untuk disimpan sementara oleh layar); hanya berisi entri yang sudah terverifikasi saat masuk. */
+    fun export(): String = best.values.joinToString("\n") { "${it.player}\t${it.score}\t${it.actions}" }
+
+    /** Muat kembali teks hasil [export] tanpa memverifikasi ulang (entri itu dulu sudah diputar ulang). */
+    fun restore(text: String) {
+        for (line in text.lines()) {
+            val p = line.split("\t")
+            if (p.size != 3) continue
+            val sc = p[1].toIntOrNull() ?: continue
+            val ac = p[2].toIntOrNull() ?: continue
+            best[Submission.safeName(p[0])] = LeaderboardEntry(Submission.safeName(p[0]), sc, ac)
+        }
     }
 
     fun ranking(): List<LeaderboardEntry> = best.values.sortedWith(compareByDescending<LeaderboardEntry> { it.score }.thenBy { it.actions }.thenBy { it.player })

@@ -1,8 +1,6 @@
 package com.example.engine
 
 import kotlin.math.abs
-import kotlin.math.exp
-import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.sqrt
 
@@ -76,8 +74,8 @@ object DerivPricing {
 
     /** Strike futures kapas (indeks): ekspektasi indeks 6 bulan ke depan di bawah mean reversion, dikali loading. */
     fun cottonStrike(idx0: Double): Double {
-        val v = COT_SIGMA * COT_SIGMA * (1.0 - Math.pow(COT_RHO, 12.0)) / (1.0 - COT_RHO * COT_RHO)
-        return exp(ln(idx0) * Math.pow(COT_RHO, 6.0) + 0.5 * v) * COT_LOADING
+        val v = COT_SIGMA * COT_SIGMA * (1.0 - StrictMath.pow(COT_RHO, 12.0)) / (1.0 - COT_RHO * COT_RHO)
+        return exp(ln(idx0) * StrictMath.pow(COT_RHO, 6.0) + 0.5 * v) * COT_LOADING
     }
 
     /** Ekspektasi (terukur) selisih rata-rata suku bunga kebijakan 12 bulan ke depan terhadap sekarang. */

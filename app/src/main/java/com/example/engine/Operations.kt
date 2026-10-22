@@ -43,7 +43,7 @@ object StaffEconomy {
     const val RAISE_STEP = 0.10
 
     /** Upah pasar relatif untuk suatu skill (0,5 → 0,97; 0,7 → 1,34; 0,9 → 1,77). */
-    fun marketWage(skill: Double): Double = 0.4 + 1.6 * Math.pow(skill, 1.5)
+    fun marketWage(skill: Double): Double = 0.4 + 1.6 * StrictMath.pow(skill, 1.5)
 
     /** Mean dan simpangan baku skill kandidat menurut tingkat perekrutan 1..3. */
     fun candidateMean(tier: Int) = when (tier) { 1 -> 0.45; 2 -> 0.58; else -> 0.70 }
@@ -119,7 +119,7 @@ class StaffPool {
             s.monthsEmployed++
             val target = (0.70 + 0.8 * (s.salaryMult - 1.0)).coerceIn(0.1, 0.98)
             s.loyalty += 0.10 * (target - s.loyalty)
-            val h = 0.0025 * rivalAggression * Math.pow(max(0.1, 1.5 - s.loyalty), 2.0) * (0.5 + s.skill)
+            val h = 0.0025 * rivalAggression * StrictMath.pow(max(0.1, 1.5 - s.loyalty), 2.0) * (0.5 + s.skill)
             if (r.nextDouble() < h) {
                 s.present = false; poachedTotal++
                 val by = rivalNames[r.nextInt(rivalNames.size)]

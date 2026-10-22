@@ -1,7 +1,6 @@
 package com.example.engine
 
 import kotlin.math.max
-import kotlin.math.pow
 import kotlin.random.Random
 
 /**

@@ -2,8 +2,6 @@ package com.example.engine
 
 import java.util.Locale
 import kotlin.math.abs
-import kotlin.math.cos
-import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -894,12 +892,12 @@ class KapitalEngine(val seed: Long) {
         return premium + (if (tradeFinance) LC_FEE * u else 0.0) + leasedBackRs * LEASE_RATE + auditFee()
     }
 
-    private fun trendGrowth(): Double = Math.pow(1.025, trendMonths / 12.0)
+    private fun trendGrowth(): Double = StrictMath.pow(1.025, trendMonths / 12.0)
 
-    private fun opexBase(): Double = sc.baseOpex * costIndex * Math.pow(trendGrowth(), 0.95) * (if (automation) 0.945 else 1.0)
+    private fun opexBase(): Double = sc.baseOpex * costIndex * StrictMath.pow(trendGrowth(), 0.95) * (if (automation) 0.945 else 1.0)
 
     private fun maintenanceSpend(): Double {
-        val scale = costIndex * Math.pow(trendGrowth(), 0.95)
+        val scale = costIndex * StrictMath.pow(trendGrowth(), 0.95)
         val needed = sc.baseMaint * scale
         return if (deferralActive) sc.baseMaint * 420.0 / 610.0 * scale
         else needed + if (deferredMonths > 0) sc.baseMaint * 120.0 / 610.0 * scale else 0.0
@@ -955,14 +953,14 @@ class KapitalEngine(val seed: Long) {
         // kabar fundamental baru (nilai wajar bergeser) hanya masuk lewat arus pesanan investor nilai, bukan lompatan instan.
         if (stockFairMc <= 0.0) stockFairMc = fair
         // Kabar fundamental langsung sebagian tercermin (pengumuman); sisanya lewat arus pesanan (seperti emiten bursa).
-        val jump = 0.6 * Math.log(fair / stockFairMc).coerceIn(-0.5, 0.5)
-        val lnMis = Math.log(fair) - Math.log(stockFairMc) - stockSentiment - jump
+        val jump = 0.6 * StrictMath.log(fair / stockFairMc).coerceIn(-0.5, 0.5)
+        val lnMis = StrictMath.log(fair) - StrictMath.log(stockFairMc) - stockSentiment - jump
         val h = stockHistory
-        val ret3m = if (h.size >= 4 && h.last() > 0.0 && h[h.size - 4] > 0.0) Math.log(h.last() / h[h.size - 4]) / 3.0 else 0.0
+        val ret3m = if (h.size >= 4 && h.last() > 0.0 && h[h.size - 4] > 0.0) StrictMath.log(h.last() / h[h.size - 4]) / 3.0 else 0.0
         val flow = bourse.book.trade("PLAYER", r, lnMis, ret3m, 1.0, bourse.mood + dunia.lastEffects.news, dunia.lastEffects.riskOff)
-        stockSentiment = (stockSentiment + jump + flow.dLnPrice + 0.03 * stdNormal(r) + Math.log(stockFairMc) - Math.log(fair)).coerceIn(-0.9, 0.6)
+        stockSentiment = (stockSentiment + jump + flow.dLnPrice + 0.03 * stdNormal(r) + StrictMath.log(stockFairMc) - StrictMath.log(fair)).coerceIn(-0.9, 0.6)
         stockFairMc = fair
-        stockPrice = fair * Math.exp(stockSentiment) / sharesOutM
+        stockPrice = fair * StrictMath.exp(stockSentiment) / sharesOutM
         stockHistory += stockPrice
         if (stockHistory.size > 480) stockHistory.removeAt(0)
     }
@@ -3150,7 +3148,7 @@ class KapitalEngine(val seed: Long) {
         // Audit transfer pricing: peluang bergantung pada seberapa besar laba yang digeser dibanding pendapatan induk (bukan peluang tetap)
         val shiftRatio = periodIntercompanyFeeToSubRs / max(1.0, baseNormalRevenue(1.0))
         if (transferPricingMode != TransferPricingMode.WAJAR && shiftRatio > 0.0) {
-            val auditP = (0.001 + 70.0 * Math.pow(shiftRatio, 2.5)).coerceAtMost(0.15)
+            val auditP = (0.001 + 70.0 * StrictMath.pow(shiftRatio, 2.5)).coerceAtMost(0.15)
             if (rOps.nextDouble() < auditP) {
                 val tpPenalty = 620.0 * sc.size * costIndex * (shiftRatio / 0.045).coerceIn(0.25, 1.5)
                 oneOffOpex += tpPenalty

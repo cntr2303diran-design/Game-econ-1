@@ -102,4 +102,58 @@ class ChallengeTest {
         // pengaturan kesulitan di log dilarang
         assertFalse(ChallengeVerifier.verify(a.copy(log = listOf(Action.SetDifficulty(Difficulty.MAGANG).encode()) + a.log)).ok)
     }
+
+    /** Rekam aksi bot disiplin sampai kampanye berakhir; ambil seed pertama yang bertahan lama agar tes tidak hampa. */
+    private fun recordLongCampaign(diff: Difficulty): Pair<Long, List<String>> {
+        for (k in 1..60) {
+            val seed = k * 7919L
+            val e = KapitalEngine(seed)
+            if (diff != Difficulty.MANAJER) e.apply(Action.SetDifficulty(diff))
+            val rec = ArrayList<String>(); var t = 0
+            while (e.gameOverReason == null && e.turn < 481) {
+                t++; TestBots.disciplinedStep(e, t, rec)
+                if (e.apply(Action.EndTurn)) rec.add(Action.EndTurn.encode())
+            }
+            if (e.turn >= 200) return seed to rec
+        }
+        throw AssertionError("tidak ada seed yang bertahan 200 giliran")
+    }
+
+    @Test
+    fun ceoChallenge_throughRepository_exportsAndVerifiesOnAnotherDevice() {
+        for (diff in listOf(Difficulty.MANAJER, Difficulty.values().last())) {
+            val (seed, actions) = recordLongCampaign(diff)
+            val repo = com.example.data.GameRepository(null, 1L)
+            val c = Challenge(Role.CEO, seed, com.example.data.CEO_CHALLENGE_HORIZON, diff)
+            repo.newGameFromChallenge(c)
+            assertTrue("kampanye belum berakhir di awal", !repo.ceoFinished())
+            assertTrue("belum selesai tidak bisa dibagikan", repo.ceoSubmission("A") == null)
+            for (l in actions) repo.corporateAction(l)
+            assertTrue("kampanye berakhir", repo.ceoFinished())
+            val text = repo.ceoSubmission("Pemain|Satu")!!
+            val sub = Submission.decode(text)!!
+            assertEquals("PemainSatu", sub.player.replace(" ", ""))
+            assertEquals(diff, sub.challenge.difficulty)
+            assertTrue("log tidak memuat baris kesulitan", sub.log.none { it.startsWith("DIF|") })
+            assertTrue("log berisi aksi nyata (${sub.log.size})", sub.log.size > 200)
+            val v = ChallengeVerifier.verify(sub)
+            assertTrue("hasil CEO dari repositori lolos verifikasi ($diff): ${v.reason}", v.ok)
+            assertTrue("skor klaim diubah ditolak", !ChallengeVerifier.verify(Submission(sub.player, sub.challenge, sub.log, (sub.claimedScore + 7) % 101)).ok)
+        }
+    }
+
+    @Test
+    fun leaderboard_exportRestoreRoundTrip_andNamesAreSanitized() {
+        val c = Challenge(Role.GUBERNUR, 5L, 24)
+        val g = GovernorGame(5L, 24)
+        while (!g.finished) RolesTest.taylorGovernor(g)
+        val b = Leaderboard(c)
+        assertTrue(b.submit(Submission("Ani\tBudi|\u0001", c, g.log.toList(), g.score())).ok)
+        val text = b.export()
+        val r = Leaderboard(c); r.restore(text)
+        assertEquals(b.ranking().map { Triple(it.player, it.score, it.actions) }, r.ranking().map { Triple(it.player, it.score, it.actions) })
+        assertTrue("nama tanpa karakter kontrol: ${r.ranking()[0].player}", r.ranking()[0].player.none { it.isISOControl() })
+        r.restore("rusak\nx\ty\tz\n\n"); assertEquals(1, r.ranking().size)
+    }
 }
+

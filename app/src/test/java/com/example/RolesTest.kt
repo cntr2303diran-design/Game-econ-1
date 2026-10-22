@@ -24,6 +24,24 @@ class RolesTest {
             g.apply(RoleAction.SetPolicy((g.policy + 1.0).coerceAtMost(16.0)))
             g.apply(RoleAction.NextMonth)
         }
+        private fun fiscalMove(g: MinisterGame, spend: Double, tax: Double) {
+            val ds = (spend.coerceIn(MinisterGame.MIN_SPEND, MinisterGame.MAX_SPEND) - g.spending).coerceIn(-1.0, 1.0)
+            if (ds != 0.0) g.apply(RoleAction.SetSpending(g.spending + ds))
+            val dt = (tax.coerceIn(MinisterGame.MIN_TAX, MinisterGame.MAX_TAX) - g.tax).coerceIn(-1.0, 1.0)
+            if (dt != 0.0) g.apply(RoleAction.SetTax(g.tax + dt))
+        }
+        fun holdMinister(g: MinisterGame) { g.apply(RoleAction.NextMonth) }
+        /** Kontra-siklus: belanja naik dan pajak turun saat ekonomi lesu, sebaliknya saat panas. */
+        fun counterCyclicalMinister(g: MinisterGame) {
+            val gap = g.sim.world.gap * 100.0
+            fiscalMove(g, 17.0 - 0.8 * gap, 15.0 + 0.2 * gap); g.apply(RoleAction.NextMonth)
+        }
+        /** Pro-siklus: kebalikannya. */
+        fun proCyclicalMinister(g: MinisterGame) {
+            val gap = g.sim.world.gap * 100.0
+            fiscalMove(g, 17.0 + 0.8 * gap, 15.0 - 0.2 * gap); g.apply(RoleAction.NextMonth)
+        }
+        fun spendthriftMinister(g: MinisterGame) { fiscalMove(g, 30.0, 8.0); g.apply(RoleAction.NextMonth) }
         fun cashFund(f: FundGame) { f.apply(RoleAction.NextMonth) }
         /** Beli bobot sama pada semua emiten di bulan pertama lalu tahan. */
         fun indexFund(f: FundGame) {
@@ -56,6 +74,12 @@ class RolesTest {
         return g
     }
 
+    private fun runMin(seed: Long, bot: (MinisterGame) -> Unit, horizon: Int = 120): MinisterGame {
+        val g = MinisterGame(seed, horizon)
+        while (!g.finished) bot(g)
+        return g
+    }
+
     private fun runFund(seed: Long, bot: (FundGame) -> Unit, horizon: Int = 120): FundGame {
         val f = FundGame(seed, horizon)
         while (!f.finished) bot(f)
@@ -64,7 +88,7 @@ class RolesTest {
 
     @Test
     fun actionCodec_roundTrip() {
-        for (a in listOf(RoleAction.NextMonth, RoleAction.SetPolicy(6.25), RoleAction.Buy("sx_mitra", 12), RoleAction.Sell("sx_cahaya", 3)))
+        for (a in listOf(RoleAction.NextMonth, RoleAction.SetPolicy(6.25), RoleAction.Buy("sx_mitra", 12), RoleAction.Sell("sx_cahaya", 3), RoleAction.SetSpending(18.5), RoleAction.SetTax(14.0)))
             assertEquals(a, RoleAction.decode(a.encode()))
         assertTrue(RoleAction.decode("???") == null)
         assertTrue(RoleAction.decode("BUY|x") == null)
@@ -101,6 +125,45 @@ class RolesTest {
         assertTrue("mengikuti sinyal lebih baik daripada diam: $taylor vs $hold", taylor > hold + 5.0)
         assertTrue("ceroboh jauh lebih buruk: $taylor vs $dove, $hawk", taylor > dove + 25.0 && taylor > hawk + 25.0)
         assertTrue("skor tetap dalam 0..100", listOf(taylor, hold, dove, hawk).all { it in 0.0..100.0 })
+    }
+
+    @Test
+    fun minister_isDeterministic_andReplayMatches() {
+        val a = runMin(5L, ::counterCyclicalMinister, 60)
+        val b = runMin(5L, ::counterCyclicalMinister, 60)
+        assertEquals(a.score(), b.score()); assertEquals(a.log, b.log)
+        val r = RoleGames.replay(Role.MENTERI, 5L, 60, a.log) as MinisterGame
+        assertEquals(a.debt, r.debt, 0.0)
+        assertEquals(a.avgLoss(), r.avgLoss(), 0.0)
+        assertTrue("log berisi aksi fiskal", a.log.any { it.startsWith("SPD|") } && a.log.any { it.startsWith("TAX|") })
+    }
+
+    @Test
+    fun minister_rulesAreEnforced() {
+        val g = MinisterGame(3L, 12)
+        assertFalse("lompatan belanja >1 poin ditolak", g.apply(RoleAction.SetSpending(g.spending + 2.0)))
+        assertFalse("pajak di atas batas ditolak", g.apply(RoleAction.SetTax(40.0)))
+        assertFalse("aksi suku bunga bukan wewenang Menteri", g.apply(RoleAction.SetPolicy(6.0)))
+        assertFalse("aksi dana ditolak", g.apply(RoleAction.Buy("sx_mitra", 1)))
+        assertTrue(g.apply(RoleAction.SetSpending(g.spending + 1.0)))
+        assertTrue(g.apply(RoleAction.SetTax(g.tax - 1.0)))
+        repeat(12) { assertTrue(g.apply(RoleAction.NextMonth)) }
+        assertTrue(g.finished)
+        assertFalse("setelah selesai tak bisa bertindak", g.apply(RoleAction.NextMonth))
+        assertFalse("Gubernur tidak menerima aksi fiskal", GovernorGame(3L, 12).apply(RoleAction.SetSpending(18.0)))
+    }
+
+    @Test
+    fun minister_skillIsRewarded_recklessIsNot_andDebtCrisisEndsTheGame() {
+        val seeds = 1L..24L
+        fun avg(bot: (MinisterGame) -> Unit) = seeds.map { runMin(it * 7919L, bot).score() }.average()
+        val counter = avg(::counterCyclicalMinister); val hold = avg(::holdMinister); val pro = avg(::proCyclicalMinister); val spend = avg(::spendthriftMinister)
+        println("MENTERI skor rata-rata: kontra-siklus=${"%.1f".format(counter)} tahan=${"%.1f".format(hold)} pro-siklus=${"%.1f".format(pro)} boros=${"%.1f".format(spend)}")
+        assertTrue("kontra-siklus lebih baik daripada diam: $counter vs $hold", counter > hold + 5.0)
+        assertTrue("pro-siklus dan boros jauh lebih buruk: $counter vs $pro, $spend", counter > pro + 25.0 && counter > spend + 25.0)
+        val g = runMin(9L, ::spendthriftMinister)
+        assertTrue("belanja maksimum dan pajak minimum berujung gagal bayar", g.defaulted && g.finished && g.months < 120)
+        assertTrue("gagal bayar membatasi skor", g.score() <= 10)
     }
 
     @Test

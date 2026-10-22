@@ -213,7 +213,17 @@ fun KapitalAppScaffold(
             }
 
             composable(ROUTE_PERAN) {
-                PeranScreen(onBack = { navController.popBackStack() })
+                PeranScreen(
+                    onBack = { navController.popBackStack() },
+                    onPlayCeo = { c ->
+                        viewModel.newGameFromChallenge(c)
+                        navController.navigate(ROUTE_MARKAS) {
+                            popUpTo(ROUTE_MENU) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
+                    ceoShare = { name -> viewModel.ceoSubmission(name) }
+                )
             }
 
             composable(ROUTE_MARKAS) {
