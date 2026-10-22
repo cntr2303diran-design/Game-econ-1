@@ -56,6 +56,9 @@ sealed class Action {
     data class CarbonAction(val kind: String, val units: Int) : Action()
     data class AppointSuccessor(val candidateId: String) : Action()
 
+    // Tahap A: lapisan dunia
+    object ChainAudit : Action()
+
     fun encode(): String = when (this) {
         EndTurn -> "END"
         is Journal -> listOf(
@@ -98,6 +101,7 @@ sealed class Action {
         is MediaLobby -> "LOB|${esc(kind)}"
         is CarbonAction -> "CRB|${esc(kind)}|$units"
         is AppointSuccessor -> "SUC|${esc(candidateId)}"
+        ChainAudit -> "CHA"
     }
 
     companion object {
@@ -149,6 +153,7 @@ sealed class Action {
                     "LOB" -> MediaLobby(p[1])
                     "CRB" -> CarbonAction(p[1], p[2].toInt())
                     "SUC" -> AppointSuccessor(p[1])
+                    "CHA" -> ChainAudit
                     else -> null
                 }
             } catch (_: Exception) {

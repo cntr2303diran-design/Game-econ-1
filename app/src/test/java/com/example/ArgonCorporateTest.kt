@@ -161,25 +161,35 @@ class ArgonCorporateTest {
 
     @Test
     fun stageB_cascadingEventChainsAndEthicsWork() {
-        val engine = KapitalEngine(203303L)
-        val initialEval = engine.evaluateCampaign()
-        assertEquals(100, initialEval.etikaReputasiScore)
+        // Catatan: versi lama tes ini memanggil SetTransferPricing di Era 1, padahal aksi itu terkunci sampai Era 2
+        // (apply mengembalikan false). Skor etika turun hanya kebetulan akibat event acak. Sekarang dimainkan sampai
+        // Era 2 dan aksi harus benar-benar berhasil.
+        val engine = TestBots.firstSurvivor(97)
+        assertEquals(2, KapitalEngine.era(engine.turn))
+        verifyIdentities(engine, "stageB awal Era 2")
+        val before = engine.evaluateCampaign()
+        val evidenceBefore = engine.ethicsEvidences.size
+        assertTrue("transfer pricing agresif harus bisa dipilih di Era 2", engine.apply(Action.SetTransferPricing(TransferPricingMode.AGRESIF)))
+        val afterEval = engine.evaluateCampaign()
+        assertTrue("Ethics score must drop after aggressive transfer pricing evidence: ${before.etikaReputasiScore} -> ${afterEval.etikaReputasiScore}",
+            afterEval.etikaReputasiScore < before.etikaReputasiScore)
+        assertEquals("tepat satu bukti etika baru dicatat", evidenceBefore + 1, engine.ethicsEvidences.size)
+        assertTrue(afterEval.grade in listOf("S", "A", "B", "C", "D", "F"))
 
+        // Aksi yang sama di Era 1 ditolak dan tidak mencatat bukti.
+        val early = KapitalEngine(203303L)
+        assertFalse(early.apply(Action.SetTransferPricing(TransferPricingMode.AGRESIF)))
+        assertEquals(0, early.ethicsEvidences.size)
+        assertEquals(100, early.evaluateCampaign().etikaReputasiScore)
+
+        // Rantai kejadian berjalan dan identitas tetap terjaga.
         for (i in 1..6) {
             val ev = engine.openEvents.firstOrNull()
-            if (ev != null) {
-                val opt = ev.options.first()
-                engine.apply(Action.EventChoice(ev.id, opt.id))
-            }
+            if (ev != null) engine.apply(Action.EventChoice(ev.id, ev.options.first().id))
             engine.apply(Action.EndTurn)
             verifyIdentities(engine, "stageB turn $i")
+            if (engine.gameOverReason != null) break
         }
-
-        engine.apply(Action.SetTransferPricing(TransferPricingMode.AGRESIF))
-        val afterEval = engine.evaluateCampaign()
-        assertTrue("Ethics score must drop after aggressive transfer pricing evidence", afterEval.etikaReputasiScore < initialEval.etikaReputasiScore)
-        assertTrue("Ethics evidence must be recorded", engine.ethicsEvidences.isNotEmpty())
-        assertTrue(afterEval.grade in listOf("S", "A", "B", "C", "D", "F"))
     }
 
     @Test

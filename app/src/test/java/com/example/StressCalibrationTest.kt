@@ -8,7 +8,7 @@ import kotlin.math.abs
 /** Uji tekanan identitas akuntansi dengan aksi acak (termasuk aksi multinasional/korporasi) dan uji determinisme. */
 class StressCalibrationTest {
 
-    private fun randomAction(r: java.util.Random, e: KapitalEngine): Action? = when (r.nextInt(21)) {
+    private fun randomAction(r: java.util.Random, e: KapitalEngine): Action? = when (r.nextInt(23)) {
         17 -> Action.SellSubStake(listOf("tarsis", "kestrel", "halvenia", "meridia")[r.nextInt(4)], 5 + r.nextInt(21))
         18 -> Action.IssueShares(500 + r.nextInt(4000))
         19 -> Action.Repatriate(listOf("tarsis", "kestrel", "halvenia", "meridia")[r.nextInt(4)])
@@ -28,6 +28,8 @@ class StressCalibrationTest {
         12 -> Action.CarbonAction(if (r.nextBoolean()) "buy" else "sell", 1 + r.nextInt(3))
         13 -> Action.AcquireRival("riv_importir")
         14 -> if (!e.cureUsed) Action.EquityCure else null
+        21 -> Action.ChainAudit
+        22 -> Action.MediaLobby(if (r.nextBoolean()) "media" else "lobi")
         else -> null
     }
 

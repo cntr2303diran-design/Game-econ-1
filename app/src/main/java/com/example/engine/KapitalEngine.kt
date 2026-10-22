@@ -246,6 +246,13 @@ class KapitalEngine(val seed: Long) {
      * Jumlah agen yang BENAR-BENAR disimulasikan saat ini, dihitung dari objek hidup (bukan konstanta desain).
      * Kelas agen yang belum diimplementasikan tidak dilaporkan di sini.
      */
+    /** Blok yang terhubung dagang dengan pemain: pemasok, pembiayaan, dan lokasi anak usaha aktif. */
+    fun linkedBlocksNow(): Set<Block> {
+        val s = Dunia.baselineLinks()
+        for ((cid, sub) in subsidiaries) if (sub.active && !sub.nationalized) Countries.byId[cid]?.let { s += it.block }
+        return s
+    }
+
     fun agentCensus(): Map<String, Int> {
         val m = LinkedHashMap<String, Int>()
         m["rumah_tangga"] = world.householdSector.agents + foreign.values.sumOf { it.householdSector.agents }
@@ -459,6 +466,9 @@ class KapitalEngine(val seed: Long) {
     val rateHikeAfterElection = worldRng.nextDouble() < 0.6
     val cooKickback = worldRng.nextDouble() < 0.5
     val electionTurn = sc.turn0 + sc.electionOffset
+
+    // ---------- Lapisan dunia (Tahap A): geopolitik, negara sekunder, sektor & rantai pasok ----------
+    val dunia = Dunia(seed, electionTurn, foreignProfiles.associate { it.id to it.baseTension })
 
     // ---------- Kebijakan dan status ----------
     var salesScheme = if (sc.salesStartsStuffing) SalesScheme.OMZET else SalesScheme.KAS; private set
@@ -751,7 +761,7 @@ class KapitalEngine(val seed: Long) {
         if (!hasKestrelSub && kestrelTariff > 10.0) {
             r += (kestrelTariff - 10.0) * 0.0008
         }
-        return r.coerceIn(0.45, 0.92)
+        return (r * dunia.lastEffects.costMult).coerceIn(0.45, 0.92)
     }
 
     fun monthlyInterest(): Double = loans.sumOf { loanBalanceRs(it) * it.annualRatePct / 100.0 / 12.0 }
@@ -1136,6 +1146,7 @@ class KapitalEngine(val seed: Long) {
             is Action.ExecuteIpo -> eraBlock(3) == null && ipoBlock() == null && doExecuteIpo(action.floatPct, action.dualClassShares)
             Action.OpenCaptiveBank -> eraBlock(3) == null && doOpenCaptiveBank()
             is Action.MediaLobby -> eraBlock(3) == null && doMediaLobby(action.kind)
+            is Action.ChainAudit -> eraBlock(2) == null && doChainAudit()
             is Action.CarbonAction -> eraBlock(4) == null && doCarbonAction(action.kind, action.units)
             is Action.AppointSuccessor -> eraBlock(4) == null && doAppointSuccessor(action.candidateId)
         }
@@ -1422,6 +1433,21 @@ class KapitalEngine(val seed: Long) {
         return true
     }
 
+    /** Uji tuntas rantai pasok sampai Tier-3 (Era 2+): berbiaya, membuka simpul tersembunyi, meredam dampak sanksi (tidak pernah 100%). */
+    private fun doChainAudit(): Boolean {
+        if (dunia.sectors.chainAudited) return false
+        if (!spend(2)) return false
+        val cost = 180.0 * sc.size * costIndex
+        if (cash - cost < 1200.0) return false
+        oneOffOpex += cost
+        dunia.auditChain()
+        val hidden = dunia.sectors.chain.filter { it.hidden }.joinToString("; ") { "Tier-${it.tier} ${it.label} (${Countries.byId.getValue(it.country).name})" }
+        chronicle += ChronicleItem(turn, "Uji Tuntas Rantai Pasok Tier-3",
+            "Biaya ${fmt(cost)} jt RS. Simpul tersembunyi terungkap: $hidden. Pasokan bisa dialihkan lebih cepat bila sanksi menyentuhnya, tetapi uji tuntas tidak pernah 100% akurat.",
+            "Uji tuntas → paparan Tier-2/3 terlihat → dampak sanksi lebih kecil.", actionCount)
+        return true
+    }
+
     /** Akuisisi Media atau Lobi Parlemen (Era 3). */
     private fun doMediaLobby(kind: String): Boolean {
         if (!spend(2)) return false
@@ -1435,6 +1461,7 @@ class KapitalEngine(val seed: Long) {
         } else {
             recordEthicsEvidence("parliament_lobby", 1.1, "exec_coo", "sundara")
             foreignMeta.values.forEach { it.tariffPct = max(it.profile.baseTariffPct, it.tariffPct - 2.0) }
+            dunia.geo.nudgeSundara(-1.2)
         }
         chronicle += ChronicleItem(turn, if (kind == "media") "Akuisisi Grup Media Nasional" else "Kampanye Lobi Parlemen & Asosiasi",
             "Biaya ${fmt(cost)} jt RS untuk memengaruhi opini publik dan menahan kenaikan tarif/regulasi.",
@@ -1918,6 +1945,25 @@ class KapitalEngine(val seed: Long) {
         val rMacro = rng(1)
         val rWorld = rng(8)
         val kursBefore = kurs
+        val crisisNow = crisisPlans().any { turn >= it.start && turn < it.start + it.months }
+        val duniaFx = dunia.step(
+            DuniaContext(
+                turn, world.gap, -0.012 * (policyRate - inflationAnnual - 2.5), commodities.oil.index, crisisNow,
+                linkedBlocksNow(),
+                Block.values().associateWith { b -> (2.5 + 40.0 * (foreign[b.anchor]?.gap ?: 0.0)).coerceIn(-2.0, 7.0) },
+                { id ->
+                    when {
+                        id == "sundara" -> inflationAnnual to world.unemployment
+                        foreign.containsKey(id) -> foreign.getValue(id).let { it.inflation to it.unemployment }
+                        else -> dunia.secondary.state(id).let { it.inflation to 5.0 }
+                    }
+                }
+            ), this::rng
+        )
+        for (nt in duniaFx.notes) {
+            lines += ReportLine(nt.text, nt.tone)
+            if (nt.chronicleTitle != null) chronicle += ChronicleItem(turn, nt.chronicleTitle, nt.text, nt.chain ?: "", actionCount)
+        }
         foreignProfiles.forEachIndexed { i, p ->
             val fw = foreign.getValue(p.id)
             fw.step(rng(20 + i), 1.0, 1.0, 1.0, 0.0, 1.0)
@@ -1926,23 +1972,23 @@ class KapitalEngine(val seed: Long) {
             // Kurs mata uang lokal terhadap RS mengikuti PPP selisih inflasi Sundara vs negara tersebut
             val diffInfl = (inflationAnnual - fw.inflation) / 1200.0
             meta.fxToRs = (meta.fxToRs * (1.0 + diffInfl + gaussian(rMacro) * 0.005)).coerceAtLeast(meta.profile.baseFxToRs * 0.4)
-            // Skor ketegangan & tarif bea masuk bergerak dinamis
-            val tensionStep = ((rMacro.nextDouble() - 0.49) * 3.2).roundToInt()
-            meta.tensionScore = (meta.tensionScore + tensionStep).coerceIn(15, 92)
-            meta.tariffPct = when {
+            // Skor ketegangan Sundara–negara ini kini berasal dari matriks geopolitik dinamis (Tahap A4);
+            // tarif bea masuk mengikuti anak tangga eskalasi ditambah haluan pemilu kedua negara.
+            meta.tensionScore = dunia.geo.tension("sundara", p.id).roundToInt().coerceIn(15, 92)
+            meta.tariffPct = (when {
                 meta.tensionScore >= 70 -> meta.profile.baseTariffPct + 14.0
                 meta.tensionScore >= 60 -> meta.profile.baseTariffPct + 9.0
                 meta.tensionScore >= 45 -> meta.profile.baseTariffPct + 4.0
                 else -> meta.profile.baseTariffPct
-            }
+            } + dunia.geo.stance(p.id).tariffAdd * 0.5 + dunia.geo.stance("sundara").tariffAdd * 0.3).coerceAtLeast(0.0)
         }
         aurPrice *= 1.0 + foreign.getValue("aurelia").inflation / 1200.0
         val infDiff = inflationAnnual - foreign.getValue("aurelia").inflation
-        val driftMonthly = infDiff / 1200.0 + 0.0012
+        val driftMonthly = infDiff / 1200.0 + 0.0012 + duniaFx.kursDrift
         kurs *= 1.0 + driftMonthly + gaussian(rMacro) * 0.008
         foreignMeta.getValue("aurelia").fxToRs = kurs
 
-        var demandShock = 0.0
+        var demandShock = duniaFx.demandShock
         // Krisis makro per era (tekanan naik tiap era, sesuai dokumen desain): jadwal deterministik dari seed
         crisisPlans().firstOrNull { turn >= it.start - 3 && turn < it.start + it.months }?.let { cp ->
             if (turn == cp.start - 3) {
@@ -1991,6 +2037,9 @@ class KapitalEngine(val seed: Long) {
         val matCost = 0.35 + 0.65 * marketMat
         val fxTarget = (1.0 + 0.6 * ((0.8 + 0.2 * fxReal()) - 1.0)) * (1.0 + 0.65 * 0.7 * (marketMat - 1.0))
         fxPassState += 0.35 * (fxTarget - fxPassState)
+        // Catatan: pengali biaya lapisan dunia (sanksi/kelangkaan) sengaja TIDAK dimasukkan ke costPressure, karena
+        // costPressure juga menentukan biaya pesaing/emiten dan pesaing tidak meneruskan biaya ke harga (mereka bangkrut).
+        // Pengali itu dipakai pada HPP pemain di cogsRatio().
         val costPressure = (0.8 + 0.2 * fxReal()) * (costIndex / priceIndex) * matCost
         val rpPlayer = (1.0 + priceAdjPct / 100.0) * fxPassLevel()
         volOverride = world.volumeFactor(rpPlayer)
@@ -2087,7 +2136,7 @@ class KapitalEngine(val seed: Long) {
                 if (policyRate > prevPolicy) Tone.WARN else Tone.INFO)
         }
         out.events.forEach { lines += ReportLine(it, Tone.WARN) }
-        creditShock *= 0.96
+        creditShock = creditShock * 0.96 + duniaFx.creditShock
         creditAdj = (0.4 * (out.unemployment - 5.0)).coerceIn(-0.5, 2.0) + creditShock - (if (isPublicCompany) (stockSentiment * 1.0).coerceIn(-0.3, 0.3) else 0.0)
         loans.forEach { l -> l.floatingSpreadPct?.let { l.annualRatePct = policyRate + it + creditAdj } }
 
