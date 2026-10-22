@@ -44,8 +44,7 @@ jobs:
       - name: Build APK debug
         run: gradle :app:assembleDebug --stacktrace
 
-      - name: Uji unit
-        continue-on-error: true
+      - name: Uji unit (gagal bila ada tes gagal)
         run: |
           set +e
           gradle :app:testDebugUnitTest > test-output.txt 2>&1
@@ -63,6 +62,16 @@ jobs:
           done
           if [ $code -ne 0 ]; then grep -E "What went wrong|error:|e: " -A3 test-output.txt | head -20 | sed 's/^/::warning::/'; fi
           exit $code
+
+      - name: Unggah log uji unit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-uji-unit
+          path: |
+            test-output.txt
+            app/build/test-results/testDebugUnitTest/*.xml
+          if-no-files-found: ignore
 
       - name: Beri nama APK
         run: |
