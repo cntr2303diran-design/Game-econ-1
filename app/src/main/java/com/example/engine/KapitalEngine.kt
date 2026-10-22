@@ -185,6 +185,12 @@ class KapitalEngine(val seed: Long) {
     val rd = RdProgram()
     var logisticsLevel = 0; private set
     var fleetOwned = false; private set
+    /** B4: asuransi, L/C, sale-leaseback. */
+    var insuranceLevel = 0; private set
+    var tradeFinance = false; private set
+    /** Nilai aset tetap yang dijual dan disewa kembali (jt RS), dasar sewa bulanan. */
+    var leasedBackRs = 0.0; private set
+    val insuranceClaimTurns = mutableListOf<Int>()
 
     // ---------- Neraca ----------
     var cash = sc.cash; private set
@@ -846,7 +852,15 @@ class KapitalEngine(val seed: Long) {
     fun operationsMonthlyCost(): Double {
         val u = sc.size * costIndex
         return staffPool.extraMonthlyCost(StaffEconomy.BASE_WAGE * u) + rd.level * RdProgram.COST_PER_LEVEL * u +
-            logisticsLevel * 25.0 * u + (if (fleetOwned) 18.0 * u else 0.0)
+            logisticsLevel * 25.0 * u + (if (fleetOwned) 18.0 * u else 0.0) + financeMonthlyCost()
+    }
+
+    /** B4: premi asuransi (naik 15% per klaim dalam 24 bulan terakhir), biaya L/C, dan sewa kembali (jt RS per bulan). */
+    fun financeMonthlyCost(): Double {
+        val u = sc.size * costIndex
+        val loading = 1.0 + 0.15 * insuranceClaimTurns.count { turn - it <= 24 }
+        val premium = when (insuranceLevel) { 1 -> 21.0; 2 -> 30.0; else -> 0.0 } * u * loading
+        return premium + (if (tradeFinance) LC_FEE * u else 0.0) + leasedBackRs * LEASE_RATE
     }
 
     private fun trendGrowth(): Double = Math.pow(1.025, trendMonths / 12.0)
@@ -1189,6 +1203,9 @@ class KapitalEngine(val seed: Long) {
             is Action.RaiseSalary -> doRaiseSalary(action.role)
             is Action.SetRdLevel -> doSetRdLevel(action.level)
             is Action.SetLogistics -> doSetLogistics(action.level)
+            is Action.SetInsurance -> doSetInsurance(action.level)
+            is Action.SetTradeFinance -> doSetTradeFinance(action.on)
+            is Action.SaleLeaseback -> doSaleLeaseback(action.pct)
         }
         if (ok) actionCount++
         return ok
@@ -1695,6 +1712,49 @@ class KapitalEngine(val seed: Long) {
     private fun doSetLogistics(level: Int): Boolean {
         if (level !in 0..2 || level == logisticsLevel || !spend(1)) return false
         logisticsLevel = level
+        return true
+    }
+
+
+    // =====================================================================
+    // B4a: asuransi, L/C, sale-leaseback
+    // =====================================================================
+    /** Alasan sale-leaseback ditolak, atau null. Dijual pada nilai buku (tanpa laba/rugi); sewa diperlakukan sebagai beban operasi. */
+    fun saleLeasebackBlock(pct: Int): String? {
+        if (pct !in 5..20) return "Porsi harus 5–20% dari aset tetap."
+        val proceeds = fixedAssets * pct / 100.0
+        if (leasedBackRs + proceeds > LEASEBACK_MAX * (fixedAssets + leasedBackRs)) return "Total aset yang disewa kembali tidak boleh lebih dari ${(LEASEBACK_MAX * 100).toInt()}% aset tetap."
+        if (ap < 2) return "AP tidak cukup (butuh 2)."
+        return null
+    }
+
+    private fun doSetInsurance(level: Int): Boolean {
+        if (level !in 0..2 || level == insuranceLevel || !spend(1)) return false
+        insuranceLevel = level
+        return true
+    }
+
+    private fun doSetTradeFinance(on: Boolean): Boolean {
+        if (on == tradeFinance) return false
+        // Mematikan L/C membuat utang dagang turun kembali; butuh kas untuk menutupnya.
+        if (!on && cash < 0.35 * payables + 1500.0) return false
+        if (!spend(1)) return false
+        tradeFinance = on
+        chronicle += ChronicleItem(turn, if (on) "L/C perdagangan diaktifkan" else "L/C perdagangan dimatikan",
+            if (on) "Utang dagang diperpanjang dari 35 ke 50 hari; kas tertahan terlepas bertahap dengan biaya ${fmt(LC_FEE * sc.size * costIndex)} jt RS per bulan."
+            else "Pemasok kembali dibayar dalam 35 hari; kas keluar bertahap.",
+            "Pembiayaan perdagangan → utang dagang lebih panjang → kas lebih longgar, biaya bulanan.", actionCount)
+        return true
+    }
+
+    private fun doSaleLeaseback(pct: Int): Boolean {
+        if (saleLeasebackBlock(pct) != null || !spend(2)) return false
+        val proceeds = fixedAssets * pct / 100.0
+        pendingCapex -= proceeds          // arus masuk investasi sebesar nilai buku; aset tetap turun dengan jumlah sama
+        leasedBackRs += proceeds
+        chronicle += ChronicleItem(turn, "Sale-leaseback aset tetap",
+            "Aset senilai ${fmt(proceeds)} jt RS dijual pada nilai buku lalu disewa kembali: sewa ${fmt(proceeds * LEASE_RATE)} jt RS per bulan, penyusutan berkurang. Tidak ada laba penjualan; agunan berkurang.",
+            "Sale-leaseback → kas masuk sekarang → beban sewa tetap bulanan dan agunan kredit mengecil.", actionCount)
         return true
     }
 
@@ -2593,6 +2653,12 @@ class KapitalEngine(val seed: Long) {
             if (rOps.nextDouble() < p) {
                 breakdownMonthsLeft = 2
                 breakdownCost = 1800.0 * sc.size * costIndex
+                if (insuranceLevel > 0) {
+                    val covered = breakdownCost * (if (insuranceLevel == 2) 0.85 else 0.60)
+                    pendingIncome += covered
+                    insuranceClaimTurns += turn
+                    lines += ReportLine("Asuransi membayar klaim ${fmt(covered)} jt RS untuk perbaikan mesin (premi akan naik).", Tone.GOOD)
+                }
                 lines += ReportLine("Mesin tenun lini 3 rusak berat: produksi turun 50% selama 2 bulan, perbaikan ${fmt(breakdownCost)} jt RS.", Tone.BAD)
                 chronicle += ChronicleItem(turn, "Kerusakan mesin besar",
                     "Perawatan yang tertunda $deferredMonths bulan berujung kerusakan.",
@@ -2672,7 +2738,7 @@ class KapitalEngine(val seed: Long) {
         val newNormalAR = normalAR + 0.5 * (arTarget - normalAR)
         val invTarget = cogs * 53.0 / 30.0 * (if (holdupThisTurn) 1.15 else 1.0) * (if (warehouse) 0.92 else 1.0)
         val newInv = inventory + 0.5 * (invTarget - inventory)
-        val payTarget = cogs * 35.0 / 30.0
+        val payTarget = cogs * (if (tradeFinance) 50.0 else 35.0) / 30.0
         val newPay = payables + 0.5 * (payTarget - payables)
         normalAR = newNormalAR
         inventory = newInv + pendingPrepay
@@ -3316,6 +3382,10 @@ class KapitalEngine(val seed: Long) {
     }
 
     companion object {
+        /** Biaya L/C bulanan (jt RS pada skala 1), tarif sewa kembali per bulan, dan batas aset yang boleh disewa kembali. */
+        const val LC_FEE = 31.0
+        const val LEASE_RATE = 0.0095
+        const val LEASEBACK_MAX = 0.40
         val INVEST = listOf(
             InvestSpec("line", "Tambah lini tenun", "Lini tenun baru menambah kapasitas. Tanpa tambahan permintaan, lini baru menganggur dan hanya menambah biaya.",
                 3600.0, 4, 3, true, "Kapasitas +12%, biaya operasi +70 jt RS per bulan", 3),

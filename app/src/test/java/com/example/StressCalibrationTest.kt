@@ -38,7 +38,10 @@ class StressCalibrationTest {
         if (r.nextInt(5) != 0) return randomAction(r, e)
         val kinds = listOf("sektor", "negara", "pesaing", "segmen", "xx")
         val kind = kinds[r.nextInt(kinds.size)]
-        return when (r.nextInt(9)) {
+        return when (r.nextInt(12)) {
+            9 -> Action.SetInsurance(r.nextInt(3))
+            10 -> Action.SetTradeFinance(r.nextBoolean())
+            11 -> Action.SaleLeaseback(3 + r.nextInt(20))
             3 -> Action.HireStaff(StaffRole.values()[r.nextInt(StaffRole.values().size)].code, 1 + r.nextInt(3))
             4 -> Action.FireStaff(StaffRole.values()[r.nextInt(StaffRole.values().size)].code)
             5 -> Action.RaiseSalary(StaffRole.values()[r.nextInt(StaffRole.values().size)].code)

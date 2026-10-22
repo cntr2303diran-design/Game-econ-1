@@ -257,7 +257,14 @@ data class OperationsView(
     val logisticsLevel: Int = 0,
     val logisticsText: String = "",
     val fleetText: String = "",
-    val costText: String = ""
+    val costText: String = "",
+    // B4a: keuangan lanjut
+    val insuranceLevel: Int = 0,
+    val insuranceText: String = "",
+    val tradeFinance: Boolean = false,
+    val tradeFinanceText: String = "",
+    val leaseText: String = "",
+    val leaseBlocks: List<String?> = emptyList()
 )
 
 data class GanttTask(

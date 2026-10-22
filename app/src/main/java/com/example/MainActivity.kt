@@ -254,7 +254,10 @@ fun KapitalAppScaffold(
                     onFireStaff = { viewModel.fireStaff(it) },
                     onRaiseSalary = { viewModel.raiseSalary(it) },
                     onSetRdLevel = { viewModel.setRdLevel(it) },
-                    onSetLogistics = { viewModel.setLogistics(it) }
+                    onSetLogistics = { viewModel.setLogistics(it) },
+                    onSetInsurance = { viewModel.setInsurance(it) },
+                    onSetTradeFinance = { viewModel.setTradeFinance(it) },
+                    onSaleLeaseback = { viewModel.saleLeaseback(it) }
                 )
             }
 

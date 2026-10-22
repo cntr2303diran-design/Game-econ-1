@@ -77,7 +77,7 @@ done
 
 DEFAULT_CLASSES=(ArgonCorporateTest ExampleUnitTest StressCalibrationTest ChainCardsTest EraCrisisTest PublicCompanyTest
   EvaluationTest GroupStatementsUiTest TransferPricingAuditTest RivalLearningTest DifficultyTest EraReviewTest
-  StockTest NciTest SuccessionTest BalanceTest PerformanceTest AgentScaleTest WorldLayerTest MacroPlusTest MarketTest CreditSystemTest LongCyclesTest StageAStressTest WorldViewTest IntelBoardTest AntiExploitTest ProductMarketTest OperationsTest)
+  StockTest NciTest SuccessionTest BalanceTest PerformanceTest AgentScaleTest WorldLayerTest MacroPlusTest MarketTest CreditSystemTest LongCyclesTest StageAStressTest WorldViewTest IntelBoardTest AntiExploitTest ProductMarketTest OperationsTest FinanceTest)
 if [ "$#" -gt 0 ]; then CLASSES=("$@"); else CLASSES=("${DEFAULT_CLASSES[@]}"); fi
 FQ=(); for c in "${CLASSES[@]}"; do FQ+=("com.example.$c"); done
 exec java -cp "$OUT/stub.jar:$OUT/engine.jar:$OUT/tests.jar:$OUT/runner.jar:$STD:$CO" RunnerKt "${FQ[@]}"

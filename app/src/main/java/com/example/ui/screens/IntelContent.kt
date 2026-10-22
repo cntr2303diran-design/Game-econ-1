@@ -155,7 +155,10 @@ fun OperasiTabContent(
     onFire: (String) -> Unit,
     onRaise: (String) -> Unit,
     onSetRd: (Int) -> Unit,
-    onSetLogistics: (Int) -> Unit
+    onSetLogistics: (Int) -> Unit,
+    onSetInsurance: (Int) -> Unit = {},
+    onSetTradeFinance: (Boolean) -> Unit = {},
+    onSaleLeaseback: (Int) -> Unit = {}
 ) {
     var hireTier by rememberSaveable { mutableStateOf(2) }
     Text("Operasi: karyawan kunci, R&D, logistik", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -202,5 +205,26 @@ fun OperasiTabContent(
             }
         }
         Text(view.fleetText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    IntelCard {
+        Text("Keuangan lanjut", style = MaterialTheme.typography.titleMedium)
+        Text(view.insuranceText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            (0..2).forEach { lv ->
+                FilterChip(selected = view.insuranceLevel == lv, onClick = { if (ap >= 1) onSetInsurance(lv) }, enabled = view.insuranceLevel == lv || ap >= 1,
+                    label = { Text(if (lv == 0) "Tanpa" else "Tingkat $lv") }, modifier = Modifier.testTag("keu_ins_$lv"))
+            }
+        }
+        Text(view.tradeFinanceText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        OutlinedButton(onClick = { onSetTradeFinance(!view.tradeFinance) }, enabled = ap >= 1, shape = RoundedCornerShape(6.dp),
+            modifier = Modifier.heightIn(min = 48.dp).testTag("keu_lc")) { Text(if (view.tradeFinance) "Matikan L/C" else "Aktifkan L/C") }
+        Text(view.leaseText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(5, 10, 20).forEachIndexed { i, pct ->
+                OutlinedButton(onClick = { onSaleLeaseback(pct) }, enabled = view.leaseBlocks.getOrNull(i) == null, shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier.heightIn(min = 48.dp).testTag("keu_slb_$pct")) { Text("Jual-sewa $pct%") }
+            }
+        }
+        view.leaseBlocks.filterNotNull().firstOrNull()?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }

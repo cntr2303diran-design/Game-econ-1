@@ -74,6 +74,12 @@ sealed class Action {
     data class SetRdLevel(val level: Int) : Action()
     /** B3: tingkat logistik (0..2): ketahanan terhadap guncangan biaya pasokan. */
     data class SetLogistics(val level: Int) : Action()
+    /** B4: asuransi aset dan gangguan usaha (0 tanpa, 1 dasar, 2 lengkap). */
+    data class SetInsurance(val level: Int) : Action()
+    /** B4: pembiayaan perdagangan L/C: utang dagang diperpanjang dari 35 ke 50 hari dengan biaya bulanan. */
+    data class SetTradeFinance(val on: Boolean) : Action()
+    /** B4: jual aset tetap pada nilai buku lalu sewa kembali (persen dari aset tetap sekarang, 5..20). */
+    data class SaleLeaseback(val pct: Int) : Action()
 
     fun encode(): String = when (this) {
         EndTurn -> "END"
@@ -126,6 +132,9 @@ sealed class Action {
         is RaiseSalary -> "RSL|${esc(role)}"
         is SetRdLevel -> "RDL|$level"
         is SetLogistics -> "LOG|$level"
+        is SetInsurance -> "INS|$level"
+        is SetTradeFinance -> "LCR|$on"
+        is SaleLeaseback -> "SLB|$pct"
     }
 
     companion object {
@@ -186,6 +195,9 @@ sealed class Action {
                     "RSL" -> RaiseSalary(p[1])
                     "RDL" -> SetRdLevel(p[1].toInt())
                     "LOG" -> SetLogistics(p[1].toInt())
+                    "INS" -> SetInsurance(p[1].toInt())
+                    "LCR" -> SetTradeFinance(p[1].toBoolean())
+                    "SLB" -> SaleLeaseback(p[1].toInt())
                     else -> null
                 }
             } catch (_: Exception) {

@@ -131,6 +131,9 @@ class GameRepository(
     fun raiseSalary(role: String) = perform(Action.RaiseSalary(role))
     fun setRdLevel(level: Int) = perform(Action.SetRdLevel(level))
     fun setLogistics(level: Int) = perform(Action.SetLogistics(level))
+    fun setInsurance(level: Int) = perform(Action.SetInsurance(level))
+    fun setTradeFinance(on: Boolean) = perform(Action.SetTradeFinance(on))
+    fun saleLeaseback(pct: Int) = perform(Action.SaleLeaseback(pct))
     fun buyIntel(kind: String, subject: String, tier: Int) = perform(Action.BuyIntel(kind, subject, tier))
     fun answerBoard(claim: String) = perform(Action.BoardAnswer(claim))
     fun applyCredit(bankId: String, amount: Int, tenor: Int, purpose: String, floating: Boolean, bullet: Boolean) =
@@ -307,7 +310,13 @@ class GameRepository(
             logisticsLevel = e.logisticsLevel,
             logisticsText = "Logistik tingkat ${e.logisticsLevel} (meredam guncangan biaya pasokan ${(35 * e.logisticsLevel)}%)",
             fleetText = if (e.fleetOwned) "Armada sendiri aktif" else "Armada sendiri: belum (investasi di tab Investasi)",
-            costText = "Biaya operasi tambahan ${fmt(e.operationsMonthlyCost())} jt RS per bulan"
+            costText = "Biaya operasi tambahan ${fmt(e.operationsMonthlyCost())} jt RS per bulan",
+            insuranceLevel = e.insuranceLevel,
+            insuranceText = "Asuransi tingkat ${e.insuranceLevel} (0 tanpa, 1 menanggung 60%, 2 menanggung 85% biaya perbaikan mesin) · klaim 24 bulan terakhir ${e.insuranceClaimTurns.count { e.turn - it <= 24 }} (premi naik 15% per klaim)",
+            tradeFinance = e.tradeFinance,
+            tradeFinanceText = if (e.tradeFinance) "L/C aktif: utang dagang 50 hari, biaya ${fmt(KapitalEngine.LC_FEE * e.sc.size * e.costIndex)} jt RS per bulan" else "L/C mati: utang dagang 35 hari. Mengaktifkan memperpanjang menjadi 50 hari (kas lebih longgar) dengan biaya bulanan.",
+            leaseText = "Aset tetap disewa kembali ${fmt(e.leasedBackRs)} jt RS (sewa ${fmt(e.leasedBackRs * KapitalEngine.LEASE_RATE)} jt RS per bulan). Dijual pada nilai buku, batas ${(KapitalEngine.LEASEBACK_MAX * 100).toInt()}% aset tetap, tidak bisa dibeli kembali.",
+            leaseBlocks = listOf(5, 10, 20).map { e.saleLeasebackBlock(it) }
         )
     }
 
