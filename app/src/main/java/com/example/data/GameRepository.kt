@@ -1,6 +1,7 @@
 package com.example.data
 
 import com.example.engine.Action
+import com.example.engine.Board
 import com.example.engine.Countries
 import com.example.engine.DataKind
 import com.example.engine.Difficulty
@@ -11,6 +12,8 @@ import com.example.engine.KapitalEngine.Companion.fmt
 import com.example.engine.KapitalEngine.Companion.fmt1
 import com.example.engine.KapitalEngine.Companion.fmt2
 import com.example.engine.KapitalEngine.Companion.signed
+import com.example.engine.IntelKind
+import com.example.engine.IntelTier
 import com.example.engine.Ladder
 import com.example.engine.SalesScheme
 import com.example.engine.Tech
@@ -228,6 +231,28 @@ class GameRepository(
     // ------------------------------------------------------------------
     // Lapisan dunia dinamis → model tampilan
     // ------------------------------------------------------------------
+
+    private fun intelView(e: KapitalEngine): IntelView {
+        val kinds = IntelKind.values().map { k -> Triple(k.code, k.label, e.intelSubjects(k)) }
+        val tiers = (1..3).map { t -> "Tingkat $t: ${fmt(e.intelCostRs(t))} jt RS (galat ±${(IntelTier.errorSd(t) * 100).roundToInt()}%)" }
+        val reports = e.intelReports.takeLast(12).reversed().map { r ->
+            IntelReportView(
+                title = "${r.kind.label}: ${r.subjectLabel}",
+                metric = r.metric,
+                estimateText = "${fmt2(r.estimate)} ${r.unit}",
+                bandText = "± ${fmt2(r.errorBand)}",
+                whenText = dateText(r.turn),
+                tierText = "tingkat ${r.tier}"
+            )
+        }
+        val q = e.boardQuestion
+        val board = q?.let {
+            BoardView(it.member, it.text, Board.METRICS.getValue(it.metric), "Dinilai ${dateText(it.dueTurn)}", it.answer)
+        }
+        val record = "benar ${e.boardCorrect} · salah ${e.boardWrong} · mengelak ${e.boardAbstained} · tak dijawab ${e.boardIgnored}"
+        return IntelView(kinds, tiers, reports, board, e.boardTrust, record)
+    }
+
     private fun liveTensions(e: KapitalEngine): List<PairwiseTension> {
         val geo = e.dunia.geo
         data class P(val a: String, val b: String, val label: String, val where: String, val strait: String?)
@@ -1009,6 +1034,7 @@ class GameRepository(
             activeMapLayer = ui.activeMapLayer,
             pairwiseTensions = liveTensions(e),
             worldLayer = worldLayerView(e),
+            intel = intelView(e),
             incomeStatementRows = incomeRows,
             balanceSheetRows = balanceRows,
             cashFlowRows = cashFlowRows,

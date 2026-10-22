@@ -1500,11 +1500,14 @@ class KapitalEngine(val seed: Long) {
         }
     }
 
+    /** Biaya riset tingkat [tier] dalam jt RS pada skala usaha dan indeks biaya saat ini. */
+    fun intelCostRs(tier: Int): Double = IntelTier.cost(tier) * sc.size * costIndex
+
     private fun doBuyIntel(kindCode: String, subject: String, tier: Int): Boolean {
         val kind = IntelKind.of(kindCode) ?: return false
         if (tier !in 1..3) return false
         val (truth, scale, meta) = intelTruth(kind, subject) ?: return false
-        val cost = IntelTier.cost(tier) * sc.size * costIndex
+        val cost = intelCostRs(tier)
         if (cash - cost < 1200.0 || !spend(1)) return false
         oneOffOpex += cost
         val sd = IntelTier.errorSd(tier) * scale

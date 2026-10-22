@@ -186,6 +186,35 @@ data class WorldLayerView(
     val lines: List<Pair<String, String>> = emptyList()
 )
 
+/** B1: satu laporan intelijen yang sudah dibeli. */
+data class IntelReportView(
+    val title: String,
+    val metric: String,
+    val estimateText: String,
+    val bandText: String,
+    val whenText: String,
+    val tierText: String
+)
+
+/** B1: pertanyaan rapat dewan yang sedang terbuka. */
+data class BoardView(
+    val member: String,
+    val text: String,
+    val metricLabel: String,
+    val dueText: String,
+    val answered: String?
+)
+
+/** B1: tampilan tab Intelijen (riset berbayar dan rapat dewan). */
+data class IntelView(
+    val kinds: List<Triple<String, String, List<Pair<String, String>>>> = emptyList(), // kode, label, subjek (kode, label)
+    val tierCosts: List<String> = emptyList(),
+    val reports: List<IntelReportView> = emptyList(),
+    val board: BoardView? = null,
+    val boardTrust: Int = 0,
+    val boardRecord: String = ""
+)
+
 data class GanttTask(
     val id: String,
     val projectName: String,
@@ -376,6 +405,7 @@ data class GameState(
     val activeMapLayer: MapLayerFilter = MapLayerFilter.PELAYARAN,
     val pairwiseTensions: List<PairwiseTension>,
     val worldLayer: WorldLayerView = WorldLayerView(),
+    val intel: IntelView = IntelView(),
 
     // Layar Perusahaan (Laporan Keuangan, Organisasi, Proyek Gantt, Kontrak)
     val incomeStatementRows: List<FinancialRowItem>,
