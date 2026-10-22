@@ -180,6 +180,11 @@ class KapitalEngine(val seed: Long) {
     var boardTrust: Int = 78; private set
     /** B2: pasar produk (harus dideklarasikan sebelum blok init yang memperkirakan pendapatan). */
     val market = ProductMarket()
+    /** B3: karyawan kunci, R&D berkelanjutan, logistik (dideklarasikan sebelum blok init). */
+    val staffPool = StaffPool()
+    val rd = RdProgram()
+    var logisticsLevel = 0; private set
+    var fleetOwned = false; private set
 
     // ---------- Neraca ----------
     var cash = sc.cash; private set
@@ -770,7 +775,9 @@ class KapitalEngine(val seed: Long) {
         if (!hasKestrelSub && kestrelTariff > 10.0) {
             r += (kestrelTariff - 10.0) * 0.0008
         }
-        return (r * dunia.lastEffects.costMult).coerceIn(0.45, 0.92)
+        if (fleetOwned) r -= 0.004
+        val costM = 1.0 + (dunia.lastEffects.costMult - 1.0) * (1.0 - 0.35 * logisticsLevel)
+        return (r * costM * staffPool.cogsMult()).coerceIn(0.45, 0.92)
     }
 
     fun monthlyInterest(): Double = loans.sumOf { loanBalanceRs(it) * it.annualRatePct / 100.0 / 12.0 }
@@ -808,7 +815,7 @@ class KapitalEngine(val seed: Long) {
     fun playerShare(): Double = world.playerShare((1.0 + priceAdjPct / 100.0) * fxPassLevel())
 
     private fun baseNormalRevenue(prodFactor: Double): Double {
-        var r = sc.baseRevenue * volumeCap() * econ * trendGrowth() * modProduct("rev") * (if (turn <= dumpingUntil) 0.98 else 1.0) * priceIndex * fxPassLevel() * prodFactor * (1.0 - lostCustomerShare) * priceRevenueFactor() * market.revenueFactor(turn)
+        var r = sc.baseRevenue * volumeCap() * econ * trendGrowth() * modProduct("rev") * (if (turn <= dumpingUntil) 0.98 else 1.0) * priceIndex * fxPassLevel() * prodFactor * (1.0 - lostCustomerShare) * priceRevenueFactor() * market.revenueFactor(turn) * staffPool.revenueMult() * (1.0 + rd.quality)
         if (salesScheme == SalesScheme.KAS) r *= 0.97
         if (!exec("exec_sales").present) r *= 0.95
         return r
@@ -832,7 +839,14 @@ class KapitalEngine(val seed: Long) {
 
     /** Biaya operasional tambahan di induk (beban lokal anak usaha sudah dibukukan di laporan entitas anak masing-masing!). */
     private fun extraOpex(): Double {
-        return (extraLines * 70.0 + (if (exportOn) 40.0 else 0.0) + (if (warehouse) 25.0 else 0.0) + (if (isPublicCompany) 35.0 else 0.0)) * sc.size * costIndex + market.monthlyCost(sc.baseRevenue, costIndex)
+        return (extraLines * 70.0 + (if (exportOn) 40.0 else 0.0) + (if (warehouse) 25.0 else 0.0) + (if (isPublicCompany) 35.0 else 0.0)) * sc.size * costIndex + market.monthlyCost(sc.baseRevenue, costIndex) + operationsMonthlyCost()
+    }
+
+    /** B3: gaji tambahan karyawan kunci, anggaran R&D, logistik, dan perawatan armada (jt RS per bulan). */
+    fun operationsMonthlyCost(): Double {
+        val u = sc.size * costIndex
+        return staffPool.extraMonthlyCost(StaffEconomy.BASE_WAGE * u) + rd.level * RdProgram.COST_PER_LEVEL * u +
+            logisticsLevel * 25.0 * u + (if (fleetOwned) 18.0 * u else 0.0)
     }
 
     private fun trendGrowth(): Double = Math.pow(1.025, trendMonths / 12.0)
@@ -1170,6 +1184,11 @@ class KapitalEngine(val seed: Long) {
             is Action.BuyIntel -> doBuyIntel(action.kind, action.subject, action.tier)
             is Action.BoardAnswer -> doBoardAnswer(action.claim)
             is Action.SetSegmentFocus -> doSetSegmentFocus(action.segment, action.level)
+            is Action.HireStaff -> doHireStaff(action.role, action.tier)
+            is Action.FireStaff -> doFireStaff(action.role)
+            is Action.RaiseSalary -> doRaiseSalary(action.role)
+            is Action.SetRdLevel -> doSetRdLevel(action.level)
+            is Action.SetLogistics -> doSetLogistics(action.level)
         }
         if (ok) actionCount++
         return ok
@@ -1615,6 +1634,70 @@ class KapitalEngine(val seed: Long) {
         return true
     }
 
+
+    // =====================================================================
+    // B3: operasi: karyawan kunci, R&D berkelanjutan, logistik (lihat Operations.kt)
+    // =====================================================================
+    private var hireSeq = 0
+    private fun staffUnit(): Double = StaffEconomy.BASE_WAGE * sc.size * costIndex
+
+    fun staffBlock(roleCode: String, action: String): String? {
+        val role = StaffRole.of(roleCode) ?: return "Jabatan tidak dikenal."
+        val st = staffPool.of(role)
+        return when (action) {
+            "hire" -> if (st.present) "Jabatan ini masih terisi." else null
+            "fire" -> if (!st.present) "Jabatan ini kosong." else null
+            else -> if (!st.present) "Jabatan ini kosong." else if (st.salaryMult >= StaffEconomy.MAX_SALARY_MULT - 1e-9) "Gaji sudah di batas 150% upah pasar." else null
+        }
+    }
+
+    fun hireCostRs(tier: Int): Double = StaffEconomy.recruitMultiple(tier) * staffUnit()
+
+    private fun doHireStaff(roleCode: String, tier: Int): Boolean {
+        val role = StaffRole.of(roleCode) ?: return false
+        if (tier !in 1..3 || staffBlock(roleCode, "hire") != null) return false
+        val cost = hireCostRs(tier)
+        if (cash - cost < 1200.0 || !spend(1)) return false
+        oneOffOpex += cost
+        val r = Random(seed * 1_000_003L + hireSeq * 7_919L + turn * 104_729L + 113L)
+        hireSeq++
+        val st = staffPool.hire(role, tier, r)
+        chronicle += ChronicleItem(turn, "Rekrut: ${role.label}", "Biaya perekrut ${fmt(cost)} jt RS (tingkat $tier). Kesan wawancara skill ${fmt2(st.interviewEstimate)}; nilai asli baru terlihat setelah 3 bulan.",
+            "Rekrutmen → kandidat berderau → produktivitas terukur kemudian.", actionCount)
+        return true
+    }
+
+    private fun doFireStaff(roleCode: String): Boolean {
+        val role = StaffRole.of(roleCode) ?: return false
+        if (staffBlock(roleCode, "fire") != null) return false
+        val st = staffPool.of(role)
+        val sev = 6.0 * StaffEconomy.marketWage(st.skill) * st.salaryMult * staffUnit()
+        if (cash - sev < 1200.0 || !spend(1)) return false
+        oneOffOpex += sev
+        staffPool.fire(role)
+        chronicle += ChronicleItem(turn, "Pesangon: ${role.label}", "Pesangon ${fmt(sev)} jt RS; karyawan lain resah (loyalitas turun).",
+            "Pemecatan → pesangon → jabatan kosong → efek hilang dan moral turun.", actionCount)
+        return true
+    }
+
+    private fun doRaiseSalary(roleCode: String): Boolean {
+        val role = StaffRole.of(roleCode) ?: return false
+        if (staffBlock(roleCode, "raise") != null || !spend(1)) return false
+        return staffPool.raise(role)
+    }
+
+    private fun doSetRdLevel(level: Int): Boolean {
+        if (level !in 0..RdProgram.MAX_LEVEL || level == rd.level || !spend(1)) return false
+        rd.setLevel(level)
+        return true
+    }
+
+    private fun doSetLogistics(level: Int): Boolean {
+        if (level !in 0..2 || level == logisticsLevel || !spend(1)) return false
+        logisticsLevel = level
+        return true
+    }
+
     /** Akuisisi Media atau Lobi Parlemen (Era 3). */
     private fun doMediaLobby(kind: String): Boolean {
         if (!spend(2)) return false
@@ -1732,6 +1815,7 @@ class KapitalEngine(val seed: Long) {
         "line" -> extraLines
         "automation" -> if (automation) 1 else 0
         "warehouse" -> if (warehouse) 1 else 0
+        "fleet" -> if (fleetOwned) 1 else 0
         "export" -> if (exportOn) 1 else 0
         "solar" -> if (esgCompliant) 1 else 0
         "institute" -> projectsInv.count { it.type == "institute" && it.done }
@@ -1784,6 +1868,7 @@ class KapitalEngine(val seed: Long) {
             "line" -> extraLines++
             "automation" -> automation = true
             "warehouse" -> warehouse = true
+            "fleet" -> fleetOwned = true
             "export" -> { exportOn = true; demandBoost += 0.06 }
             "rnd" -> demandBoost += 0.04
             "brand" -> mods += Mod("rev", 1.03, turn + 11)
@@ -2110,6 +2195,14 @@ class KapitalEngine(val seed: Long) {
 
         // ---- 1. Makro & Geopolitik 7 Negara Asing ----
         market.step(turn, rng(111))
+        for ((role, by) in staffPool.step(rng(112), world.rivals.filter { it.active }.sumOf { it.aggression }, world.rivals.filter { it.active }.map { it.name }.ifEmpty { listOf("pesaing") })) {
+            lines += ReportLine("$by membajak ${role.label} Anda. Jabatan kosong: efeknya hilang sampai Anda merekrut pengganti.", Tone.BAD)
+            chronicle += ChronicleItem(turn, "Staf kunci dibajak: ${role.label}", "$by menawarkan paket lebih tinggi.",
+                "Loyalitas rendah atau gaji di bawah pasar → tawaran pesaing → jabatan kosong → produktivitas turun.", actionCount)
+        }
+        if (rd.step(rng(114), staffPool.rdRateMult())) {
+            lines += ReportLine("Tim R&D menuntaskan satu inovasi: indeks kualitas produk naik (kini ${fmt2(rd.quality * 100)}%).", Tone.GOOD)
+        }
         val rMacro = rng(1)
         val rWorld = rng(8)
         val kursBefore = kurs
@@ -2494,7 +2587,7 @@ class KapitalEngine(val seed: Long) {
 
         var breakdownCost = 0.0
         if (breakdownMonthsLeft == 0) {
-            var p = 0.015 * (1.0 + 0.5 * deferredMonths)
+            var p = 0.015 * (1.0 + 0.5 * deferredMonths) * staffPool.breakdownMult()
             if (!exec("exec_factory").present) p *= 1.5
             if (turn <= unskilledUntil) p *= 1.4
             if (rOps.nextDouble() < p) {
@@ -2508,7 +2601,7 @@ class KapitalEngine(val seed: Long) {
         }
         holdupThisTurn = false
         val hasKestrelSub = subsidiaries["kestrel"]?.let { it.active && !it.nationalized } == true
-        if (!dualSourcing && !hasKestrelSub && rOps.nextDouble() < (if (warehouse) 0.05 else 0.10)) {
+        if (!dualSourcing && !hasKestrelSub && rOps.nextDouble() < (if (warehouse) 0.05 else 0.10) * (1.0 - 0.30 * logisticsLevel) * (if (fleetOwned) 0.8 else 1.0)) {
             holdupThisTurn = true
             lines += ReportLine("Pemasok Kestrel menahan kiriman sensor dengan alasan \"mesin rusak\"; produksi turun 30% bulan ini.", Tone.BAD)
         }
@@ -3234,6 +3327,8 @@ class KapitalEngine(val seed: Long) {
                 1200.0, 4, 2, false, "Penjualan +3% selama 12 bulan", 1),
             InvestSpec("warehouse", "Gudang dan logistik", "Gudang tambahan dekat pelabuhan.",
                 1500.0, 2, 2, true, "Persediaan −8% dan risiko pengiriman tertahan separuh", 1),
+            InvestSpec("fleet", "Armada truk dan kontainer sendiri", "Armada milik sendiri mengurangi ketergantungan pada ekspeditur dan penundaan pengiriman.",
+                1400.0, 2, 1, true, "HPP −0,4%, risiko pengiriman tertahan −20%, perawatan 18 jt RS per bulan", 1),
             InvestSpec("export", "Pasar ekspor Aurelia", "Sertifikasi, pameran dagang, dan agen penjualan luar negeri.",
                 1500.0, 6, 3, false, "Permintaan +6% permanen, biaya operasi +40 jt RS per bulan", 1),
             InvestSpec("solar", "PLTS Atap & IPAL Hijau (Transisi Era 4)", "Panel surya kawasan dan daur ulang air limbah untuk sertifikasi ESG penuh dan bebas pajak karbon Halvenia (CBAM).",

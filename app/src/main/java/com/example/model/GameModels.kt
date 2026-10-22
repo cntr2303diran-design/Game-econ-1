@@ -235,6 +235,31 @@ data class ProductMarketView(
     val costText: String = ""
 )
 
+/** B3: satu jabatan karyawan kunci. */
+data class StaffRowView(
+    val code: String,
+    val label: String,
+    val present: Boolean,
+    val skillText: String,
+    val loyaltyText: String,
+    val salaryText: String,
+    val canHire: Boolean,
+    val canFire: Boolean,
+    val canRaise: Boolean
+)
+
+/** B3: tampilan tab Operasi (SDM, R&D, logistik, armada). */
+data class OperationsView(
+    val staff: List<StaffRowView> = emptyList(),
+    val hireCosts: List<String> = emptyList(),
+    val rdLevel: Int = 0,
+    val rdText: String = "",
+    val logisticsLevel: Int = 0,
+    val logisticsText: String = "",
+    val fleetText: String = "",
+    val costText: String = ""
+)
+
 data class GanttTask(
     val id: String,
     val projectName: String,
@@ -427,6 +452,7 @@ data class GameState(
     val worldLayer: WorldLayerView = WorldLayerView(),
     val intel: IntelView = IntelView(),
     val productMarket: ProductMarketView = ProductMarketView(),
+    val operations: OperationsView = OperationsView(),
 
     // Layar Perusahaan (Laporan Keuangan, Organisasi, Proyek Gantt, Kontrak)
     val incomeStatementRows: List<FinancialRowItem>,

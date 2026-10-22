@@ -17,6 +17,8 @@ object TestBots {
             apply(Action.EventChoice(ev.id, o.id))
         }
         if (eng.covenantDistancePct() < 4.5 && !eng.cureUsed) apply(Action.EquityCure)
+        // B3: pemain cakap mengisi jabatan kunci yang kosong (dibajak pesaing) dengan perekrutan tingkat 2.
+        for (role in StaffRole.values()) if (eng.staffBlock(role.code, "hire") == null) apply(Action.HireStaff(role.code, 2))
     }
 
     /** Bermain disiplin sampai giliran absolut [targetTurn]; null bila permainan berakhir sebelum itu. */

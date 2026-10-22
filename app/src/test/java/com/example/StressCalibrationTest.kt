@@ -38,7 +38,13 @@ class StressCalibrationTest {
         if (r.nextInt(5) != 0) return randomAction(r, e)
         val kinds = listOf("sektor", "negara", "pesaing", "segmen", "xx")
         val kind = kinds[r.nextInt(kinds.size)]
-        return when (r.nextInt(3)) {
+        return when (r.nextInt(9)) {
+            3 -> Action.HireStaff(StaffRole.values()[r.nextInt(StaffRole.values().size)].code, 1 + r.nextInt(3))
+            4 -> Action.FireStaff(StaffRole.values()[r.nextInt(StaffRole.values().size)].code)
+            5 -> Action.RaiseSalary(StaffRole.values()[r.nextInt(StaffRole.values().size)].code)
+            6 -> Action.SetRdLevel(r.nextInt(4))
+            7 -> Action.SetLogistics(r.nextInt(3))
+            8 -> Action.Invest("fleet")
             2 -> Action.SetSegmentFocus(Segment.values()[r.nextInt(Segment.values().size)].code, r.nextInt(4) - 0)
             0 -> {
                 val subj = IntelKind.of(kind)?.let { k -> e.intelSubjects(k).let { l -> l[r.nextInt(l.size)].first } } ?: "zz"

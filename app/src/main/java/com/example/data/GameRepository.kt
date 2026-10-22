@@ -17,6 +17,7 @@ import com.example.engine.IntelTier
 import com.example.engine.Ladder
 import com.example.engine.ProductMarket
 import com.example.engine.Segment
+import com.example.engine.StaffRole
 import com.example.engine.SalesScheme
 import com.example.engine.Tech
 import com.example.engine.Tone
@@ -125,6 +126,11 @@ class GameRepository(
 
     fun adjustPrice(deltaPct: Int) = perform(Action.AdjustPrice(deltaPct))
     fun setSegmentFocus(segment: String, level: Int) = perform(Action.SetSegmentFocus(segment, level))
+    fun hireStaff(role: String, tier: Int) = perform(Action.HireStaff(role, tier))
+    fun fireStaff(role: String) = perform(Action.FireStaff(role))
+    fun raiseSalary(role: String) = perform(Action.RaiseSalary(role))
+    fun setRdLevel(level: Int) = perform(Action.SetRdLevel(level))
+    fun setLogistics(level: Int) = perform(Action.SetLogistics(level))
     fun buyIntel(kind: String, subject: String, tier: Int) = perform(Action.BuyIntel(kind, subject, tier))
     fun answerBoard(claim: String) = perform(Action.BoardAnswer(claim))
     fun applyCredit(bankId: String, amount: Int, tenor: Int, purpose: String, floating: Boolean, bullet: Boolean) =
@@ -276,6 +282,32 @@ class GameRepository(
             brandText = "Merek ${fmt1(m.brand)}/100 (netral ${ProductMarket.BRAND_NEUTRAL.roundToInt()})",
             focusText = "Fokus terpakai ${m.focusUsed()}/${ProductMarket.focusCap(e.currentEra)}",
             costText = "Biaya pemasaran ${fmt(m.monthlyCost(e.sc.baseRevenue, e.costIndex))} jt RS per bulan"
+        )
+    }
+
+
+    private fun operationsView(e: KapitalEngine): OperationsView {
+        val rows = StaffRole.values().map { role ->
+            val st = e.staffPool.of(role)
+            StaffRowView(
+                code = role.code, label = role.label, present = st.present,
+                skillText = if (!st.present) "kosong (efek hilang)" else if (st.revealed) "skill ${fmt2(st.skill)} (terukur)" else "kesan wawancara ${fmt2(st.interviewEstimate)} (berderau)",
+                loyaltyText = if (st.present) "loyalitas ${(st.loyalty * 100).roundToInt()}%" else "-",
+                salaryText = if (st.present) "gaji ${(st.salaryMult * 100).roundToInt()}% upah pasar" else "-",
+                canHire = e.staffBlock(role.code, "hire") == null,
+                canFire = e.staffBlock(role.code, "fire") == null,
+                canRaise = e.staffBlock(role.code, "raise") == null
+            )
+        }
+        return OperationsView(
+            staff = rows,
+            hireCosts = (1..3).map { "Tingkat $it: ${fmt(e.hireCostRs(it))} jt RS" },
+            rdLevel = e.rd.level,
+            rdText = "R&D tingkat ${e.rd.level} · kualitas produk +${fmt2(e.rd.quality * 100)}% · ${e.rd.innovations} inovasi",
+            logisticsLevel = e.logisticsLevel,
+            logisticsText = "Logistik tingkat ${e.logisticsLevel} (meredam guncangan biaya pasokan ${(35 * e.logisticsLevel)}%)",
+            fleetText = if (e.fleetOwned) "Armada sendiri aktif" else "Armada sendiri: belum (investasi di tab Investasi)",
+            costText = "Biaya operasi tambahan ${fmt(e.operationsMonthlyCost())} jt RS per bulan"
         )
     }
 
@@ -1062,6 +1094,7 @@ class GameRepository(
             worldLayer = worldLayerView(e),
             intel = intelView(e),
             productMarket = productMarketView(e),
+            operations = operationsView(e),
             incomeStatementRows = incomeRows,
             balanceSheetRows = balanceRows,
             cashFlowRows = cashFlowRows,

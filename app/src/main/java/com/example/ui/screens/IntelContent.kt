@@ -145,3 +145,62 @@ fun SegmenTabContent(
         }
     }
 }
+
+/** B3: tab Operasi: karyawan kunci, R&D berkelanjutan, logistik, armada. */
+@Composable
+fun OperasiTabContent(
+    view: OperationsView,
+    ap: Int,
+    onHire: (role: String, tier: Int) -> Unit,
+    onFire: (String) -> Unit,
+    onRaise: (String) -> Unit,
+    onSetRd: (Int) -> Unit,
+    onSetLogistics: (Int) -> Unit
+) {
+    var hireTier by rememberSaveable { mutableStateOf(2) }
+    Text("Operasi: karyawan kunci, R&D, logistik", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    IntelCard {
+        Text(view.costText, style = MaterialTheme.typography.bodyMedium)
+        Text("Pesaing bisa membajak karyawan berloyalitas rendah atau bergaji di bawah pasar. Jabatan kosong menghilangkan efeknya; perekrutan baru berisiko karena skill asli baru terlihat setelah 3 bulan.",
+            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            view.hireCosts.forEachIndexed { i, label ->
+                FilterChip(selected = hireTier == i + 1, onClick = { hireTier = i + 1 }, label = { Text(label, style = MaterialTheme.typography.labelSmall) }, modifier = Modifier.testTag("operasi_tier_${i + 1}"))
+            }
+        }
+    }
+    view.staff.forEach { st ->
+        IntelCard {
+            Text(st.label, style = MaterialTheme.typography.titleMedium)
+            Text("${st.skillText} · ${st.loyaltyText} · ${st.salaryText}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (!st.present) {
+                    Button(onClick = { onHire(st.code, hireTier) }, enabled = st.canHire && ap >= 1, shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.heightIn(min = 48.dp).testTag("operasi_hire_${st.code}")) { Text("Rekrut") }
+                } else {
+                    OutlinedButton(onClick = { onRaise(st.code) }, enabled = st.canRaise && ap >= 1, shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.heightIn(min = 48.dp).testTag("operasi_raise_${st.code}")) { Text("Naikkan gaji 10%") }
+                    OutlinedButton(onClick = { onFire(st.code) }, enabled = st.canFire && ap >= 1, shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.heightIn(min = 48.dp).testTag("operasi_fire_${st.code}")) { Text("Pecat") }
+                }
+            }
+        }
+    }
+    IntelCard {
+        Text(view.rdText, style = MaterialTheme.typography.titleMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            (0..3).forEach { lv ->
+                FilterChip(selected = view.rdLevel == lv, onClick = { if (ap >= 1) onSetRd(lv) }, enabled = view.rdLevel == lv || ap >= 1,
+                    label = { Text(if (lv == 0) "Mati" else "Tingkat $lv") }, modifier = Modifier.testTag("operasi_rd_$lv"))
+            }
+        }
+        Text(view.logisticsText, style = MaterialTheme.typography.titleMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            (0..2).forEach { lv ->
+                FilterChip(selected = view.logisticsLevel == lv, onClick = { if (ap >= 1) onSetLogistics(lv) }, enabled = view.logisticsLevel == lv || ap >= 1,
+                    label = { Text(if (lv == 0) "Dasar" else "Tingkat $lv") }, modifier = Modifier.testTag("operasi_log_$lv"))
+            }
+        }
+        Text(view.fleetText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}

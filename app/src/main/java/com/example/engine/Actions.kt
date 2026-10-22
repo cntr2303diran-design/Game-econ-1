@@ -64,6 +64,16 @@ sealed class Action {
     data class BoardAnswer(val claim: String) : Action()
     /** B2: atur tingkat fokus pada satu segmen konsumen (0 abaikan, 1 layani, 2 fokus). */
     data class SetSegmentFocus(val segment: String, val level: Int) : Action()
+    /** B3: rekrut karyawan kunci untuk jabatan kosong (tingkat perekrutan 1..3). */
+    data class HireStaff(val role: String, val tier: Int) : Action()
+    /** B3: pecat karyawan kunci (pesangon 6 bulan gaji). */
+    data class FireStaff(val role: String) : Action()
+    /** B3: naikkan gaji karyawan kunci 10 poin di atas upah pasar (maks 150%). */
+    data class RaiseSalary(val role: String) : Action()
+    /** B3: anggaran R&D berkelanjutan (0..3). */
+    data class SetRdLevel(val level: Int) : Action()
+    /** B3: tingkat logistik (0..2): ketahanan terhadap guncangan biaya pasokan. */
+    data class SetLogistics(val level: Int) : Action()
 
     fun encode(): String = when (this) {
         EndTurn -> "END"
@@ -111,6 +121,11 @@ sealed class Action {
         is BuyIntel -> "INT|${esc(kind)}|${esc(subject)}|$tier"
         is BoardAnswer -> "BRD|${esc(claim)}"
         is SetSegmentFocus -> "SEG|${esc(segment)}|$level"
+        is HireStaff -> "HIR|${esc(role)}|$tier"
+        is FireStaff -> "FST|${esc(role)}"
+        is RaiseSalary -> "RSL|${esc(role)}"
+        is SetRdLevel -> "RDL|$level"
+        is SetLogistics -> "LOG|$level"
     }
 
     companion object {
@@ -166,6 +181,11 @@ sealed class Action {
                     "INT" -> BuyIntel(p[1], p[2], p[3].toInt())
                     "BRD" -> BoardAnswer(p[1])
                     "SEG" -> SetSegmentFocus(p[1], p[2].toInt())
+                    "HIR" -> HireStaff(p[1], p[2].toInt())
+                    "FST" -> FireStaff(p[1])
+                    "RSL" -> RaiseSalary(p[1])
+                    "RDL" -> SetRdLevel(p[1].toInt())
+                    "LOG" -> SetLogistics(p[1].toInt())
                     else -> null
                 }
             } catch (_: Exception) {

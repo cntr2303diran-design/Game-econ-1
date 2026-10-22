@@ -50,9 +50,14 @@ fun PerusahaanScreen(
     onBuyIntel: (kind: String, subject: String, tier: Int) -> Unit = { _, _, _ -> },
     onAnswerBoard: (String) -> Unit = {},
     onSetSegmentFocus: (segment: String, level: Int) -> Unit = { _, _ -> },
+    onHireStaff: (role: String, tier: Int) -> Unit = { _, _ -> },
+    onFireStaff: (String) -> Unit = {},
+    onRaiseSalary: (String) -> Unit = {},
+    onSetRdLevel: (Int) -> Unit = {},
+    onSetLogistics: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val subTabs = listOf("Laporan keuangan", "Organisasi", "Proyek", "Kontrak", "Bank", "Pelaku", "Investasi", "Intelijen", "Segmen")
+    val subTabs = listOf("Laporan keuangan", "Organisasi", "Proyek", "Kontrak", "Bank", "Pelaku", "Investasi", "Intelijen", "Segmen", "Operasi")
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -133,6 +138,7 @@ fun PerusahaanScreen(
                     6 -> InvestTabContent(gameState.investments, gameState.investSummary, gameState.actionPoints, onInvest, onCorporateAction)
                     7 -> IntelTabContent(gameState.intel, gameState.actionPoints, onBuyIntel, onAnswerBoard)
                     8 -> SegmenTabContent(gameState.productMarket, gameState.actionPoints, onSetSegmentFocus)
+                    9 -> OperasiTabContent(gameState.operations, gameState.actionPoints, onHireStaff, onFireStaff, onRaiseSalary, onSetRdLevel, onSetLogistics)
                 }
             }
         }
