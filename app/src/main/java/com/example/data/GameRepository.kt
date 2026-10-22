@@ -136,6 +136,8 @@ class GameRepository(
     fun setTradeFinance(on: Boolean) = perform(Action.SetTradeFinance(on))
     fun saleLeaseback(pct: Int) = perform(Action.SaleLeaseback(pct))
     fun buyDerivative(kind: String, pct: Int) = perform(Action.BuyDerivative(kind, pct))
+    fun windowDress(pct: Int) = perform(Action.WindowDress(pct))
+    fun setAuditor(level: Int) = perform(Action.SetAuditor(level))
     fun sellSubStake(countryId: String, pct: Int, askDiscountPct: Int) = perform(Action.SellSubStake(countryId, pct, askDiscountPct))
     fun buyIntel(kind: String, subject: String, tier: Int) = perform(Action.BuyIntel(kind, subject, tier))
     fun answerBoard(claim: String) = perform(Action.BoardAnswer(claim))
@@ -331,6 +333,12 @@ class GameRepository(
             },
             stockSeries = if (e.isPublicCompany) e.stockHistory.takeLast(60).toList() else emptyList(),
             stockText = if (e.isPublicCompany) "Harga ${fmt(e.stockPrice)} RS · kapitalisasi ${fmt(e.stockPrice * e.sharesOutM)} jt RS" else "",
+            auditorLevel = e.auditorLevel,
+            auditText = "Auditor ${listOf("tidak ada", "regional", "internasional")[e.auditorLevel]} · biaya ${fmt(e.auditFee())} jt RS per bulan · koreksi laporan sejauh ini ${e.restatements}x. Auditor memeriksa percantikan laporan tiap bulan; temuan berakibat denda 30% dari jumlah yang dipercantik, jauh lebih ringan daripada skandal.",
+            mScoreText = e.mScore()?.let { "Skor-M Beneish ${"%.2f".format(it)} (ambang ${"%.2f".format(com.example.engine.ForensicBook.THRESHOLD)}): " + if (e.mScoreFlag()) "laporan Anda tampak seperti dimanipulasi" else "wajar" } ?: "Skor-M tersedia setelah 24 bulan riwayat.",
+            mScoreFlag = e.mScoreFlag(),
+            dressText = "Percantikan laporan: kapitalisasi biaya operasi ke persediaan menaikkan laba bulan ini (membantu ICR dan harga saham) lalu berbalik sebagai beban dalam beberapa bulan; pajak dibayar lebih awal, kas tidak berubah. Meninggalkan bukti etika. Sisa belum berbalik ${fmt(e.dressedRs)} jt RS.",
+            dressBlocks = listOf(10, 25, 50).map { e.windowDressBlock(it) },
             derivs = DerivKind.values().map { k ->
                 val a = e.derivs.firstOrNull { it.kind == k }
                 DerivRowView(

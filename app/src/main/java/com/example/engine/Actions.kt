@@ -83,6 +83,10 @@ sealed class Action {
     data class SaleLeaseback(val pct: Int) : Action()
     /** B4b: beli derivatif lindung nilai ("fxo" opsi A$, "ctf" futures kapas, "swp" swap bunga) untuk 25/50/100% eksposur. */
     data class BuyDerivative(val kind: String, val pct: Int) : Action()
+    /** B5: percantikan laporan: biaya dikapitalisasi ke persediaan (10/25/50% dari biaya operasi bulanan). Menaikkan laba sekarang, berbalik dalam beberapa bulan. */
+    data class WindowDress(val pct: Int) : Action()
+    /** B5: auditor eksternal (0 tanpa, 1 regional, 2 internasional). */
+    data class SetAuditor(val level: Int) : Action()
 
     fun encode(): String = when (this) {
         EndTurn -> "END"
@@ -139,6 +143,8 @@ sealed class Action {
         is SetTradeFinance -> "LCR|$on"
         is SaleLeaseback -> "SLB|$pct"
         is BuyDerivative -> "DRV|${esc(kind)}|$pct"
+        is WindowDress -> "WDR|$pct"
+        is SetAuditor -> "EAU|$level"
     }
 
     companion object {
@@ -203,6 +209,8 @@ sealed class Action {
                     "LCR" -> SetTradeFinance(p[1].toBoolean())
                     "SLB" -> SaleLeaseback(p[1].toInt())
                     "DRV" -> BuyDerivative(p[1], p[2].toInt())
+                    "WDR" -> WindowDress(p[1].toInt())
+                    "EAU" -> SetAuditor(p[1].toInt())
                     else -> null
                 }
             } catch (_: Exception) {

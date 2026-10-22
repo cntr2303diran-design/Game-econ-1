@@ -288,7 +288,14 @@ data class OperationsView(
     // B4c: saham minoritas anak usaha dan grafik harga saham
     val stakes: List<StakeRowView> = emptyList(),
     val stockSeries: List<Double> = emptyList(),
-    val stockText: String = ""
+    val stockText: String = "",
+    // B5: forensik
+    val auditorLevel: Int = 0,
+    val auditText: String = "",
+    val mScoreText: String = "",
+    val mScoreFlag: Boolean = false,
+    val dressText: String = "",
+    val dressBlocks: List<String?> = emptyList()
 )
 
 data class GanttTask(

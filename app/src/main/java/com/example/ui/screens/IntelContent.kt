@@ -215,7 +215,9 @@ fun OperasiTabContent(
     onSetTradeFinance: (Boolean) -> Unit = {},
     onSaleLeaseback: (Int) -> Unit = {},
     onBuyDerivative: (String, Int) -> Unit = { _, _ -> },
-    onSellStake: (String, Int, Int) -> Unit = { _, _, _ -> }
+    onSellStake: (String, Int, Int) -> Unit = { _, _, _ -> },
+    onWindowDress: (Int) -> Unit = {},
+    onSetAuditor: (Int) -> Unit = {}
 ) {
     var hireTier by rememberSaveable { mutableStateOf(2) }
     Text("Operasi: karyawan kunci, R&D, logistik", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -283,6 +285,26 @@ fun OperasiTabContent(
             }
         }
         view.leaseBlocks.filterNotNull().firstOrNull()?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    }
+    IntelCard {
+        Text("Forensik dan audit", style = MaterialTheme.typography.titleMedium)
+        Text(view.mScoreText, style = MaterialTheme.typography.bodyMedium,
+            color = if (view.mScoreFlag) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+        Text(view.auditText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            (0..2).forEach { lv ->
+                FilterChip(selected = view.auditorLevel == lv, onClick = { if (ap >= 1) onSetAuditor(lv) }, enabled = view.auditorLevel == lv || ap >= 1,
+                    label = { Text(listOf("Tanpa", "Regional", "Internasional")[lv]) }, modifier = Modifier.testTag("aud_$lv"))
+            }
+        }
+        Text(view.dressText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(10, 25, 50).forEachIndexed { i, pct ->
+                OutlinedButton(onClick = { onWindowDress(pct) }, enabled = view.dressBlocks.getOrNull(i) == null, shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier.heightIn(min = 48.dp).testTag("wdr_$pct")) { Text("Percantik $pct%") }
+            }
+        }
+        view.dressBlocks.filterNotNull().firstOrNull()?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
     if (view.stockSeries.size >= 2) StockChartCard(view.stockSeries, view.stockText)
     if (view.stakes.isNotEmpty()) StakeCard(view.stakes, ap, onSellStake)

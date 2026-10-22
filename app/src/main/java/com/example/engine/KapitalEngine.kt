@@ -192,6 +192,15 @@ class KapitalEngine(val seed: Long) {
     var leasedBackRs = 0.0; private set
     val insuranceClaimTurns = mutableListOf<Int>()
     /** B4b: derivatif aktif dan jumlah bersih (penyelesaian dikurangi premi) sejak awal, jt RS. */
+    /** B5: riwayat forensik (skor-M), auditor eksternal, dan percantikan laporan. */
+    val forensics = ForensicBook()
+    var auditorLevel = 0; private set
+    /** Sisa biaya yang dikapitalisasi ke persediaan dan belum berbalik; total sejak pembersihan terakhir; jumlah koreksi laporan. */
+    var dressedRs = 0.0; private set
+    var dressedSinceCleanRs = 0.0; private set
+    private var dressedFreshRs = 0.0
+    var restatements = 0; private set
+    var shortReports = 0; private set
     val derivs = mutableListOf<Deriv>()
     var derivNetRs = 0.0; private set
     var derivPremiumsRs = 0.0; private set
@@ -868,7 +877,7 @@ class KapitalEngine(val seed: Long) {
         val u = sc.size * costIndex
         val loading = 1.0 + 0.15 * insuranceClaimTurns.count { turn - it <= 24 }
         val premium = when (insuranceLevel) { 1 -> 21.0; 2 -> 30.0; else -> 0.0 } * u * loading
-        return premium + (if (tradeFinance) LC_FEE * u else 0.0) + leasedBackRs * LEASE_RATE
+        return premium + (if (tradeFinance) LC_FEE * u else 0.0) + leasedBackRs * LEASE_RATE + auditFee()
     }
 
     private fun trendGrowth(): Double = Math.pow(1.025, trendMonths / 12.0)
@@ -1215,6 +1224,8 @@ class KapitalEngine(val seed: Long) {
             is Action.SetTradeFinance -> doSetTradeFinance(action.on)
             is Action.SaleLeaseback -> doSaleLeaseback(action.pct)
             is Action.BuyDerivative -> doBuyDerivative(action.kind, action.pct)
+            is Action.WindowDress -> doWindowDress(action.pct)
+            is Action.SetAuditor -> doSetAuditor(action.level)
         }
         if (ok) actionCount++
         return ok
@@ -1816,6 +1827,83 @@ class KapitalEngine(val seed: Long) {
             "Aset senilai ${fmt(proceeds)} jt RS dijual pada nilai buku lalu disewa kembali: sewa ${fmt(proceeds * LEASE_RATE)} jt RS per bulan, penyusutan berkurang. Tidak ada laba penjualan; agunan berkurang.",
             "Sale-leaseback → kas masuk sekarang → beban sewa tetap bulanan dan agunan kredit mengecil.", actionCount)
         return true
+    }
+
+    // =====================================================================
+    // B5: forensik: percantikan laporan, auditor eksternal, skor-M
+    // =====================================================================
+    fun auditFee(): Double = when (auditorLevel) { 1 -> 45.0; 2 -> 120.0; else -> 0.0 } * sc.size * costIndex
+
+    /** Alasan percantikan ditolak, atau null. Batas: sisa terkapitalisasi tidak lebih dari 3x biaya operasi bulanan. */
+    fun windowDressBlock(pct: Int): String? {
+        if (pct != 10 && pct != 25 && pct != 50) return "Porsi harus 10, 25, atau 50% dari biaya operasi bulanan."
+        val opex = estimateMonth().getValue("opex")
+        if (dressedRs + opex * pct / 100.0 > 3.0 * opex) return "Biaya terkapitalisasi sudah terlalu besar; tunggu berbalik."
+        if (ap < 2) return "AP tidak cukup (butuh 2)."
+        return null
+    }
+
+    private fun doWindowDress(pct: Int): Boolean {
+        if (windowDressBlock(pct) != null || !spend(2)) return false
+        val x = estimateMonth().getValue("opex") * pct / 100.0
+        pendingIncome += x           // beban operasi turun sebesar x
+        pendingPrepay += x           // tetapi kas yang sama keluar dan menjadi persediaan (kas bersih tidak berubah)
+        dressedRs += x; dressedFreshRs += x; dressedSinceCleanRs += x
+        recordEthicsEvidence("window_dressing", 0.5 + pct / 50.0, "exec_cfo", "sundara")
+        chronicle += ChronicleItem(turn, "Laporan dipercantik",
+            "Biaya operasi ${fmt(x)} jt RS dikapitalisasi ke persediaan: laba bulan ini naik, tetapi berbalik sebagai beban dalam beberapa bulan. Kas tidak berubah, pajak dibayar lebih awal.",
+            "Kapitalisasi biaya → laba dan ICR terlihat lebih baik → akrual naik (skor-M) → auditor atau penjual kosong dapat membongkarnya.", actionCount)
+        return true
+    }
+
+    private fun doSetAuditor(level: Int): Boolean {
+        if (level !in 0..2 || level == auditorLevel || !spend(1)) return false
+        auditorLevel = level
+        chronicle += ChronicleItem(turn, if (level == 0) "Auditor eksternal diberhentikan" else "Auditor eksternal ${if (level == 1) "regional" else "internasional"} ditunjuk",
+            if (level == 0) "Tanpa auditor, kecurangan hanya terbongkar lewat saksi atau penyelidikan dan akibatnya jauh lebih besar." else "Biaya ${fmt(auditFee())} jt RS per bulan. Auditor memeriksa percantikan laporan tiap bulan dan akibat temuan lebih ringan daripada skandal.",
+            "Auditor → pemeriksaan berkala → koreksi laporan dini dengan denda kecil.", actionCount)
+        return true
+    }
+
+    /** Skor-M terkini (null sebelum 24 bulan riwayat) dan apakah ia menandai kemungkinan manipulasi. */
+    fun mScore(): Double? = forensics.mScore()
+    fun mScoreFlag(): Boolean = (forensics.mScore() ?: Double.NEGATIVE_INFINITY) > ForensicBook.THRESHOLD
+
+    /** Balikkan sebagian biaya terkapitalisasi sebagai beban (sama dengan laju kembalinya persediaan ke target), lalu periksa auditor dan analis. */
+    private fun forensicsMonthly(lines: MutableList<ReportLine>) {
+        // bagian yang baru dikapitalisasi bulan ini belum berbalik (persediaan baru bergerak ke target bulan depan)
+        val old = dressedRs - dressedFreshRs
+        if (old > 0.005) {
+            val u = 0.5 * old
+            oneOffOpex += u
+            dressedRs -= u
+        }
+        dressedFreshRs = 0.0
+        if (dressedRs < 0.01) dressedRs = 0.0
+        val r = rng(117)
+        val flagged = mScoreFlag()
+        if (auditorLevel > 0 && dressedSinceCleanRs > 0.01) {
+            val p = 0.06 * auditorLevel * (if (flagged) 2.0 else 1.0)
+            if (r.nextDouble() < p) {
+                val fine = 0.30 * dressedSinceCleanRs
+                oneOffOpex += fine
+                restatements++
+                boardTrust = (boardTrust - 6).coerceAtLeast(0)
+                val kept = ethicsEvidences.filter { it.kind != "window_dressing" }
+                val removed = ethicsEvidences.filter { it.kind == "window_dressing" }.sumOf { it.severity }
+                ethicsEvidences.clear(); ethicsEvidences.addAll(kept)
+                ethicsLoad = max(0.0, ethicsLoad - removed)
+                lines += ReportLine("Auditor menemukan percantikan laporan senilai ${fmt(dressedSinceCleanRs)} jt RS dan mewajibkan koreksi (denda ${fmt(fine)} jt RS). Kepercayaan dewan turun.", Tone.BAD)
+                chronicle += ChronicleItem(turn, "Koreksi laporan oleh auditor", "Kapitalisasi biaya yang tidak wajar dikoreksi; denda ${fmt(fine)} jt RS.",
+                    "Percantikan laporan → temuan auditor → koreksi dini dengan denda kecil (lebih ringan daripada skandal).", actionCount)
+                dressedSinceCleanRs = 0.0
+            }
+        }
+        if (isPublicCompany && flagged && r.nextDouble() < 0.10) {
+            shortReports++
+            stockSentiment = (stockSentiment - 0.05).coerceIn(-0.9, 0.6)
+            lines += ReportLine("Penjual kosong menerbitkan laporan forensik: skor-M Anda ${"%.2f".format(mScore() ?: 0.0)} di atas ambang. Harga saham tertekan.", Tone.WARN)
+        }
     }
 
     // =====================================================================
@@ -2794,6 +2882,7 @@ class KapitalEngine(val seed: Long) {
         }
 
         // Skor Rahasia Etika & Bom Waktu Skandal (Tahap C - Bagian 16 PDF)
+        forensicsMonthly(lines)
         ethicsLoad *= 0.988
         var scandalCost = 0.0
         val departedWitnessBoost = ethicsEvidences.count { ev -> execs.any { it.id == ev.witnessExecId && !it.present } } * 0.035
@@ -3282,6 +3371,8 @@ class KapitalEngine(val seed: Long) {
                 "e_divin" to divInCash, "e_factor" to -factorDiscount, "e_fx" to -eqFx, "e_div" to -dividend, "e_close" to equity,
                 "e_resid" to equity - periodStartEquity - eqSum)
         }
+        forensics.record(revenue, cogs, opex + maint, dep, ni, cfo, totalAR(), totalAssets(), fixedAssets, totalLiabilities(),
+            max(0.0, totalAssets() - cash - totalAR() - inventory - fixedAssets))
         prevCashFlow = lastCashFlow
         lastCashFlow = mapOf("ni" to ni, "dep" to dep, "wc" to (-dAR - dInv + dPay), "cfo" to cfo,
             "capex" to -(capex + periodSubInvestOutRs), "fin" to newDebt - principal, "stock" to periodInvestIn - periodInvestOut, "div" to (lastDividendIncome + periodSubDivInGrossRs), "net" to cash - startCash)
