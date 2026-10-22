@@ -38,7 +38,9 @@ class DuniaEffects(
     /** Kejutan berita dari rilis data resmi untuk pasar saham (-0,05..0,05). */
     val news: Double = 0.0,
     /** Tekanan risk-off 0..1 untuk institusi (panik perbankan, ketegangan geopolitik). */
-    val riskOff: Double = 0.0
+    val riskOff: Double = 0.0,
+    /** Selisih inflasi rilis awal terhadap inflasi sebenarnya (bank sentral Sundara membaca angka rilis). */
+    val cbMisread: Double = 0.0
 ) {
     companion object {
         val NEUTRAL = DuniaEffects(0.0, 1.0, 0.0, 0.0, 0.0, emptyList())
@@ -131,7 +133,8 @@ class Dunia(seed: Long, sundaraElectionTurn: Int, sundaraBaseTension: Map<String
         val fx = DuniaEffects(
             demandAll, cost, (sr.creditAdd * 0.2 + mx.creditAdd + creditStress) * k, mx.kursDrift * k, mx.policyBias * k, notes,
             mx.foreignBias.mapValues { it.value * k },
-            dd.news, riskOff
+            dd.news, riskOff,
+            data.latestFirstEstimate("sundara", DataKind.INFLASI)?.let { (it - ctx.macroInput("sundara").inflation).coerceIn(-0.8, 0.8) } ?: 0.0
         )
         lastEffects = fx
         return fx

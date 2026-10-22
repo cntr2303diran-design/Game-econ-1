@@ -85,6 +85,8 @@ fun DuniaScreen(
                     PairwiseTensionSection(tensions = gameState.pairwiseTensions)
 
                     ElectionCalendarSection(countries = gameState.countries)
+
+                    WorldLayerSection(layer = gameState.worldLayer)
                 }
             }
         } else {
@@ -100,6 +102,8 @@ fun DuniaScreen(
                 PairwiseTensionSection(tensions = gameState.pairwiseTensions)
 
                 ElectionCalendarSection(countries = gameState.countries)
+
+                WorldLayerSection(layer = gameState.worldLayer)
 
                 Text(
                     text = "Daftar Negara & Indikator Makro (Inflasi, Bunga, Pertumbuhan)",
@@ -242,6 +246,48 @@ private fun PairwiseTensionSection(
                         color = KapitalSemanticColors.border.copy(alpha = 0.5f),
                         modifier = Modifier.padding(top = 4.dp)
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorldLayerSection(layer: WorldLayerView) {
+    if (layer.rows.isEmpty() && layer.lines.isEmpty()) return
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(6.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
+            .testTag("dunia_lanjutan")
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "Dunia Lanjutan: Utang, Peringkat, Bank, Data Resmi",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            layer.rows.forEach { row ->
+                val col = semanticToneColor(row.tone)
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(row.countryName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Peringkat ${row.rating}", style = MaterialTheme.typography.labelMedium, color = col)
+                    }
+                    Text(
+                        "${row.debtText} · ${row.yieldText} · ${row.curveText}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            HorizontalDivider(color = KapitalSemanticColors.border.copy(alpha = 0.5f))
+            layer.lines.forEach { (k, v) ->
+                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    Text(k, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+                    Text(v, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

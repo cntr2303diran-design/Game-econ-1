@@ -2083,7 +2083,7 @@ class KapitalEngine(val seed: Long) {
             allowCoalition = difficulty.allowRivalCoalition
         )
 
-        val out = world.step(rWorld, rpPlayer, costPressure, fxPassLevel(), kurs / kursBefore - 1.0, kurs, demandShock, playerObs, duniaFx.policyBias)
+        val out = world.step(rWorld, rpPlayer, costPressure, fxPassLevel(), kurs / kursBefore - 1.0, kurs, demandShock, playerObs, duniaFx.policyBias, duniaFx.cbMisread)
         econ = out.demand
 
         // Tindak lanjut serangan terarah dari pesaing AI yang belajar (Tahap A)
@@ -2598,7 +2598,8 @@ class KapitalEngine(val seed: Long) {
         val fxBefore = prevBalance["debt_st"]!! + prevBalance["debt_lt"]!!
         val debtAfterFlows = totalDebt()
         val rawFxLoss = debtAfterFlows - (fxBefore + newDebt - principal)
-        if (abs(rawFxLoss) > 1.0) {
+        // Selisih kurs dibukukan berapa pun kecilnya: ambang lama (> 1 jt RS) membuang selisih kecil dan neraca meleset.
+        if (abs(rawFxLoss) > 1e-9) {
             if (fxHedgeActive && rawFxLoss > 0.0) {
                 // Kontrak forward valas menutup kerugian depresiasi kurs atas utang A$
                 val covered = rawFxLoss * 0.90

@@ -37,6 +37,9 @@ class DataDesk {
     /** Rilis terbaru (angka paling baru yang diumumkan) untuk suatu negara dan jenis data; null bila belum ada. */
     fun latest(country: String, kind: DataKind): Release? = history[key(country, kind)]?.lastOrNull()
 
+    /** Perkiraan awal (revisi 0) terbaru; inilah angka yang dibaca pasar dan bank sentral saat itu. */
+    fun latestFirstEstimate(country: String, kind: DataKind): Double? = history[key(country, kind)]?.lastOrNull { it.revision == 0 }?.value
+
     /** Seluruh riwayat rilis (termasuk revisi) untuk satu seri, urut waktu terbit. */
     fun releases(country: String, kind: DataKind): List<Release> = history[key(country, kind)] ?: emptyList()
 

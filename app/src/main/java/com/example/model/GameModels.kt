@@ -170,6 +170,22 @@ data class Country(
     val originInfo: DataOriginInfo
 )
 
+/** Satu baris lapisan dunia lanjutan: kondisi makro-fiskal satu negara inti. */
+data class WorldLayerRow(
+    val countryName: String,
+    val rating: String,
+    val debtText: String,
+    val yieldText: String,
+    val curveText: String,
+    val tone: SemanticTone
+)
+
+/** Ringkasan lapisan dunia lanjutan (Tahap A): peringkat, panik, bank, rilis data, iklim, teknologi, demografi. */
+data class WorldLayerView(
+    val rows: List<WorldLayerRow> = emptyList(),
+    val lines: List<Pair<String, String>> = emptyList()
+)
+
 data class GanttTask(
     val id: String,
     val projectName: String,
@@ -359,6 +375,7 @@ data class GameState(
     val mapPieces: List<MapPiece>,
     val activeMapLayer: MapLayerFilter = MapLayerFilter.PELAYARAN,
     val pairwiseTensions: List<PairwiseTension>,
+    val worldLayer: WorldLayerView = WorldLayerView(),
 
     // Layar Perusahaan (Laporan Keuangan, Organisasi, Proyek Gantt, Kontrak)
     val incomeStatementRows: List<FinancialRowItem>,

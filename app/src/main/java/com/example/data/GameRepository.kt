@@ -1,6 +1,8 @@
 package com.example.data
 
 import com.example.engine.Action
+import com.example.engine.Countries
+import com.example.engine.DataKind
 import com.example.engine.Difficulty
 import com.example.engine.FactoryScheme
 import com.example.engine.KapitalEngine
@@ -9,7 +11,9 @@ import com.example.engine.KapitalEngine.Companion.fmt
 import com.example.engine.KapitalEngine.Companion.fmt1
 import com.example.engine.KapitalEngine.Companion.fmt2
 import com.example.engine.KapitalEngine.Companion.signed
+import com.example.engine.Ladder
 import com.example.engine.SalesScheme
+import com.example.engine.Tech
 import com.example.engine.Tone
 import com.example.model.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /** Penyimpanan permainan: seed + daftar tindakan (satu baris per tindakan). */
@@ -217,6 +222,60 @@ class GameRepository(
     // ------------------------------------------------------------------
     // Pemetaan mesin → model tampilan
     // ------------------------------------------------------------------
+
+    // ------------------------------------------------------------------
+    // Lapisan dunia dinamis → model tampilan
+    // ------------------------------------------------------------------
+    private fun liveTensions(e: KapitalEngine): List<PairwiseTension> {
+        val geo = e.dunia.geo
+        data class P(val a: String, val b: String, val label: String, val where: String, val strait: String?)
+        val pairs = listOf(
+            P("aurelia", "kestrel", "Aurelia ↔ Kestrel", "Selat Kestrel (jalur chip dan barang jadi)", "selat_chip"),
+            P("norvaldia", "halvenia", "Norvaldia ↔ Halvenia", "Selat Norvaldia–Halvenia (jalur energi)", "selat_energi"),
+            P("aurelia", "velmora", "Aurelia ↔ Velmora", "Sanksi dan mineral tanah jarang", null),
+            P("tarsis", "sundara", "Tarsis ↔ Sundara", "Selat Tarsis–Sundara (jalur pangan)", "selat_pangan")
+        )
+        return pairs.map { p ->
+            val v = geo.tension(p.a, p.b)
+            val lad = Ladder.of(v)
+            val closed = p.strait?.let { geo.strait(it) } ?: 0.0
+            PairwiseTension(
+                pairLabel = p.label,
+                straitOrBorder = if (closed > 0.0) "${p.where} · tertutup ${(closed * 100).roundToInt()}%" else p.where,
+                score = v.roundToInt().coerceIn(0, 100),
+                escalationStage = "${lad.label} (skor ≥${lad.from})",
+                businessEffect = lad.effect,
+                tone = when { lad.rung <= 0 -> SemanticTone.GOOD_GREEN; lad.rung <= 2 -> SemanticTone.WARNING_YELLOW; else -> SemanticTone.DANGER_RED }
+            )
+        }
+    }
+
+    private fun worldLayerView(e: KapitalEngine): WorldLayerView {
+        val d = e.dunia
+        val rows = Countries.coreIds.map { id ->
+            val s = d.macro.state(id)
+            WorldLayerRow(
+                countryName = id.replaceFirstChar { it.uppercase() },
+                rating = s.rating.label,
+                debtText = "utang ${fmt1(s.debtGdp)}% PDB",
+                yieldText = "imbal hasil 10 th ${fmt2(s.yield10)}%",
+                curveText = if (s.slope < 0) "kurva terbalik ${fmt2(s.slope)}" else "kurva normal +${fmt2(s.slope)}",
+                tone = when { s.rating.ordinal <= 2 -> SemanticTone.GOOD_GREEN; s.rating.ordinal <= 4 -> SemanticTone.WARNING_YELLOW; else -> SemanticTone.DANGER_RED }
+            )
+        }
+        val su = d.credit.countries.getValue("sundara")
+        val infl = d.data.latest("sundara", DataKind.INFLASI)
+        val lines = ArrayList<Pair<String, String>>()
+        lines += "Indeks panik Sundara" to "${fmt1(d.macro.panic)} / 100" + (if (d.macro.runMonthsLeft > 0) " · penarikan simpanan massal berlangsung" else "")
+        lines += "Bank Sundara" to "CAR rata-rata ${fmt1(su.meanCar)}% · ${(su.weakShare * 100).roundToInt()}% bank lemah · gagal bayar ${fmt1(su.defaultRate)}%/th · ${su.failuresTotal} bank pernah diselamatkan"
+        if (infl != null) lines += "Rilis inflasi terakhir" to "${fmt2(infl.value)}% (${if (infl.revision == 0) "perkiraan awal" else "revisi ke-${infl.revision}"}) — angka resmi bisa direvisi"
+        lines += "Suhu global" to "+${fmt2(d.cycles.temperature)} °C · ${d.cycles.events.size} kejadian ekstrem sejauh ini"
+        lines += "Adopsi teknologi" to Tech.values().joinToString(" · ") { "${it.label} ${(d.cycles.adoption(it, e.turn) * 100).roundToInt()}%" }
+        val dm = d.cycles.demography.getValue("sundara")
+        lines += "Demografi Sundara" to "usia 65+ ${fmt1(dm.old * 100)}% · usia kerja ${fmt1(dm.work * 100)}%"
+        return WorldLayerView(rows, lines)
+    }
+
     private fun tone(t: Tone): SemanticTone = when (t) {
         Tone.BAD -> SemanticTone.DANGER_RED
         Tone.WARN -> SemanticTone.WARNING_YELLOW
@@ -352,7 +411,9 @@ class GameRepository(
 
         // ---- Negara dan pasar (Sundara dan kurs dinamis) ----
         val monthsToElection = e.electionTurn - turn
-        val countries = StaticWorldData.countries().map { c ->
+        val geoNow = e.dunia.geo
+        val countries = StaticWorldData.countries().map { c0 ->
+            val c = c0.copy(tensionScore = (if (c0.id == "sundara") geoNow.meanTensionOf("sundara") else geoNow.tension("sundara", c0.id)).roundToInt().coerceIn(0, 100))
             if (c.id == "sundara") c.copy(
                 inflationRange = "${fmt1(inflLo)}–${fmt1(inflLo + 2.0)}%",
                 policyRate = "${fmt2(e.policyRate)}%",
@@ -360,9 +421,11 @@ class GameRepository(
             ) else e.foreign[c.id]?.let { f ->
                 // Perkiraan statistik asing punya ketidakpastian ±0,6 pp (imperfect information)
                 val lo = f.inflation - 0.6
+                val mte = geoNow.monthsToElection(c.id, turn)
                 c.copy(
                     inflationRange = "${fmt1(max(0.0, lo))}–${fmt1(max(0.0, lo) + 1.2)}%",
-                    policyRate = "${fmt2(f.policyRate)}%"
+                    policyRate = "${fmt2(f.policyRate)}%",
+                    electionCountdown = if (mte > 0) "$mte bulan lagi" else "Bulan ini"
                 )
             } ?: c
         }
@@ -942,7 +1005,8 @@ class GameRepository(
             countries = countries,
             mapPieces = StaticWorldData.mapPieces(),
             activeMapLayer = ui.activeMapLayer,
-            pairwiseTensions = StaticWorldData.pairwiseTensions(),
+            pairwiseTensions = liveTensions(e),
+            worldLayer = worldLayerView(e),
             incomeStatementRows = incomeRows,
             balanceSheetRows = balanceRows,
             cashFlowRows = cashFlowRows,

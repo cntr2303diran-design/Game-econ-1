@@ -47,7 +47,11 @@ class MacroPlusTest {
         val (dBoom, pBoom) = debtAfter(0.03)
         val (dBust, pBust) = debtAfter(-0.06)
         assertTrue("resesi menaikkan utang: $dBust vs $dBoom", dBust > dBoom + 3.0)
-        assertTrue("resesi memperlebar defisit primer: $pBust vs $pBoom", pBust > pBoom + 1.5)
+        // Defisit primer diukur di awal resesi (bulan 12): pada bulan 60 aturan fiskal sudah mengetatkan
+        // (stabilisasi utang), jadi selisihnya mengecil walau utang tetap jauh lebih tinggi.
+        val early = { gap: Double -> run(12, input = { _, _ -> calm(gap = gap) }).state("sundara").primaryDeficit }
+        assertTrue("resesi memperlebar defisit primer di awal: ${early(-0.06)} vs ${early(0.03)}", early(-0.06) > early(0.03) + 1.5)
+        assertTrue("pengetatan fiskal menyempitkan selisih seiring waktu: $pBust vs $pBoom", pBust - pBoom < early(-0.06) - early(0.03))
         val a = run(120, input = { t, _ -> calm(gap = 0.04 * Math.sin(t / 9.0)) })
         val b = run(120, input = { t, _ -> calm(gap = 0.04 * Math.sin(t / 9.0)) })
         for (s in a.states) {

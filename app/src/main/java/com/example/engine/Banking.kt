@@ -144,7 +144,9 @@ class CreditSystem(seed: Long) {
                     b.car = min(16.0, b.car + 0.14 * (0.6 + 0.4 * b.concentration) - loss - flight + 0.02 * stdNormal(r))
                     if (b.car < 4.0) {
                         fails++; recapBanks++
-                        b.car = 11.0; b.resolvedMonths = 6
+                        // Penyelamatan: modal disuntik, portofolio dibersihkan (konsentrasi turun) dan bank diawasi 12 bulan.
+                        b.car = 11.0; b.resolvedMonths = 12
+                        b.concentration = max(0.6, b.concentration * 0.75)
                     }
                 }
                 if (b.car < 8.0) weak++

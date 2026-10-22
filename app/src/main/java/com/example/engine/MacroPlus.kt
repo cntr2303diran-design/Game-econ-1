@@ -161,7 +161,10 @@ class MacroPlus(private val seed: Long) {
 
             // ---- Fiskal: stabilisator otomatis + haluan pemilu + pengetatan bila utang melewati dasar ----
             val interest = s.debtGdp * s.yield10 / 100.0
-            val primary = 0.01 * s.debtBase - 0.4 * inp.gap * 100.0 + st.deficitAdd + agingCost(id) - 0.04 * (s.debtGdp - s.debtBase)
+            // Aturan fiskal: pemerintah menutup 80% beban (bunga - pertumbuhan nominal) lewat surplus primer dan mengetatkan bila utang
+            // melewati dasar. Tanpa ini utang Sundara meledak (rata-rata 59 -> 131% PDB) karena bunga acuan 9-11% > pertumbuhan nominal.
+            val rMinusG = s.debtGdp * (s.yield10 - (inp.growthAnnual + inp.inflation)) / 100.0
+            val primary = -0.8 * rMinusG - 0.4 * inp.gap * 100.0 + st.deficitAdd + agingCost(id) - 0.08 * (s.debtGdp - s.debtBase)
             s.primaryDeficit = primary
             s.deficit = primary + interest // % PDB per tahun
             val nominal = inp.growthAnnual + inp.inflation
