@@ -262,6 +262,16 @@ fun InvestTabContent(
             "Terbitkan saham lanjutan 3.000 jt RS" to "SPO|3000",
             "Jual 15% saham anak usaha Tarsis" to "NCI|tarsis|15",
             "Jual 15% saham anak usaha Kestrel" to "NCI|kestrel|15",
+            "Akuisisi Importir Velmora" to "ACQ|riv_importir",
+            "Akuisisi Cahaya Weaving" to "ACQ|riv_cahaya",
+            "Akuisisi Prima Garmen" to "ACQ|riv_prima",
+            "Beli media" to "LOB|media",
+            "Lobi parlemen (tarif turun, berisiko etika)" to "LOB|parliament",
+            "Beli 5 kredit karbon" to "CRB|buy|5",
+            "Jual 3 kredit karbon" to "CRB|sell|3",
+            "Tunjuk CFO sebagai penerus CEO" to "SUC|exec_cfo",
+            "Tunjuk COO sebagai penerus CEO" to "SUC|exec_coo",
+            "Tunjuk anggota keluarga sebagai penerus" to "SUC|family",
             "Dirikan bank dan asuransi grup" to "CBK"
         )
         actions.forEach { (label, code) ->

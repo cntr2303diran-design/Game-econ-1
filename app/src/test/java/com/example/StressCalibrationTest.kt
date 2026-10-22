@@ -447,3 +447,48 @@ class NciTest {
         assertTrue(worst < 1e-6)
     }
 }
+
+class SuccessionTest {
+    @Test
+    fun handoverDependsOnSuccessor() {
+        var smooth = 0; var chaotic = 0; var n = 0
+        for (withSuccessor in listOf(true, false)) {
+            for (seed in 1L..50L) {
+                val e = TestBots.playUntil(seed * 7919L, 440) ?: continue
+                if (withSuccessor) e.apply(Action.AppointSuccessor("exec_cfo"))
+                var t = 0
+                while (e.gameOverReason == null && e.turn <= 470) { t++; TestBots.disciplinedStep(e, 500 + t); e.apply(Action.EndTurn) }
+                if (!e.handoverDone) continue
+                n++
+                if (withSuccessor) { if (!e.handoverChaotic) smooth++ } else { assertTrue(e.handoverChaotic); chaotic++ }
+            }
+        }
+        println("SUKSESI: mulus dengan penerus=$smooth, darurat tanpa penerus=$chaotic dari $n")
+        assertTrue(chaotic > 0)
+    }
+}
+
+class BalanceTest {
+    private fun campaign(seed: Long, active: Boolean): KapitalEngine {
+        val e = KapitalEngine(seed)
+        var t = 0
+        while (e.gameOverReason == null && e.turn < 481) { t++; if (active) ActiveBot.step(e, t) else TestBots.disciplinedStep(e, t); e.apply(Action.EndTurn) }
+        return e
+    }
+    @Test
+    fun activePlayBeatsPassivePlay_butIsNotGuaranteed() {
+        val res = mutableMapOf<String, Pair<Int, Int>>()
+        for (active in listOf(false, true)) {
+            var win = 0; val n = 60; val deathEra = IntArray(5); var gradeSum = 0
+            val reasons = mutableMapOf<String, Int>()
+            for (seed in 1L..n) {
+                val e = campaign(seed * 2654435761L % 100000007L, active)
+                if (e.isVictory) { win++; gradeSum += e.evaluateCampaign().totalScore } else { deathEra[KapitalEngine.era(e.turn)]++; reasons.merge("E${KapitalEngine.era(e.turn)}:" + (e.gameOverReason ?: "?").take(14), 1, Int::plus) }
+            }
+            println("BALANS ${if (active) "AKTIF" else "PASIF"}: menang=$win/$n mati per era=${deathEra.toList().drop(1)} skor rata2 menang=${if (win == 0) 0 else gradeSum / win} sebab=$reasons")
+            res[if (active) "a" else "p"] = win to n
+        }
+        assertTrue("bermain aktif harus lebih baik dari pasif", res.getValue("a").first > res.getValue("p").first)
+        assertTrue("tidak boleh dijamin menang", res.getValue("a").first < 60)
+    }
+}

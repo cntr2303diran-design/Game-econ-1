@@ -52,3 +52,29 @@ object TestBots {
         throw AssertionError("tidak ada seed yang bertahan sampai giliran $targetTurn dalam $maxSeeds percobaan")
     }
 }
+
+/** Bot aktif: bertindak seperti pemain cakap (ekspansi saat penuh, anak usaha, IPO, buyback, suksesi, karbon). */
+object ActiveBot {
+    fun step(e: KapitalEngine, t: Int) {
+        TestBots.disciplinedStep(e, t)
+        if (e.gameOverReason != null) return
+        val era = KapitalEngine.era(e.turn)
+        if (e.utilization() > 0.97 && e.extraLines < 3 && e.cash > 18000.0 * e.sc.size) e.apply(Action.Invest("line"))
+        if (t % 24 == 7 && e.cash > 15000.0 * e.sc.size) e.apply(Action.Invest(listOf("automation", "brand", "rnd")[(t / 24) % 3]))
+        if (!e.esgCompliant && e.cash > 12000.0 * e.sc.size) e.apply(Action.Invest("solar"))
+        if (era >= 2 && t % 12 == 3) {
+            for (c in listOf("tarsis", "kestrel")) if (e.cash > 30000.0 * e.sc.size) e.apply(Action.OpenSubsidiary(c))
+            if (e.fxHedgeActive.not() && e.subsidiaries.isNotEmpty()) e.apply(Action.HedgeFx)
+            for (c in e.subsidiaries.keys) e.apply(Action.Repatriate(c))
+        }
+        if (era >= 3) {
+            if (!e.isPublicCompany && e.ipoBlock() == null && e.cash > 20000.0 * e.sc.size) e.apply(Action.ExecuteIpo(20, false))
+            if (e.isPublicCompany && t % 12 == 9 && e.cash > 60000.0 * e.sc.size) e.apply(Action.Buyback(2000))
+            if (t % 12 == 5 && e.cash > 40000.0 * e.sc.size) e.apply(Action.OpenCaptiveBank)
+        }
+        if (era >= 4) {
+            if (e.appointedSuccessorId == null) e.apply(Action.AppointSuccessor("exec_cfo"))
+            if (e.carbonCredits < 5 && e.cash > 20000.0 * e.sc.size) e.apply(Action.CarbonAction("buy", 5))
+        }
+    }
+}

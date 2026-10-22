@@ -374,6 +374,7 @@ class KapitalEngine(val seed: Long) {
     var appointedSuccessorId: String? = null; private set
     val successorExecId: String? get() = appointedSuccessorId
     var successorReadiness: Double = 0.0; private set
+    private var appointedAtTurn = 0
 
     private var pendingWithholdingTaxRs: Double = 0.0
     private var periodSubInvestOutRs: Double = 0.0
@@ -867,6 +868,39 @@ class KapitalEngine(val seed: Long) {
         stockPrice = fair * Math.exp(stockSentiment) / sharesOutM
         stockHistory += stockPrice
         if (stockHistory.size > 480) stockHistory.removeAt(0)
+    }
+
+    var handoverDone = false; private set
+    var handoverChaotic = false; private set
+
+    /**
+     * Suksesi Era 4: pada giliran 445 (Januari 2067) dewan mengumumkan masa jabatan Anda berakhir tahun 2068.
+     * Pada giliran 468 terjadi serah terima: penerus yang siap menjaga kepercayaan kreditur, tanpa penerus
+     * terjadi serah terima darurat yang mengguncang dewan dan kredit.
+     */
+    private fun successionMilestones(out: MutableList<ReportLine>) {
+        if (turn == 445) {
+            out += ReportLine("Ketua Dewan mengumumkan: masa jabatan Anda berakhir Desember 2068. Tunjuk dan siapkan penerus sekarang.", Tone.WARN)
+            chronicle += ChronicleItem(turn, "Pengumuman suksesi", "Dewan menetapkan serah terima kepemimpinan pada Desember 2068.", "Era 4 → suksesi wajib → siapkan penerus.")
+        }
+        if (turn == 468 && !handoverDone) {
+            handoverDone = true
+            val months = if (appointedSuccessorId != null) 468 - appointedAtTurn else 0
+            val ready = if (appointedSuccessorId != null) (successorReadiness + 0.012 * months).coerceAtMost(1.0) else 0.0
+            successorReadiness = ready
+            if (appointedSuccessorId == null || ready < 0.5) {
+                handoverChaotic = true
+                boardTrust = (boardTrust - 25).coerceAtLeast(0)
+                creditShock += 0.5
+                out += ReportLine("SERAH TERIMA DARURAT: penerus ${if (appointedSuccessorId == null) "belum ditunjuk" else "belum siap (${(ready * 100).toInt()}%)"}. Kepercayaan dewan anjlok dan kreditur menuntut premi.", Tone.BAD)
+                chronicle += ChronicleItem(turn, "Serah terima darurat", "Penerus tidak siap; dewan dan kreditur goyah.", "Suksesi gagal → kepercayaan dewan turun → kredit mengetat.")
+            } else {
+                boardTrust = (boardTrust + 8).coerceAtMost(100)
+                creditShock = (creditShock - 0.2).coerceAtLeast(-0.25)
+                out += ReportLine("Serah terima mulus: penerus siap (${(ready * 100).toInt()}%). Kreditur dan dewan tenang.", Tone.GOOD)
+                chronicle += ChronicleItem(turn, "Serah terima mulus", "Penerus siap memimpin.", "Kaderisasi berhasil → kepercayaan terjaga.")
+            }
+        }
     }
 
     private fun eraTransitionReview(endingEra: Int, out: MutableList<ReportLine>) {
@@ -1428,6 +1462,7 @@ class KapitalEngine(val seed: Long) {
     private fun doAppointSuccessor(candidateId: String): Boolean {
         if (candidateId.isBlank() || !spend(2)) return false
         appointedSuccessorId = candidateId
+        appointedAtTurn = turn
         val trainingCost = 380.0 * sc.size * costIndex
         oneOffOpex += trainingCost
         val rSuc = Random(seed * 19L + candidateId.hashCode().toLong())
@@ -2771,6 +2806,7 @@ class KapitalEngine(val seed: Long) {
                 "$gameOverReason ${eval.summaryText}", "Lihat post-mortem dan evaluasi 5 komponen.")
         }
 
+        if (gameOverReason == null) successionMilestones(lines)
         if (gameOverReason == null && era(turn + 1) != era(turn)) eraTransitionReview(era(turn), lines)
         turn += 1
         currentEra = era(turn)
