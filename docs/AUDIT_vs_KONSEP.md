@@ -250,3 +250,11 @@ Tes baru: `EraCrisisTest` (satu krisis per era, dalam batas era, deterministik; 
 - **Buyback** (`Action.Buyback`): menarik saham di harga berjalan, menaikkan porsi pendiri, diperlakukan sebagai distribusi ekuitas sehingga neraca, arus kas dan ekuitas konsolidasi tetap cocok (diuji dalam tes tekanan acak 7.700+ giliran).
 - Kartu aktivis dan penjual-pendek kini menggeser sentimen harga; pilihan "beli kembali saham" memakai buyback sungguhan.
 - **Belum**: kepentingan non-pengendali (anak usaha kepemilikan sebagian) dan pembelian saham oleh pemegang lain; harga saham belum memengaruhi biaya modal atau penerbitan saham lanjutan (SPO); tidak ada grafik harga di UI.
+
+## Build-30 — Tahap 4b: kepentingan non-pengendali, SPO, harga saham ke biaya kredit (jujur)
+- **Kepentingan non-pengendali (NCI)**: jual 5–25% saham anak usaha aktif (≥12 bulan, maks. 49% total) ke investor luar, harga = maks(0,7x ekuitas, 9x laba tahunan), biaya 3%. Dana masuk sebagai ekuitas induk. Laba bersih grup dipecah ke pemilik induk vs NCI; ekuitas NCI tampil; dividen anak usaha dibagi — porsi NCI keluar dari grup.
+- Tes (228 penjualan, 38 seed) + tes tekanan acak: kas, laba, dan ekuitas konsolidasi tetap cocok (residu ~1e-10).
+- **Bug lama yang ditemukan tes**: repatriasi dividen pada bulan yang sama dengan nasionalisasi dihitung ganda sebagai kas disita. Diperbaiki.
+- **SPO**: terbitkan saham lanjutan (diskon 5%, biaya 4%, jeda 12 bulan), pendiri terdilusi.
+- Sentimen saham kini memengaruhi spread kredit mengambang (±0,3 poin).
+- **Belum/disederhanakan**: pajak withholding atas bagian NCI tidak dihitung; harga jual NCI tidak dinegosiasikan; tidak ada hak veto/tag-along; tidak ada grafik harga sungguhan (hanya tren panah).

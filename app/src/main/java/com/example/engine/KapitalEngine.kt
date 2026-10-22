@@ -314,6 +314,10 @@ class KapitalEngine(val seed: Long) {
         var periodNewDebtLocal: Double = 0.0
         var periodDivPaidLocal: Double = 0.0
         var lastDivPaidLocal: Double = 0.0
+        /** Bagian pemilik minoritas (kepentingan non-pengendali), 0..0,49. */
+        var nciPct: Double = 0.0
+        var periodDivParentLocal: Double = 0.0
+        var lastDivParentLocal: Double = 0.0
 
         var lastIncomeLocal: Map<String, Double> = emptyMap()
         var lastBalanceLocal: Map<String, Double> = emptyMap()
@@ -376,6 +380,8 @@ class KapitalEngine(val seed: Long) {
     private var periodSubCashAcquiredRs: Double = 0.0
     private var periodSubSeizedCashRs: Double = 0.0
     private var periodSubDeconsolRs: Double = 0.0
+    private var periodNciDivRs: Double = 0.0
+    var nciSaleProceedsTotal = 0.0; private set
     private val subCashSnap = mutableMapOf<String, Pair<Double, Double>>()
     private var periodSubDivInGrossRs: Double = 0.0
     private var periodGoodwillImpairmentRs: Double = 0.0
@@ -694,6 +700,7 @@ class KapitalEngine(val seed: Long) {
             "debt_lt" to debtLt,
             "liab" to consolidatedTotalLiabilities(),
             "cta_equity" to cta,
+            "nci_equity" to nciEquityRs(),
             "equity" to consEq
         )
     }
@@ -1080,6 +1087,8 @@ class KapitalEngine(val seed: Long) {
             is Action.IssueCorporateBond -> eraBlock(3) == null && doIssueCorporateBond(action.amountRs, action.tenorMonths)
             is Action.Buyback -> isPublicCompany && action.amountRs in 100..20000 && pendingBuyback == 0.0 &&
                 cash - action.amountRs >= 3000.0 * sc.size * costIndex && spend(1).also { if (it) pendingBuyback = action.amountRs.toDouble() }
+            is Action.SellSubStake -> eraBlock(2) == null && doSellSubStake(action.countryId, action.pct)
+            is Action.IssueShares -> eraBlock(3) == null && doIssueShares(action.amountRs)
             is Action.ExecuteIpo -> eraBlock(3) == null && ipoBlock() == null && doExecuteIpo(action.floatPct, action.dualClassShares)
             Action.OpenCaptiveBank -> eraBlock(3) == null && doOpenCaptiveBank()
             is Action.MediaLobby -> eraBlock(3) == null && doMediaLobby(action.kind)
@@ -1179,10 +1188,14 @@ class KapitalEngine(val seed: Long) {
 
         // Pembukuan induk: kas & ekuitas induk menerima dividen bruto (dieliminasi penuh di konsolidasi grup);
         // pajak withholding lintas batas diakui sebagai beban pajak (pendingWithholdingTaxRs), bukan beban operasi.
-        cash += grossRs
-        equity += grossRs
-        periodSubDivInGrossRs += grossRs
-        pendingWithholdingTaxRs += taxRs
+        val parentShare = 1.0 - sub.nciPct
+        val parentRs = grossRs * parentShare
+        cash += parentRs
+        equity += parentRs
+        periodSubDivInGrossRs += parentRs
+        periodNciDivRs += grossRs - parentRs
+        sub.periodDivParentLocal += divLocal * parentShare
+        pendingWithholdingTaxRs += taxRs * parentShare
 
         chronicle += ChronicleItem(turn, "Repatriasi Dividen dari ${sub.spec.countryName}",
             "Menarik dividen ${fmt2(divLocal)} jt ${sub.spec.currencyCode} (${fmt(grossRs)} jt RS); pajak withholding dividen ${fmt1(effWithholdingPct)}% (${fmt(taxRs)} jt RS).",
@@ -1277,6 +1290,49 @@ class KapitalEngine(val seed: Long) {
         chronicle += ChronicleItem(turn, "Penerbitan Obligasi Korporasi ${fmt(amt)} jt RS",
             "Tenor $tenorMonths bulan (bullet maturity), kupon tetap ${fmt2(couponPct)}%, biaya emisi ${fmt(fee)} jt RS (cair akhir bulan ini).",
             "Pendanaan pasar modal Era 3 → kas masuk jangka panjang dengan pokok jatuh tempo sekaligus.", actionCount)
+        return true
+    }
+
+    fun nciEquityRs(): Double =
+        subsidiaries.values.filter { !it.nationalized && it.active }.sumOf { it.nciPct * it.equityLocal() * foreignMeta.getValue(it.spec.countryId).fxToRs }
+
+    /** Jual saham minoritas anak usaha ke investor luar (kepentingan non-pengendali). Dana masuk sebagai ekuitas induk. */
+    private fun doSellSubStake(countryId: String, pct: Int): Boolean {
+        val sub = subsidiaries[countryId] ?: return false
+        if (!sub.active || sub.nationalized || sub.monthsActive < 12 || pct !in 5..25) return false
+        if (sub.nciPct + pct / 100.0 > 0.49 + 1e-9) return false
+        if (!spend(2)) return false
+        val fx = foreignMeta.getValue(countryId).fxToRs
+        val eqRs = sub.equityLocal() * fx
+        val annNiRs = 12.0 * (sub.lastIncomeLocal["ni"] ?: 0.0) * fx
+        val value = max(0.7 * eqRs, 9.0 * annNiRs)
+        val gross = value * pct / 100.0
+        val net = gross * 0.97
+        if (net <= 0.0) return false
+        sub.nciPct += pct / 100.0
+        cash += net; equity += net; periodCureIn += net; nciSaleProceedsTotal += net
+        chronicle += ChronicleItem(turn, "Jual $pct% saham anak usaha ${sub.spec.countryName}",
+            "Investor luar membeli $pct% seharga ${fmt(net)} jt RS (bersih biaya 3%). Mereka kini berhak atas ${fmt1(sub.nciPct * 100)}% laba dan dividen anak usaha ini.",
+            "Penjualan saham minoritas → kas masuk sebagai ekuitas → laba & dividen dibagi dengan kepentingan non-pengendali.", actionCount)
+        return true
+    }
+
+    private var lastSpoTurn = -99
+    /** Penerbitan saham lanjutan (SPO): kas masuk, pendiri terdilusi. */
+    private fun doIssueShares(amountRs: Int): Boolean {
+        if (!isPublicCompany || amountRs !in 500..30000 || turn - lastSpoTurn < 12 || stockPrice <= 0.0) return false
+        if (!spend(2)) return false
+        val net = amountRs * 0.96
+        val issuePrice = stockPrice * 0.95
+        val newShares = amountRs / issuePrice
+        sharesOutM += newShares
+        founderSharePct = (founderSharesM / sharesOutM * 100.0).coerceAtMost(100.0)
+        cash += net; equity += net; periodCureIn += net
+        lastSpoTurn = turn
+        stockSentiment -= 0.04
+        chronicle += ChronicleItem(turn, "Penerbitan saham lanjutan (SPO)",
+            "Menerbitkan ${fmt1(newShares)} juta lembar di ${fmt(issuePrice)} RS (diskon 5%); dana bersih ${fmt(net)} jt RS. Porsi pendiri turun ke ${fmt1(founderSharePct)}%.",
+            "Ekuitas baru → kas bertambah → kepemilikan pendiri terdilusi.", actionCount)
         return true
     }
 
@@ -1987,7 +2043,7 @@ class KapitalEngine(val seed: Long) {
         }
         out.events.forEach { lines += ReportLine(it, Tone.WARN) }
         creditShock *= 0.96
-        creditAdj = (0.4 * (out.unemployment - 5.0)).coerceIn(-0.5, 2.0) + creditShock
+        creditAdj = (0.4 * (out.unemployment - 5.0)).coerceIn(-0.5, 2.0) + creditShock - (if (isPublicCompany) (stockSentiment * 1.0).coerceIn(-0.3, 0.3) else 0.0)
         loans.forEach { l -> l.floatingSpreadPct?.let { l.annualRatePct = policyRate + it + creditAdj } }
 
         // ---- 2. Kejadian operasional, Pembukuan Anak Usaha Lokal, Skandal Etika, & Risiko Politik ----
@@ -2017,7 +2073,8 @@ class KapitalEngine(val seed: Long) {
             }
             if (meta.tensionScore >= 86 && rOps.nextDouble() < 0.03) {
                 sub.nationalized = true
-                subCashSnap.remove(cid)?.let { periodSubSeizedCashRs += it.first * it.second }
+                // kas yang sudah ditarik sebagai dividen bulan ini tidak ikut disita
+                subCashSnap.remove(cid)?.let { periodSubSeizedCashRs += (it.first - sub.periodDivPaidLocal) * it.second }
                 periodSubDeconsolRs -= sub.retainedEarningsHistoricalRs()
                 val lostInvRs = sub.paidInCapitalHistoricalRs
                 investmentInSubsRs = max(0.0, investmentInSubsRs - lostInvRs)
@@ -2105,6 +2162,8 @@ class KapitalEngine(val seed: Long) {
             sub.periodNewDebtLocal = 0.0
             sub.lastDivPaidLocal = sub.periodDivPaidLocal
             sub.periodDivPaidLocal = 0.0
+            sub.lastDivParentLocal = sub.periodDivParentLocal
+            sub.periodDivParentLocal = 0.0
         }
 
         // Audit transfer pricing: peluang bergantung pada seberapa besar laba yang digeser dibanding pendapatan induk (bukan peluang tetap)
@@ -2645,9 +2704,10 @@ class KapitalEngine(val seed: Long) {
             val consEbt = taxable + sumSubInc("ebt")
             val consTax = tax + sumSubInc("tax")
             val consNi = ni + sumSubInc("ni")
+            val nciNiRs = validSubs.sumOf { (it.lastIncomeLocal["ni"] ?: 0.0) * foreignMeta.getValue(it.spec.countryId).fxToRs * it.nciPct }
             ctaEquity = computeCtaEquity()
             val consEqClose = consolidatedEquity()
-            val parentDirect = (periodCureIn - periodTradeFees - periodSubWriteOffRs - periodGoodwillImpairmentRs + mtm + divInCash - factorDiscount - eqFx - dividend)
+            val parentDirect = (periodCureIn - periodTradeFees - periodSubWriteOffRs - periodGoodwillImpairmentRs + mtm + divInCash - factorDiscount - eqFx - dividend - periodNciDivRs)
             val consOpen = if (consEquityPrev.isNaN()) consEqClose - consNi - parentDirect - (ctaEquity - ctaPrev) else consEquityPrev
             lastConsolidatedEquity = mapOf(
                 "open" to consOpen, "ni" to consNi, "direct" to parentDirect, "cta" to (ctaEquity - ctaPrev), "deconsol" to periodSubDeconsolRs,
@@ -2658,12 +2718,13 @@ class KapitalEngine(val seed: Long) {
                 "revenue" to consRev, "cogs" to consCogs, "opex" to consOpex, "maint" to maint,
                 "dep" to consDep, "baddebt" to writeOff, "ebit" to consEbit, "interest" to consInt,
                 "ebt" to consEbt, "tax" to consTax, "wht_tax" to whtNow, "ni" to consNi,
-                "elim_intercompany_rev" to -icRevElim, "elim_intercompany_div" to -icDivElim
+                "elim_intercompany_rev" to -icRevElim, "elim_intercompany_div" to -icDivElim,
+                "ni_nci" to nciNiRs, "ni_parent" to (consNi - nciNiRs)
             )
             lastConsolidatedBalance = consolidatedBalanceSnapshot()
             val consCfo = cfo + sumSubCf("cfo")
             // Dividen internal dieliminasi pada nilai penutupan yang dipakai di sisi anak usaha; selisih kurs dividen dalam perjalanan masuk ke pengaruh kurs
-            val icDivElimClose = validSubs.sumOf { it.lastDivPaidLocal * foreignMeta.getValue(it.spec.countryId).fxToRs }
+            val icDivElimClose = validSubs.sumOf { it.lastDivParentLocal * foreignMeta.getValue(it.spec.countryId).fxToRs }
             // Investasi: belanja modal induk + pembangunan anak usaha (kas keluar grup) - kas anak usaha yang diperoleh saat aktivasi + investasi saham + CFI lokal
             val consCfi = (-capex - periodSubInvestOutRs - periodInvestOut + periodInvestIn + divInCash) + sumSubCf("cfi") + periodSubCashAcquiredRs
             val consCff = (newDebt - principal + rcfFlow - forcedPay + factorProceeds - dividend + periodCureIn) + sumSubCf("cff") + icDivElimClose
@@ -2673,6 +2734,8 @@ class KapitalEngine(val seed: Long) {
                 val sub = subsidiaries[cid] ?: continue
                 if (!sub.active || sub.nationalized) continue
                 fxCash += (snap.first - sub.lastDivPaidLocal) * (foreignMeta.getValue(cid).fxToRs - snap.second)
+                // Dividen ke pemilik minoritas keluar dari grup pada kurs awal bulan, sedangkan arus kas lokal dihitung pada kurs penutupan
+                fxCash += (sub.lastDivPaidLocal - sub.lastDivParentLocal) * (foreignMeta.getValue(cid).fxToRs - snap.second)
             }
             val consNet = consCfo + consCfi + consCff + fxCash - periodSubSeizedCashRs
             lastConsolidatedCashFlow = mapOf(
@@ -2687,7 +2750,7 @@ class KapitalEngine(val seed: Long) {
         periodInvestIn = 0.0; periodInvestOut = 0.0; periodStartCash = cash
         periodCureIn = 0.0; periodTradeFees = 0.0; periodStartEquity = equity
         periodSubInvestOutRs = 0.0; periodSubDivInGrossRs = 0.0; periodGoodwillImpairmentRs = 0.0
-        periodSubCashAcquiredRs = 0.0; periodSubSeizedCashRs = 0.0; periodSubDeconsolRs = 0.0
+        periodSubCashAcquiredRs = 0.0; periodSubSeizedCashRs = 0.0; periodSubDeconsolRs = 0.0; periodNciDivRs = 0.0
         revenueHist += revenue
         cashHist += cash
         kursHist += kurs

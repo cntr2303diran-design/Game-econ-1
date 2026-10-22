@@ -8,7 +8,10 @@ import kotlin.math.abs
 /** Uji tekanan identitas akuntansi dengan aksi acak (termasuk aksi multinasional/korporasi) dan uji determinisme. */
 class StressCalibrationTest {
 
-    private fun randomAction(r: java.util.Random, e: KapitalEngine): Action? = when (r.nextInt(18)) {
+    private fun randomAction(r: java.util.Random, e: KapitalEngine): Action? = when (r.nextInt(21)) {
+        17 -> Action.SellSubStake(listOf("tarsis", "kestrel", "halvenia", "meridia")[r.nextInt(4)], 5 + r.nextInt(21))
+        18 -> Action.IssueShares(500 + r.nextInt(4000))
+        19 -> Action.Repatriate(listOf("tarsis", "kestrel", "halvenia", "meridia")[r.nextInt(4)])
         15, 16 -> Action.Buyback(300 + r.nextInt(3000))
         0 -> Action.AdjustPrice(r.nextInt(9) - 4)
         1 -> Action.HedgeCotton
@@ -93,10 +96,11 @@ class StressCalibrationTest {
                 for (t in 1..60) {
                     if (e.gameOverReason != null) break
                     TestBots.disciplinedStep(e, 100 + t)
-                    repeat(2) { randomAction(r, e)?.let { a -> e.apply(a) } }
+                    val acts = StringBuilder()
+                    repeat(2) { randomAction(r, e)?.let { a -> val ok = e.apply(a); acts.append(a.encode()).append(if (ok) "+ " else "- ") } }
                     e.apply(Action.EndTurn)
                     check(e, "era-mulai=$startTurn seed=$seed t=${e.turn}")
-                    prevCons = checkConsolidated(e, prevCons, "era-mulai=$startTurn seed=$seed t=${e.turn}")
+                    prevCons = checkConsolidated(e, prevCons, "era-mulai=$startTurn seed=$seed t=${e.turn} acts=$acts cf=${e.lastConsolidatedCashFlow} d=${e.lastDetail.filterKeys { it.startsWith("d_") }}")
                     turns++
                 }
             }
@@ -386,8 +390,60 @@ class StockTest {
     }
 
     @Test
+    fun spoDilutesFounder_andHasCooldown() {
+        var done = 0
+        for (seed in 1L..40L) {
+            val e = TestBots.playUntil(seed * 15485863L, 232) ?: continue
+            if (e.ipoBlock() != null || !e.apply(Action.ExecuteIpo(20, false))) continue
+            for (t in 1..6) { TestBots.disciplinedStep(e, 100 + t); e.apply(Action.EndTurn) }
+            if (e.gameOverReason != null) continue
+            val f0 = e.founderSharePct; val sh0 = e.sharesOutM
+            if (e.apply(Action.IssueShares(2000))) {
+                assertTrue(e.sharesOutM > sh0); assertTrue(e.founderSharePct < f0)
+                assertFalse("jeda 12 bulan", e.apply(Action.IssueShares(2000)))
+                done++
+            }
+        }
+        assertTrue("SPO teruji: $done", done > 0)
+    }
+
+    @Test
     fun privateCompanyCannotBuyback() {
         val e = KapitalEngine(5L)
         assertFalse(e.apply(Action.Buyback(500)))
+    }
+}
+
+class NciTest {
+    @Test
+    fun minorityStakeKeepsGroupIdentities_andAttributesIncome() {
+        var sold = 0; var withNci = 0; var spo = 0; var worst = 0.0
+        for (seed in 1L..60L) {
+            val e = TestBots.playUntil(seed * 104729L, 130) ?: continue
+            e.apply(Action.OpenSubsidiary("tarsis")); e.apply(Action.OpenSubsidiary("kestrel"))
+            var prev = e.lastConsolidatedBalance["cash"] ?: Double.NaN
+            for (t in 1..48) {
+                if (e.gameOverReason != null) break
+                TestBots.disciplinedStep(e, 100 + t)
+                for (c in listOf("tarsis", "kestrel", "halvenia", "meridia")) {
+                    if (t % 6 == 1 && e.apply(Action.SellSubStake(c, 15))) sold++
+                    if (t % 4 == 0) e.apply(Action.Repatriate(c))
+                }
+                if (t == 30 && e.apply(Action.IssueShares(1500))) spo++
+                e.apply(Action.EndTurn)
+                val ce = e.lastConsolidatedEquity
+                worst = maxOf(worst, abs(ce["resid"] ?: 0.0))
+                val cf = e.lastConsolidatedCashFlow
+                val cash = e.lastConsolidatedBalance["cash"] ?: 0.0
+                if (!prev.isNaN()) assertEquals("kas grup seed=$seed t=${e.turn}", cash - prev, cf["net"] ?: 0.0, 1e-6)
+                prev = cash
+                val ci = e.lastConsolidatedIncome
+                assertEquals((ci["ni"] ?: 0.0), (ci["ni_parent"] ?: 0.0) + (ci["ni_nci"] ?: 0.0), 1e-6)
+                assertTrue(abs(e.totalAssets() - e.totalLiabilities() - e.equity) < 1e-6)
+            }
+            if (e.subsidiaries.values.any { it.nciPct > 0 }) withNci++
+        }
+        println("NCI: penjualan=$sold seed dengan NCI=$withNci SPO=$spo residu ekuitas konsolidasi terbesar=$worst")
+        assertTrue(worst < 1e-6)
     }
 }

@@ -430,7 +430,8 @@ class GameRepository(
         ) + (if (e.isPublicCompany) listOf(
             "Harga saham" to "${fmt(e.stockPrice)} RS (${fmt1(e.sharesOutM)} juta lembar; kapitalisasi ${fmt(e.stockPrice * e.sharesOutM)} jt RS)",
             "Dividen/saham terakhir dan buyback" to "${fmt1(e.lastDividendPerShare)} RS; total buyback ${fmt(e.buybackTotalRs)} jt RS (${fmt1(e.sharesRetiredM)} juta lembar ditarik)",
-            "Porsi pendiri" to "${fmt1(e.founderSharePct)}%"
+            "Porsi pendiri" to "${fmt1(e.founderSharePct)}%",
+            "Tren harga 12 bulan" to e.stockHistory.takeLast(12).let { h -> if (h.size < 2) "belum cukup data" else h.zipWithNext { a, b -> if (b > a * 1.005) "▲" else if (b < a * 0.995) "▼" else "■" }.joinToString("") + "  (${fmt1((h.last() / h.first() - 1) * 100)}%)" }
         ) else emptyList()) + e.subsidiaries.values.map { sb ->
             "Anak usaha ${sb.spec.countryName}" to when {
                 sb.nationalized -> "Dinasionalisasi"
@@ -623,6 +624,10 @@ class GameRepository(
             groupRows += g("Beban bunga", m(gi, "interest"), "", neg = true)
             groupRows += g("Pajak penghasilan", m(gi, "tax"), "Pajak withholding dividen: ${fmt(m(gi, "wht_tax"))} jt RS", neg = true)
             groupRows += g("Laba bersih grup", m(gi, "ni"), "", total = true)
+            if (m(gi, "ni_nci") != 0.0) {
+                groupRows += g("  diatribusikan ke pemilik induk", m(gi, "ni_parent"))
+                groupRows += g("  diatribusikan ke kepentingan non-pengendali", m(gi, "ni_nci"), "Bagian investor luar di anak usaha")
+            }
             groupRows += head("NERACA KONSOLIDASI")
             groupRows += g("Kas grup", m(gb, "cash")); groupRows += g("Piutang", m(gb, "ar")); groupRows += g("Persediaan", m(gb, "inv"))
             groupRows += g("Aset tetap", m(gb, "fa")); groupRows += g("Goodwill", m(gb, "goodwill"))
@@ -630,6 +635,7 @@ class GameRepository(
             groupRows += g("Total liabilitas", m(gb, "liab"), "", total = true)
             groupRows += g("Selisih kurs translasi (CTA)", m(gb, "cta_equity"), "Komponen ekuitas dari translasi anak usaha")
             groupRows += g("Ekuitas grup", m(gb, "equity"), "Aset = liabilitas + ekuitas", total = true)
+            if (m(gb, "nci_equity") != 0.0) groupRows += g("  di antaranya kepentingan non-pengendali", m(gb, "nci_equity"), "Bagian investor luar atas ekuitas anak usaha")
             groupRows += head("ARUS KAS KONSOLIDASI")
             groupRows += g("Operasi", m(gc, "cfo")); groupRows += g("Investasi", m(gc, "cfi"), "Termasuk pembangunan anak usaha, dikurangi kas anak usaha yang diperoleh")
             groupRows += g("Pendanaan", m(gc, "cff"), "Dividen internal dieliminasi")

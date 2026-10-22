@@ -259,6 +259,9 @@ fun InvestTabContent(
             "Terbitkan obligasi 3.000 jt RS, 36 bulan" to "BND|3000|36",
             "IPO 20% saham" to "IPO|20|false",
             "Beli kembali saham 1.500 jt RS" to "BYB|1500",
+            "Terbitkan saham lanjutan 3.000 jt RS" to "SPO|3000",
+            "Jual 15% saham anak usaha Tarsis" to "NCI|tarsis|15",
+            "Jual 15% saham anak usaha Kestrel" to "NCI|kestrel|15",
             "Dirikan bank dan asuransi grup" to "CBK"
         )
         actions.forEach { (label, code) ->
