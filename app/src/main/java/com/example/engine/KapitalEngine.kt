@@ -192,6 +192,8 @@ class KapitalEngine(val seed: Long) {
     var leasedBackRs = 0.0; private set
     val insuranceClaimTurns = mutableListOf<Int>()
     /** B4b: derivatif aktif dan jumlah bersih (penyelesaian dikurangi premi) sejak awal, jt RS. */
+    /** B6: aktor yang belajar dari pola pemain (politisi, investor aktivis, eksekutif egois). */
+    val actors = ActorMind()
     /** B5: riwayat forensik (skor-M), auditor eksternal, dan percantikan laporan. */
     val forensics = ForensicBook()
     var auditorLevel = 0; private set
@@ -1853,6 +1855,117 @@ class KapitalEngine(val seed: Long) {
     }
 
     // =====================================================================
+    // B6: aktor yang belajar: politisi pemeras, investor aktivis, eksekutif egois
+    // =====================================================================
+    private fun actorEvent(tpl: String, title: String, body: String, warning: String, options: List<EventOption>, window: Int, default: String): GameEvent =
+        GameEvent("evt_${turn}_${eventCounter++}_$tpl", tpl, "Aktor", title, body, warning, options, turn, turn + window - 1, default)
+
+    private fun eo(id: String, title: String, ap: Int, impact: String, advisor: String, tone: Tone, vararg outs: Outcome) =
+        EventOption(id, title, ap, impact, advisor, tone, outs.toList())
+
+    private fun raisePoliticianDemand() {
+        val rev = max(1.0, lastIncome["revenue"] ?: sc.baseRevenue)
+        val a = actors
+        val amt = 0.18 * ActorTuning.fineScale * rev * (1.0 + a.politicianAppetite)
+        val pFine = min(0.80, 0.30 + 0.12 * min(3.0, a.politicianGrudge) + 0.15 * a.politicianAppetite)
+        val fine = 0.12 * ActorTuning.fineScale * rev * (1.0 + 0.5 * min(3.0, a.politicianGrudge))
+        val lawyer = 200.0 * sc.size * costIndex
+        val tone = if (a.paid > a.refused) "Anda pernah membayar; ia tahu Anda mudah ditekan." else if (a.refused > 0) "Anda pernah menolaknya; ia menaruh dendam." else "Ini permintaan pertamanya."
+        val ev = actorEvent("pol_demand", "Politisi meminta \"uang pelicin\"",
+            "Seorang politisi berpengaruh atas perizinan industri meminta ${fmt(amt)} jt RS sebagai \"sumbangan\". $tone Ia mengatur inspeksi, izin, dan tarif.",
+            "Pemeras yang dibayar akan kembali dengan permintaan lebih besar dan lebih sering; yang ditolak membalas lewat inspeksi.",
+            listOf(
+                eo("a", "Tolak", 0, "Risiko inspeksi dengan denda hingga ${fmt(fine)} jt RS", "Mempertahankan integritas; peluang inspeksi ${(pFine * 100).toInt()}% dan dendam menumpuk.", Tone.NEUTRAL,
+                    Outcome(pFine, "Inspeksi mendadak menemukan pelanggaran; denda ${fmt(fine)} jt RS.", listOf(Effect("fine", fine), Effect("actor", fine, 0, "pol_refuse"))),
+                    Outcome(1.0 - pFine, "Tidak ada tindak lanjut kali ini.", listOf(Effect("actor", 0.0, 0, "pol_refuse")))),
+                eo("b", "Bayar", 1, "Biaya ${fmt(amt)} jt RS; bukti suap tersimpan", "Cepat dan aman hari ini, tetapi menumbuhkan nafsu pemeras dan menambah bukti etika.", Tone.WARN,
+                    Outcome(1.0, "Permintaan dibayar; izin lancar untuk sementara.", listOf(Effect("cost", amt), Effect("ethics", 1.2, 0, "bribe"), Effect("actor", 0.0, 0, "pol_pay")))),
+                eo("c", "Laporkan ke Komisi Antikorupsi", 2, "Biaya hukum ${fmt(lawyer)} jt RS; kepercayaan dewan naik", "Menunjukkan kepatuhan; politisi itu menjadi musuh seumur hidup.", Tone.GOOD,
+                    Outcome(1.0, "Laporan diterima; dewan menghargai sikap Anda, politisi itu murka.", listOf(Effect("cost", lawyer), Effect("board_trust", 4.0), Effect("actor", 0.0, 0, "pol_report"))))
+            ), 4, "a")
+        openEvents += ev; actors.onDemandRaised(turn)
+    }
+
+    private fun raiseActivist(stakePct: Double) {
+        val cap = stockPrice * sharesOutM
+        val stakeValue = cap * stakePct / 100.0
+        val premium = 0.20 * stakeValue
+        val legal = 300.0 * sc.size * costIndex
+        val pWin = (boardTrust / 150.0).coerceIn(0.15, 0.60)
+        val buyDemand = 0.08 * cap
+        val ev = actorEvent("activist", "Investor aktivis mengambil ${"%.1f".format(stakePct)}% saham",
+            "Sebuah dana aktivis membeli ${"%.1f".format(stakePct)}% saham Anda (${fmt(stakeValue)} jt RS) dan menuntut pembelian kembali saham ${fmt(buyDemand)} jt RS atau perubahan dewan.",
+            "Aktivis mengincar perusahaan yang menimbun kas atau diperdagangkan di bawah nilai buku; yang pernah membayar greenmail menarik pemburu baru.",
+            listOf(
+                eo("a", "Lawan di rapat pemegang saham", 2, "Biaya ${fmt(legal)} jt RS; peluang menang ${(pWin * 100).toInt()}%", "Bergantung pada kepercayaan dewan; kalah berarti tuntutan dipaksakan.", Tone.WARN,
+                    Outcome(pWin, "Pemegang saham berpihak pada manajemen; aktivis mundur.", listOf(Effect("cost", legal), Effect("actor", 0.0, 0, "act_win"))),
+                    Outcome(1.0 - pWin, "Anda kalah suara: pembelian kembali dipaksakan dan saham tertekan.", listOf(Effect("cost", legal), Effect("buyback", buyDemand), Effect("sentiment", -0.08), Effect("actor", 0.0, 0, "act_lose")))),
+                eo("b", "Penuhi tuntutan (buyback)", 1, "Pembelian kembali saham ${fmt(buyDemand)} jt RS dari kas", "Menenangkan aktivis; kas berkurang.", Tone.NEUTRAL,
+                    Outcome(1.0, "Pembelian kembali disetujui; aktivis puas dan keluar.", listOf(Effect("buyback", buyDemand), Effect("actor", 0.0, 0, "act_accept")))),
+                eo("c", "Greenmail: beli kembali saham mereka dengan premi", 1, "Premi ${fmt(premium)} jt RS di atas nilai saham ${fmt(stakeValue)} jt RS", "Mengusir aktivis sekarang, tetapi mengundang aktivis lain.", Tone.BAD,
+                    Outcome(1.0, "Saham aktivis dibeli kembali dengan premi 20%.", listOf(Effect("buyback", stakeValue), Effect("cost", premium), Effect("actor", 0.0, 0, "act_greenmail"))))
+            ), 4, "a")
+        openEvents += ev; actors.onActivistRaised(turn)
+    }
+
+    private fun dressInternal(x: Double, severity: Double, label: String) {
+        pendingIncome += x; pendingPrepay += x
+        dressedRs += x; dressedFreshRs += x; dressedSinceCleanRs += x
+        recordEthicsEvidence(label, severity, "exec_cfo", "sundara")
+    }
+
+    private fun actorsMonthly(lines: MutableList<ReportLine>) {
+        val a = actors
+        a.decayGrudge()
+        val ta = max(1.0, totalAssets())
+        val ebitda = max(1.0, (ebitHist.takeLast(3).sum() + 3 * fixedAssets * 0.0081) * 4.0)
+        a.profile.observe(priceAdjPct, lobbyCount, ethicsLoad, max(0.0, (totalDebt() - cash) / ebitda), cash / ta)
+        if (gameOverReason != null || turn - sc.turn0 < 12) return
+
+        // Politisi: peluang naik bila pernah dibayar (nafsu), mendekati pemilu; turun dengan lobi parlemen
+        val r = rng(120)
+        val election = if (electionTurn >= turn && electionTurn - turn <= 3) 0.03 else 0.0
+        val pPol = max(0.0, 0.015 + 0.045 * a.politicianAppetite + election - 0.025 * min(1.0, lobbyCount / 2.0)) * ActorTuning.freqScale
+        if (turn - a.lastDemandTurn >= 8 && openEvents.none { it.templateId == "pol_demand" } && openEvents.size < 3 && r.nextDouble() < pPol) raisePoliticianDemand()
+
+        // Investor aktivis (hanya emiten): pemburu kas menganggur, saham di bawah nilai buku, dan pembayar greenmail
+        if (isPublicCompany && stockPrice > 0.0) {
+            val rAct = rng(121)
+            val hoardExcess = min(0.20, max(0.0, cash / ta - 0.22) * 4.0)
+            val lowPb = if (stockPrice * sharesOutM < 0.9 * equity) 0.04 else 0.0
+            val pAct = (0.008 + 0.05 * hoardExcess + lowPb + 0.03 * a.profile.appeasement) * ActorTuning.activistScale
+            val stake = 3.0 + 5.0 * rAct.nextDouble()
+            if (turn - a.lastActivistTurn >= 18 && openEvents.none { it.templateId == "activist" } && openEvents.size < 3 && rAct.nextDouble() < pAct) raiseActivist(stake)
+            // Serangan jual kosong (bear raid) pada perusahaan dengan leverage tinggi
+            val rBear = rng(122)
+            val lev = (totalDebt() - cash) / ebitda
+            if (lev > 3.0 && rBear.nextDouble() < 0.04) {
+                stockSentiment = (stockSentiment - 0.06).coerceIn(-0.9, 0.6)
+                lines += ReportLine("Penjual kosong menyerang saham Anda dengan menyorot leverage ${"%.1f".format(lev)}x EBITDA. Harga tertekan.", Tone.WARN)
+            }
+        }
+
+        // Eksekutif egois: yang loyalitasnya rendah mengambil jalan pintas yang menguntungkan dirinya
+        val rEx = rng(123)
+        for (e in execs) {
+            if (!e.present || e.loyalty >= 0.40) continue
+            val roll = rEx.nextDouble() / max(1e-9, ActorTuning.selfishScale)
+            if (e.id == "exec_cfo" && auditorLevel == 0 && roll < 0.05 && ebitHist.size >= 7 && ebitHist.takeLast(3).sum() < ebitHist.takeLast(6).take(3).sum()) {
+                val x = 0.10 * estimateMonth().getValue("opex")
+                dressInternal(x, 0.6, "window_dressing")
+                a.onSelfish()
+                lines += ReportLine("${e.name} (CFO) diam-diam mempercantik laporan ${fmt(x)} jt RS demi bonus. Tanpa auditor, hal ini tidak terdeteksi.", Tone.WARN)
+            } else if ((e.id == "exec_factory" || e.id == "exec_coo") && roll < 0.02) {
+                val kick = 0.004 * (lastIncome["cogs"] ?: 0.0)
+                oneOffOpex += kick
+                recordEthicsEvidence("kickback", 0.25, e.id, "sundara")
+                a.onSelfish()
+                lines += ReportLine("${e.name} menerima komisi terselubung dari pemasok; biaya pasokan naik ${fmt(kick)} jt RS.", Tone.WARN)
+            }
+        }
+    }
+
+    // =====================================================================
     // B5: forensik: percantikan laporan, auditor eksternal, skor-M
     // =====================================================================
     fun auditFee(): Double = when (auditorLevel) { 1 -> 45.0; 2 -> 120.0; else -> 0.0 } * sc.size * costIndex
@@ -2438,6 +2551,7 @@ class KapitalEngine(val seed: Long) {
                 if (ethicsEvidences.isNotEmpty()) ethicsEvidences.removeAt(0)
             }
             "esg_clean" -> esgCompliant = true
+            "actor" -> actors.onChoice(f.s, f.a)
             "board_trust" -> boardTrust = (boardTrust + f.a.toInt()).coerceIn(0, 100)
             "chain" -> {
                 val parts = f.s.split(":", limit = 2)
@@ -2986,6 +3100,7 @@ class KapitalEngine(val seed: Long) {
 
         // Skor Rahasia Etika & Bom Waktu Skandal (Tahap C - Bagian 16 PDF)
         forensicsMonthly(lines)
+        actorsMonthly(lines)
         ethicsLoad *= 0.988
         var scandalCost = 0.0
         val departedWitnessBoost = ethicsEvidences.count { ev -> execs.any { it.id == ev.witnessExecId && !it.present } } * 0.035

@@ -69,7 +69,7 @@ class StageAStressTest {
         var bankRuns = 0; var bankFailures = 0; var downgrades = 0; var sanctionTurns = 0
         val starts = listOf(0, 100, 232, 376)
         for (start in starts) {
-            for (seed in 1L..45L) {
+            for (seed in 1L..90L) {
                 val e = (if (start == 0) KapitalEngine(seed * 7_368_787L) else TestBots.playUntil(seed * 104729L + start, start)) ?: continue
                 val r = java.util.Random(seed * 31 + start)
                 prevCons = e.lastConsolidatedBalance["cash"] ?: Double.NaN
