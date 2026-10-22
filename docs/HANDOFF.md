@@ -55,9 +55,16 @@ Keseimbangan dengan kartu (200 seed): pasif 35%, cakap 62%; tanpa kartu 40%/64%.
 - Mesin: `engine/Roles.kt` (Gubernur, Manajer Dana, `MacroSim`, `RoleAction` dengan kode teks `NM`, `POL|laju`, `BUY|id|lot`, `SEL|id|lot`) dan `engine/Challenge.kt` (kode tantangan `KAPITAL-TANTANGAN|1|...`, hasil `KAPITAL-HASIL|1|nama|skor`, verifikator putar ulang, papan peringkat). Tes: `RolesTest` dan `ChallengeTest` (masuk `DEFAULT_CLASSES` di `tools/run-tests.sh`).
 - `World.step` mendapat parameter `policyOverride` (bawaan null, jalur CEO tidak berubah) agar Gubernur dapat menetapkan suku bunga.
 - Layar: `ui/screens/PeranScreen.kt`, rute `ROUTE_PERAN`, tombol `menu_peran` di `MenuScreen`. **Belum dilihat di emulator**, hanya kompilasi CI; daftar uji ada di `docs/UJI_MANUAL_UI.md` bagian G.
-- Batasan jujur: lihat baris C4 di `docs/AUDIT_vs_KONSEP.md` (tanpa Menteri, makro disederhanakan, log dapat disalin, tanpa server, sesi peran tidak disimpan).
+- Batasan jujur: lihat baris C4 di `docs/AUDIT_vs_KONSEP.md` (makro disederhanakan, log dapat disalin, tanpa server, sesi peran hanya bertahan lewat `rememberSaveable`, belum diuji di perangkat).
 
 ## Tahap C — C5 (transisi era berbasis kinerja) — status
 - `KapitalEngine.eraCriteria(target)`, `earlyEra`, `checkEarlyUnlock` (dipanggil tiap akhir bulan), `BalanceTuning.performanceUnlock` (bawaan true; false = perilaku lama murni kalender). `eraBlock` menerima `earlyEra` dan menampilkan syarat pada pesan.
 - Tes: `EraUnlockTest` (masuk `DEFAULT_CLASSES`). Batasan dan angka ukur: baris C5 di `docs/AUDIT_vs_KONSEP.md`.
 
+## Tahap C — peran Menteri, tantangan CEO, DMath (sesi penutup)
+- `MinisterGame` (`engine/Roles.kt`): belanja dan pajak % PDB (`RoleAction` `SPD|...`, `TAX|...`), utang, premi risiko nonlinier, gagal bayar di 120% PDB. Parameter ditetapkan dengan bot rancangan sendiri, bukan data riil.
+- Tantangan CEO: `CEO_CHALLENGE_HORIZON = 480` di `GameRepository`; `newGameFromChallenge`, `ceoFinished`, `ceoSubmission`. Log dikirim tanpa baris `DIF`; verifikasi memutar ulang satu kampanye penuh (beberapa detik, sebaiknya dipindah dari utas UI).
+- `engine/DMath.kt`: pembungkus `exp/ln/cos/tanh/pow` di atas `StrictMath` agar putar ulang identik antar CPU. `DeterminismGuardTest` memindai sumber mesin dan gagal bila ada `Math.*` atau `kotlin.math` transendental. **Jangan** impor `kotlin.math.exp` dan sejenisnya di `engine/`.
+- Perbaikan audit rilis: `AdjustPrice` memakai aritmetika Long (delta ekstrem tidak lagi meluap); bendera `sanctioned` di `eventCtx()` sebelumnya mati (sekarang `geo.sanctions.isNotEmpty()`), pemicu kartu yang tak terjangkau disesuaikan, `CardDeckTest` kini mengambil sampel jawaban acak dan menjaga kartu "tak pernah aktif" ≤2%.
+- Rilis: R8 aktif (`minifyEnabled`, `shrinkResources`, `app/proguard-rules.pro`). CI membangun release dengan kunci sementara hanya untuk verifikasi dan ukuran; APK bertanda tangan rilis terbit bila rahasia `RELEASE_KEYSTORE_B64`, `RELEASE_STORE_PASSWORD`, `RELEASE_KEY_PASSWORD` dipasang. `signingConfigs` di `app/build.gradle.kts` bertanda "Do not remove or modify" dan tidak diubah. Jangan pernah menaruh keystore di repo.
+- Catatan jujur lengkap: `docs/RELEASE_NOTES.md`.

@@ -95,4 +95,27 @@ class AuditGuardsTest {
         }
         assertTrue("uji tidak hampa: $months bulan", months > 2000)
     }
+
+    /**
+     * Setiap aksi pemain harus punya jalur dari antarmuka: dipanggil lewat fungsi bernama di repositori, atau kodenya dipakai
+     * sebagai tombol korporasi di layar. Aksi yang hanya bisa dijalankan bot adalah fitur yang tak bisa dipakai manusia.
+     */
+    @Test
+    fun everyPlayerAction_isReachableFromTheUi() {
+        fun dir(sub: String) = listOf("src/main/java/com/example/$sub", "app/src/main/java/com/example/$sub").map { java.io.File(it) }.firstOrNull { it.exists() }
+            ?: throw AssertionError("sumber $sub tidak ditemukan dari ${java.io.File(".").absolutePath}")
+        val actions = dir("engine/Actions.kt").readLines()
+        val repo = dir("data/GameRepository.kt").readText()
+        val ui = (dir("ui/screens").listFiles { f -> f.name.endsWith(".kt") }!!.toList() + dir("MainActivity.kt")).joinToString("\n") { it.readText() }
+        val rx = Regex("""^\s*(?:is\s+)?(\w+)\s*->\s*"([A-Z]{3})""")
+        val pairs = actions.mapNotNull { rx.find(it)?.let { m -> m.groupValues[1] to m.groupValues[2] } }
+        assertTrue("uji tidak hampa: ${pairs.size} aksi", pairs.size >= 45)
+        val unreachable = pairs.filter { (name, code) ->
+            val viaRepo = Regex("""Action\.$name\b""").containsMatchIn(repo)
+            val viaUiCode = Regex("\"$code(\\||\")").containsMatchIn(ui)
+            !viaRepo && !viaUiCode
+        }.map { it.first }
+        // EndTurn dan Journal dst. dipanggil lewat repositori; sisanya harus punya tombol.
+        assertTrue("aksi tanpa jalur dari UI: $unreachable", unreachable.isEmpty())
+    }
 }

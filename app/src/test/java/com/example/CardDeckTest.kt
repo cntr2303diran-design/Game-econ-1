@@ -96,13 +96,29 @@ class CardDeckTest {
                 }
             }
         }
+        // Pemain yang menjawab kartu sembarangan (mogok dan konflik buruh baru muncul bila dijawab buruk; bot cakap menghindarinya).
+        for (k in 1..15) {
+            val e = KapitalEngine(k * 104729L); val r = java.util.Random(k.toLong())
+            var t = 0
+            while (e.gameOverReason == null && t < 400) {
+                t++
+                for (ev in e.openEvents.toList()) { val o = ev.options[r.nextInt(ev.options.size)]; e.apply(Action.EventChoice(ev.id, o.id)) }
+                TestBots.disciplinedStep(e, t)
+                e.apply(Action.EndTurn)
+                if (t % 2 == 0) {
+                    samples++
+                    val c = e.eventCtx(); utils += c.util; if (c.priceAdj < 0) cuts++
+                    for (card in cards) card.trig?.let { tr -> if (tr.f(c) > 0.0) fired[card.id] = (fired[card.id] ?: 0) + 1 }
+                }
+            }
+        }
         val triggered = cards.filter { it.trig != null }
         val never = triggered.filter { (fired[it.id] ?: 0) == 0 }
         val always = triggered.count { (fired[it.id] ?: 0) >= samples * 0.9 }
         val shareActive = triggered.sumOf { (fired[it.id] ?: 0).toDouble() } / (triggered.size * samples.toDouble())
         utils.sort(); println("KARTU util: p5=${"%.2f".format(utils[utils.size / 20])} p25=${"%.2f".format(utils[utils.size / 4])} median=${"%.2f".format(utils[utils.size / 2])} p75=${"%.2f".format(utils[utils.size * 3 / 4])}; harga turun=$cuts/$samples")
         println("KARTU pemicu: $samples sampel kondisi; tak pernah aktif=${never.size}/${triggered.size} ${never.take(40).map { it.id }}; hampir selalu aktif=$always; rata-rata aktif=${"%.2f".format(shareActive)}")
-        assertTrue("sebagian besar kartu punya kondisi yang pernah terpenuhi: ${never.size} tak pernah aktif", never.size <= triggered.size * 0.10)
+        assertTrue("hampir semua kartu punya kondisi yang pernah terpenuhi: ${never.size} tak pernah aktif ${never.map { it.id }}", never.size <= triggered.size * 0.02)
         assertTrue("kartu yang hampir selalu aktif (=acak murni) dibatasi: $always", always <= triggered.size * 0.12)
     }
 

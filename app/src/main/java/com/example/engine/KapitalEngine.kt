@@ -2566,7 +2566,9 @@ class KapitalEngine(val seed: Long) {
         isPublic = isPublicCompany,
         profitFalling = ebitHist.size >= 6 && ebitHist.takeLast(3).average() < 0.85 * ebitHist.dropLast(3).takeLast(3).average(),
         panic = dunia.macro.panic, ratingIdx = dunia.macro.state("sundara").rating.ordinal, tension = dunia.geo.meanTensionOf("sundara"),
-        sanctioned = dunia.geo.activeSanctionsOn("sundara").isNotEmpty(), blockade = dunia.geo.anyBlockade(),
+        // Sundara sengaja tidak pernah disanksi langsung; pemicu kartu sanksi berarti ada sanksi antarnegara aktif di dunia yang dapat merembet
+        // ke rantai pasok dan pembeli pemain. (Sebelumnya memakai activeSanctionsOn("sundara") yang selalu kosong, sehingga kartu sanksi mati.)
+        sanctioned = dunia.geo.sanctions.isNotEmpty(), blockade = dunia.geo.anyBlockade(),
         monthsToElection = dunia.geo.monthsToElection("sundara", turn), util = utilization(), priceAdj = priceAdjPct,
         sentiment = stockSentiment, oilIndex = commodities.oil.index, gapPct = world.gap * 100.0, era = KapitalEngine.era(turn))
 
