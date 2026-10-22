@@ -57,3 +57,7 @@ Keseimbangan dengan kartu (200 seed): pasif 35%, cakap 62%; tanpa kartu 40%/64%.
 - Layar: `ui/screens/PeranScreen.kt`, rute `ROUTE_PERAN`, tombol `menu_peran` di `MenuScreen`. **Belum dilihat di emulator**, hanya kompilasi CI; daftar uji ada di `docs/UJI_MANUAL_UI.md` bagian G.
 - Batasan jujur: lihat baris C4 di `docs/AUDIT_vs_KONSEP.md` (tanpa Menteri, makro disederhanakan, log dapat disalin, tanpa server, sesi peran tidak disimpan).
 
+## Tahap C — C5 (transisi era berbasis kinerja) — status
+- `KapitalEngine.eraCriteria(target)`, `earlyEra`, `checkEarlyUnlock` (dipanggil tiap akhir bulan), `BalanceTuning.performanceUnlock` (bawaan true; false = perilaku lama murni kalender). `eraBlock` menerima `earlyEra` dan menampilkan syarat pada pesan.
+- Tes: `EraUnlockTest` (masuk `DEFAULT_CLASSES`). Batasan dan angka ukur: baris C5 di `docs/AUDIT_vs_KONSEP.md`.
+

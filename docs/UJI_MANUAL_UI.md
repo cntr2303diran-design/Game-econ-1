@@ -78,6 +78,13 @@ Perangkat minimum yang disarankan: ponsel 5,5" (360 dp lebar), ponsel besar (412
 | G9 | Pilih Manajer Dana; Beli 1 lot di satu saham berulang | Setelah melewati 35% dana, pembelian ditolak dengan pesan; kas dan lot di ringkasan berubah | |
 | G10 | Putar layar / font 130% / tema gelap di layar peran | Tidak ada teks terpotong; **perhatian**: sesi hilang saat layar diputar bila Activity dibuat ulang (state tidak disimpan) | |
 
+## H. Syarat era dini
+| # | Langkah | Yang diharapkan | Hasil |
+|---|---|---|---|
+| H1 | Permainan baru → tab yang menampilkan fitur terkunci (anak usaha/M&A) | Pesan 'Terkunci sampai Era 2' diikuti syarat kinerja dengan penanda [ok]/[belum] dan angka kemajuan; tidak terpotong | |
+| H2 | Mainkan sampai Januari 2038 dengan kinerja biasa | Fitur Era 2 terbuka pada tanggal kalender (jaring pengaman) | |
+| H3 | Mainkan dengan ekspansi agresif sampai syarat terpenuhi sebelum 2038 | Muncul laporan 'Fitur Era 2 ... terbuka lebih awal' dan entri kronik; aksi anak usaha dapat dipakai | |
+
 ## Risiko yang sudah diketahui (belum diperbaiki)
 - Grafik saham dan riwayat punya deskripsi aksesibilitas; FanChart dan Sparkline belum.
 - Peta belum mendukung pinch-zoom (belum diverifikasi); label negara bisa bertumpuk pada layar kecil.

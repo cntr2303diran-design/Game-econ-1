@@ -1256,9 +1256,52 @@ class KapitalEngine(val seed: Long) {
 
     /** Fitur terkunci sampai era tertentu (sesuai dokumen desain: Era 2 lintas batas, Era 3 finansialisasi, Era 4 kekaisaran global). */
     fun eraBlock(minEra: Int): String? {
-        if (era(turn) >= minEra) return null
+        if (era(turn) >= minEra || earlyEra >= minEra) return null
         val startTurn = ERA_START_TURNS[minEra - 1]
-        return "Terkunci sampai Era $minEra (${ERA_NAMES[minEra - 1]}), ${dateText(startTurn)}."
+        val early = if (BalanceTuning.performanceUnlock && minEra == max(era(turn), earlyEra) + 1) {
+            val c = eraCriteria(minEra)
+            " Atau terbuka lebih awal bila semua syarat kinerja terpenuhi: " + c.joinToString("; ") { (if (it.met) "[ok] " else "[belum] ") + it.label + " (" + it.progress + ")" } + "."
+        } else ""
+        return "Terkunci sampai Era $minEra (${ERA_NAMES[minEra - 1]}), ${dateText(startTurn)}.$early"
+    }
+
+    /** Era tertinggi yang fiturnya sudah dibuka lebih awal karena kinerja (kait permanen; kalender tetap jaring pengaman: fitur tidak pernah terkunci melewati tanggal era). */
+    var earlyEra = 0; private set
+
+    class EraCriterion(val label: String, val progress: String, val met: Boolean)
+
+    /** Syarat membuka fitur era [target] sebelum tanggal kalendernya. Bukan hukuman: pemain yang tidak memenuhinya tetap mendapat fitur pada tanggal era. */
+    fun eraCriteria(target: Int): List<EraCriterion> {
+        val minTurn = ERA_START_TURNS[target - 2] + 36
+        val ttm = revenueHist.takeLast(12).sum()
+        val base = 12.0 * sc.baseRevenue
+        val revMult = if (revenueHist.size >= 12 && base > 1.0) (ttm / max(0.5, priceIndex)) / base else 0.0
+        val eqMult = (consolidatedEquity() / max(0.5, priceIndex)) / max(1000.0, initialEquity)
+        val needRev = listOf(1.15, 1.4, 1.8)[target - 2]
+        val needEq = listOf(1.15, 1.5, 2.0)[target - 2]
+        val needSubs = listOf(0, 1, 3)[target - 2]
+        val subs = subsidiaries.values.count { it.active && !it.nationalized }
+        val out = ArrayList<EraCriterion>()
+        out += EraCriterion("sudah berjalan sampai ${dateText(minTurn)}", "sekarang ${dateText(turn)}", turn >= minTurn)
+        out += EraCriterion("pendapatan 12 bulan riil minimal ${fmt2(needRev)}x basis awal", "sekarang ${fmt2(revMult)}x", revMult >= needRev)
+        out += EraCriterion("ekuitas konsolidasi riil minimal ${fmt2(needEq)}x awal", "sekarang ${fmt2(eqMult)}x", eqMult >= needEq)
+        out += EraCriterion("laba operasi 12 bulan positif", if (ebitHist.size >= 12) fmt(ebitHist.takeLast(12).sum()) + " jt" else "riwayat kurang dari 12 bulan",
+            ebitHist.size >= 12 && ebitHist.takeLast(12).sum() > 0.0)
+        out += EraCriterion("tanpa pelanggaran covenant yang berjalan", "$covenantBreaches pelanggaran", covenantBreaches == 0)
+        if (needSubs > 0) out += EraCriterion("anak usaha aktif minimal $needSubs", "sekarang $subs", subs >= needSubs)
+        return out
+    }
+
+    /** Dipanggil tiap akhir bulan; membuka era berikutnya lebih awal bila semua syarat terpenuhi. Tanpa efek acak, jadi mesin tetap deterministik. */
+    private fun checkEarlyUnlock(out: MutableList<ReportLine>) {
+        if (!BalanceTuning.performanceUnlock) return
+        val target = max(era(turn + 1), earlyEra) + 1
+        if (target > 4) return
+        if (!eraCriteria(target).all { it.met }) return
+        earlyEra = target
+        val title = "Fitur Era $target (${ERA_NAMES[target - 1]}) terbuka lebih awal"
+        out += ReportLine("$title karena kinerja perusahaan memenuhi semua syarat.", Tone.GOOD)
+        chronicle += ChronicleItem(turn, title, "Syarat pendapatan, ekuitas, laba, covenant dan entitas terpenuhi sebelum tanggal kalender.", "Kinerja kuat → fitur era berikutnya dibuka lebih awal.")
     }
 
     /** IPO butuh rekam jejak laba (minimal 12 bulan riwayat dan EBIT rata-rata 6 bulan positif). */
@@ -3734,6 +3777,7 @@ class KapitalEngine(val seed: Long) {
 
         if (gameOverReason == null && (turn + 1) % 3 == 0) boardMeeting(lines)
         if (gameOverReason == null) successionMilestones(lines)
+        if (gameOverReason == null) checkEarlyUnlock(lines)
         if (gameOverReason == null && era(turn + 1) != era(turn)) eraTransitionReview(era(turn), lines)
         turn += 1
         currentEra = era(turn)
@@ -4058,4 +4102,6 @@ class KapitalEngine(val seed: Long) {
 object BalanceTuning {
     /** Pengali batas ICR covenant bank (1,0 = nilai skenario apa adanya). 0,6 hasil sapuan C3: kematian Era 1 pasif 34%→18%, cakap 23%→13%. */
     @JvmField var covenantScale = 0.6
+    /** C5: bila true, fitur era berikutnya dapat dibuka lebih awal oleh kinerja (kalender tetap jaring pengaman). */
+    @JvmField var performanceUnlock = true
 }
