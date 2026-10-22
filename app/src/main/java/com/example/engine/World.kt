@@ -162,7 +162,9 @@ class World(
         obs: PlayerObservation? = null,
         policyBias: Double = 0.0,
         /** Selisih inflasi yang DIUMUMKAN (rilis awal berisik, tertunda) dikurangi inflasi sebenarnya; bank sentral bereaksi pada angka rilis. */
-        inflationMisread: Double = 0.0
+        inflationMisread: Double = 0.0,
+        /** Mode peran Gubernur (C4): bila tidak null, suku bunga acuan ditetapkan pemain, bukan aturan Taylor. */
+        policyOverride: Double? = null
     ): Output {
         val events = mutableListOf<String>()
         monthsElapsed++
@@ -260,6 +262,7 @@ class World(
         taylorStar = star
         shadowRate += (0.30 * (star - shadowRate)).coerceIn(-0.5, 0.5)
         shadowRate = shadowRate.coerceIn(2.0, 14.0)
+        if (policyOverride != null) shadowRate = policyOverride.coerceIn(0.5, 20.0)
         val newPolicy = Math.round(shadowRate / 0.25) * 0.25
         val changed = newPolicy != policyRate
         policyRate = newPolicy
