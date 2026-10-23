@@ -19,3 +19,16 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Jejak tumpukan yang bisa dibaca saat dilaporkan pemain (nama berkas dan nomor baris tetap ada).
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+
+# Berkas simpanan, log aksi dan kode tantangan memuat nama enum (Difficulty, SalesScheme, FactoryScheme, TransferPricingMode, Role, ...)
+# lewat name()/valueOf(). Nama itu adalah nilai string, bukan nama kelas, jadi aman diobfuskasi; aturan ini hanya menjaga
+# valueOf/values bila aturan bawaan berubah.
+-keepclassmembers enum com.example.engine.** {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
+

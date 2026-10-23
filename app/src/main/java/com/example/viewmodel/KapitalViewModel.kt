@@ -3,30 +3,106 @@ package com.example.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import com.example.data.GameRepository
+import com.example.data.SaveStore
+import com.example.data.SlotStore
 import com.example.model.*
 import kotlinx.coroutines.flow.StateFlow
+import java.io.File
 
-class KapitalViewModel(
-    application: Application
-) : AndroidViewModel(application) {
+/** Menyimpan permainan ke file internal aplikasi (seed + log tindakan). */
+class FileSaveStore(private val file: File) : SaveStore {
+    override fun read(): String? = try {
+        if (file.exists()) file.readText() else null
+    } catch (e: Exception) {
+        null
+    }
 
-    private val repository = GameRepository(application.applicationContext)
+    override fun write(text: String) {
+        try {
+            val tmp = File(file.parentFile, file.name + ".tmp")
+            tmp.writeText(text)
+            if (!tmp.renameTo(file)) {
+                file.writeText(text)
+                tmp.delete()
+            }
+        } catch (e: Exception) {
+            // Penyimpanan gagal tidak boleh menghentikan permainan.
+        }
+    }
+}
+
+/** Lima slot autosave bergilir sebagai berkas internal (kapital_slot_1..5.txt). */
+class FileSlotStore(private val dir: File) : SlotStore {
+    private fun file(slot: Int) = File(dir, "kapital_slot_$slot.txt")
+    override fun readSlot(slot: Int): String? = try {
+        file(slot).let { if (it.exists()) it.readText() else null }
+    } catch (e: Exception) { null }
+
+    override fun writeSlot(slot: Int, text: String) {
+        FileSaveStore(file(slot)).write(text)
+    }
+}
+
+class KapitalViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val repository = GameRepository(
+        FileSaveStore(File(application.filesDir, "kapital_save.txt")),
+        slots = FileSlotStore(application.filesDir)
+    )
 
     val gameState: StateFlow<GameState> = repository.gameState
 
-    fun toggleTheme() = repository.toggleTheme()
+    fun toggleTheme(currentlyDark: Boolean) = repository.toggleTheme(currentlyDark)
     fun setMapLayer(layer: MapLayerFilter) = repository.setMapLayer(layer)
     fun selectCountryForBottomSheet(country: Country?) = repository.selectCountryForBottomSheet(country)
     fun inspectDataOrigin(origin: DataOriginInfo?) = repository.inspectDataOrigin(origin)
-    fun openEventDialog(show: Boolean, eventId: String? = null) = repository.openEventDialog(show, eventId)
-    fun dismissTurnReport() = repository.dismissTurnReport()
-    fun openSaveDialog(show: Boolean) = repository.openSaveDialog(show)
-    fun clearBanner() = repository.clearBanner()
-    fun switchRole(roleName: String) = repository.switchRole(roleName)
-    fun setDifficulty(difficultyName: String) = repository.setDifficulty(difficultyName)
-    fun changeIncentiveScheme(schemeName: String) = repository.changeIncentiveScheme(schemeName)
-    fun changeFactoryScheme(schemeName: String) = repository.changeFactoryScheme(schemeName)
+    fun openEventDialog(show: Boolean, id: String? = null) = repository.openEventDialog(show, id)
+    fun clearEventOutcome() = repository.clearEventOutcome()
+    fun setSalesScheme(id: String) = repository.setSalesScheme(id)
+    fun setFactoryScheme(id: String) = repository.setFactoryScheme(id)
+    fun adjustPrice(delta: Int) = repository.adjustPrice(delta)
+    fun invest(typeId: String) = repository.invest(typeId)
+    fun corporateAction(code: String) = repository.corporateAction(code)
+    fun setSegmentFocus(segment: String, level: Int) = repository.setSegmentFocus(segment, level)
+    fun hireStaff(role: String, tier: Int) = repository.hireStaff(role, tier)
+    fun fireStaff(role: String) = repository.fireStaff(role)
+    fun raiseSalary(role: String) = repository.raiseSalary(role)
+    fun setRdLevel(level: Int) = repository.setRdLevel(level)
+    fun setLogistics(level: Int) = repository.setLogistics(level)
+    fun setInsurance(level: Int) = repository.setInsurance(level)
+    fun setTradeFinance(on: Boolean) = repository.setTradeFinance(on)
+    fun saleLeaseback(pct: Int) = repository.saleLeaseback(pct)
+    fun buyDerivative(kind: String, pct: Int) = repository.buyDerivative(kind, pct)
+    fun windowDress(pct: Int) = repository.windowDress(pct)
+    fun setAuditor(level: Int) = repository.setAuditor(level)
+    fun predict(qid: Int, yes: Boolean, stake: Int) = repository.predict(qid, yes, stake)
+    fun openSpv(amountRs: Int) = repository.openSpv(amountRs)
+    fun sellSubStake(countryId: String, pct: Int, ask: Int) = repository.sellSubStake(countryId, pct, ask)
+    fun buyIntel(kind: String, subject: String, tier: Int) = repository.buyIntel(kind, subject, tier)
+    fun answerBoard(claim: String) = repository.answerBoard(claim)
+    fun applyCredit(bankId: String, amount: Int, tenor: Int, purpose: String, floating: Boolean, bullet: Boolean) =
+        repository.applyCredit(bankId, amount, tenor, purpose, floating, bullet)
+    fun reviewOffer(appId: String) = repository.reviewOffer(appId)
+    fun acceptOffer(appId: String) = repository.acceptOffer(appId)
+    fun declineOffer(appId: String) = repository.declineOffer(appId)
+    fun buyStock(id: String, lots: Int) = repository.buyStock(id, lots)
+    fun sellStock(id: String, lots: Int) = repository.sellStock(id, lots)
     fun crossCheckNewsItem(newsId: String) = repository.crossCheckNewsItem(newsId)
+    fun auditExecutive(id: String) = repository.auditExecutive(id)
+    fun confrontExecutive(id: String) = repository.confrontExecutive(id)
+    fun fireExecutive(id: String) = repository.fireExecutive(id)
+    fun contractAction(contractId: String, actionId: String) = repository.contractAction(contractId, actionId)
+    fun resolveEventOption(option: EventOptionItem) = repository.resolveEventOption(option)
+    fun advanceTurn() = repository.advanceTurn()
+    fun dismissMonthlyReport() = repository.dismissMonthlyReport()
+    fun showMonthlyReport() = repository.showMonthlyReport()
+    fun newGame(difficulty: com.example.engine.Difficulty? = null) = repository.newGame(difficulty)
+    fun newGameFromChallenge(c: com.example.engine.Challenge) = repository.newGameFromChallenge(c)
+    fun ceoSubmission(player: String): String? = repository.ceoSubmission(player)
+    fun loadSlot(slot: Int) = repository.loadSlot(slot)
+    fun runCounterfactual(actionIndex: Int) = repository.runCounterfactual(actionIndex)
+    fun clearCounterfactual() = repository.clearCounterfactual()
+    fun rejectDecision(decisionId: String) = repository.rejectDecision(decisionId)
 
     fun submitDecisionJournal(
         decisionId: String,
@@ -34,46 +110,9 @@ class KapitalViewModel(
         strategicReason: String,
         numericPrediction: String,
         confidencePct: Int,
+        predictedCash: Double,
         failureScenario: String
-    ) = repository.submitDecisionJournal(
-        decisionId = decisionId,
-        optionId = optionId,
-        strategicReason = strategicReason,
-        numericPrediction = numericPrediction,
-        confidencePct = confidencePct,
-        failureScenario = failureScenario
+    ): Boolean = repository.submitDecisionJournal(
+        decisionId, optionId, strategicReason, numericPrediction, confidencePct, predictedCash, failureScenario
     )
-
-    fun rejectProposal(decisionId: String) = repository.rejectProposal(decisionId)
-    fun resolveEventOption(option: EventOptionItem) = repository.resolveEventOption(option)
-    fun executeContractAction(contractId: String) = repository.executeContractAction(contractId)
-    fun auditExecutive(execId: String) = repository.auditExecutive(execId)
-    fun confrontExecutive(execId: String) = repository.confrontExecutive(execId)
-    fun fireExecutive(execId: String) = repository.fireExecutive(execId)
-    fun adjustPrice(deltaPct: Int) = repository.adjustPrice(deltaPct)
-    fun applyCredit(bankId: String, amount: Int, tenor: Int, purpose: String, floating: Boolean, bullet: Boolean) =
-        repository.applyCredit(bankId, amount, tenor, purpose, floating, bullet)
-    fun reviewCreditOffer(appId: String) = repository.reviewCreditOffer(appId)
-    fun acceptCreditOffer(appId: String) = repository.acceptCreditOffer(appId)
-    fun declineCreditOffer(appId: String) = repository.declineCreditOffer(appId)
-    fun startInvestment(typeId: String) = repository.startInvestment(typeId)
-    fun openSubsidiary(countryId: String) = repository.openSubsidiary(countryId)
-    fun repatriateSubsidiary(countryId: String) = repository.repatriateSubsidiary(countryId)
-    fun setTransferPricingMode(modeName: String) = repository.setTransferPricingMode(modeName)
-    fun acquireRival(rivalId: String) = repository.acquireRival(rivalId)
-    fun borrowForeignSub(countryId: String, amountRs: Int) = repository.borrowForeignSub(countryId, amountRs)
-    fun issueCorporateBond(amountRs: Int, tenorMonths: Int) = repository.issueCorporateBond(amountRs, tenorMonths)
-    fun executeIpo(stakePct: Int) = repository.executeIpo(stakePct, dualClassShares = false)
-    fun openCaptiveBank() = repository.openCaptiveBank()
-    fun mediaLobby(intensity: Int) = repository.mediaLobby(if (intensity >= 2) "media" else "lobby")
-    fun carbonAction(actionType: Int) = repository.carbonAction(if (actionType >= 1) "buy" else "sell", 5)
-    fun appointSuccessor(execId: String) = repository.appointSuccessor(execId)
-    fun buyStock(companyId: String, lots: Int) = repository.buyStock(companyId, lots)
-    fun sellStock(companyId: String, lots: Int) = repository.sellStock(companyId, lots)
-    fun advanceTurn() = repository.advanceTurn()
-    fun saveToSlot(slot: Int) = repository.saveToSlot(slot)
-    fun loadFromSlot(slot: Int) = repository.loadFromSlot(slot)
-    fun newGame(seed: Long) = repository.newGame(seed)
-    fun newRandomGame() = repository.newGame()
-    fun branchFromAction(actionIndex: Int) = repository.branchFromAction(actionIndex)
 }

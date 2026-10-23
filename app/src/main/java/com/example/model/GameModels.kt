@@ -1,11 +1,11 @@
 package com.example.model
 
 enum class SemanticTone {
-    DANGER_RED,
-    WARNING_YELLOW,
-    GOOD_GREEN,
-    PRIMARY_BLUE,
-    NEUTRAL_GRAY
+    DANGER_RED,     // Merah = bahaya
+    WARNING_YELLOW, // Kuning = peringatan
+    GOOD_GREEN,     // Hijau = membaik
+    PRIMARY_BLUE,   // Biru = aksi utama
+    NEUTRAL_GRAY    // Abu-abu = netral / data tertunda
 }
 
 enum class ConfidenceTier(val label: String, val tone: SemanticTone) {
@@ -14,6 +14,10 @@ enum class ConfidenceTier(val label: String, val tone: SemanticTone) {
     HIGH("Keyakinan tinggi", SemanticTone.GOOD_GREEN)
 }
 
+/**
+ * Metadata yang ditampilkan saat pengguna melakukan ketuk lama (long-press) pada angka mana pun
+ * untuk membuka Bottom Sheet "Asal data" (sumber, tanggal, cara hitung, bias).
+ */
 data class DataOriginInfo(
     val title: String,
     val displayedValue: String,
@@ -24,6 +28,9 @@ data class DataOriginInfo(
     val confidence: ConfidenceTier
 )
 
+/**
+ * Model untuk kartu indikator di Markas dan di seluruh layar.
+ */
 data class Indicator(
     val id: String,
     val label: String,
@@ -42,9 +49,9 @@ enum class MediaSlant(
     val editorialProfile: String
 ) {
     BISNIS("Harian Bisnis", "Bisnis", "Fokus likuiditas, suku bunga, rantai pasok, dan covenant bank"),
-    PRO_PEMERINTAH("Suara Sundara", "Pro-Pemerintah", "Menonjolkan stabilitas makro dan memperhalus angka inflasi"),
+    PRO_PEMERINTAH("Suara Sundara", "Pro-Pemerintah", "Menonjolkan stabilitas makro dan memperhalus angka inflasi jelang pemilu"),
     OPOSISI("Mimbar Rakyat", "Oposisi", "Menyorot tajam pemadaman listrik, biaya hidup, dan tuntutan serikat pekerja"),
-    SENSASIONAL("Kilat Sore", "Sensasional", "Judul bombastis; rawan ditunggangi rumor spekulan"),
+    SENSASIONAL("Kilat Sore", "Sensasional", "Judul bombastis; rawan ditunggangi rumor spekulan atau short-seller"),
     INDEPENDEN("Lensa Independen", "Independen", "Jurnalisme investigatif rantai pasok dan akuntansi forensik")
 }
 
@@ -62,14 +69,6 @@ data class NewsItem(
     val originInfo: DataOriginInfo
 )
 
-data class DecisionOption(
-    val id: String,
-    val title: String,
-    val subtitle: String,
-    val badge: String,
-    val tone: SemanticTone
-)
-
 data class Decision(
     val id: String,
     val title: String,
@@ -81,9 +80,15 @@ data class Decision(
     val defaultContextNote: String,
     val isCompleted: Boolean = false,
     val opensEventDialog: Boolean = false,
-    val canReject: Boolean = false,
-    val options: List<DecisionOption> = emptyList()
+    val options: List<Pair<String, String>> = emptyList(), // (id, label) untuk keputusan pilihan
+    val canReject: Boolean = false
 )
+
+data class MemoItem(val from: String, val role: String, val text: String)
+
+data class ReportLineItem(val text: String, val tone: SemanticTone)
+
+data class ContractActionItem(val id: String, val label: String, val enabled: Boolean)
 
 data class CompletedJournalEntry(
     val id: String,
@@ -95,8 +100,7 @@ data class CompletedJournalEntry(
     val confidencePct: Int,
     val failureScenario: String,
     val evaluated: Boolean = false,
-    val brierScoreContribution: Double? = null,
-    val outcomeText: String? = null
+    val brierScoreContribution: Double? = null
 )
 
 data class Executive(
@@ -104,8 +108,8 @@ data class Executive(
     val initials: String,
     val name: String,
     val roleTitle: String,
-    val loyaltyEstimate: String,
-    val ambitionEstimate: String,
+    val loyaltyEstimate: String,   // Ditampilkan sebagai perkiraan ("Tinggi?", "Sedang?", "Rendah?")
+    val ambitionEstimate: String,  // Ditampilkan sebagai perkiraan ("Tinggi?", "Sedang?")
     val skillEstimate: String,
     val horizonNote: String,
     val incentiveScheme: String,
@@ -113,11 +117,11 @@ data class Executive(
     val loyaltyTone: SemanticTone,
     val originInfo: DataOriginInfo,
     val present: Boolean = true,
-    val vacantNote: String = "",
-    val canAudit: Boolean = true,
-    val auditStatus: String = "Belum diaudit",
+    val signalNote: String = "",
+    val auditStatus: String = "",
+    val canAudit: Boolean = false,
     val canConfront: Boolean = false,
-    val canFire: Boolean = true,
+    val canFire: Boolean = false,
     val lastOutcome: String = ""
 )
 
@@ -156,25 +160,172 @@ data class Country(
     val inflationRange: String,
     val policyRate: String,
     val gdpGrowth: String,
-    val tensionScore: Int,
+    val tensionScore: Int, // 0..100
     val electionCountdown: String,
     val electricityReliability: String,
     val climateRiskLabel: String,
     val supplyChainRole: String,
-    val polygonPoints: List<Pair<Float, Float>>,
+    val polygonPoints: List<Pair<Float, Float>>, // Normalized 0f..1f coordinates for Canvas polygon
     val pieces: List<MapPiece>,
-    val originInfo: DataOriginInfo,
-    val fxToRsText: String = "1,00 RS",
-    val corpTaxText: String = "22%",
-    val tariffText: String = "0%",
-    val hasSubsidiary: Boolean = false
+    val originInfo: DataOriginInfo
+)
+
+/** Satu baris lapisan dunia lanjutan: kondisi makro-fiskal satu negara inti. */
+data class WorldLayerRow(
+    val countryName: String,
+    val rating: String,
+    val debtText: String,
+    val yieldText: String,
+    val curveText: String,
+    val tone: SemanticTone
+)
+
+/** Ringkasan lapisan dunia lanjutan (Tahap A): peringkat, panik, bank, rilis data, iklim, teknologi, demografi. */
+data class WorldLayerView(
+    val rows: List<WorldLayerRow> = emptyList(),
+    val lines: List<Pair<String, String>> = emptyList()
+)
+
+/** B1: satu laporan intelijen yang sudah dibeli. */
+data class IntelReportView(
+    val title: String,
+    val metric: String,
+    val estimateText: String,
+    val bandText: String,
+    val whenText: String,
+    val tierText: String
+)
+
+/** B1: pertanyaan rapat dewan yang sedang terbuka. */
+data class BoardView(
+    val member: String,
+    val text: String,
+    val metricLabel: String,
+    val dueText: String,
+    val answered: String?
+)
+
+/** B8: ringkasan satu slot autosave. */
+data class AutosaveView(val slot: Int, val turn: Int, val label: String)
+
+/** B7: pertanyaan pasar prediksi yang terbuka. */
+data class PredictionQuestionView(val id: Int, val text: String, val crowdYesPct: Int, val monthsLeft: Int, val position: String?)
+
+/** B7: pasar prediksi berpoin (bukan kas). */
+data class PredictionView(
+    val points: Int = 100,
+    val maxStake: Int = 20,
+    val questions: List<PredictionQuestionView> = emptyList(),
+    val summary: String = "",
+    val recent: List<String> = emptyList()
+)
+
+/** B1: tampilan tab Intelijen (riset berbayar dan rapat dewan). */
+data class IntelView(
+    val kinds: List<Triple<String, String, List<Pair<String, String>>>> = emptyList(), // kode, label, subjek (kode, label)
+    val tierCosts: List<String> = emptyList(),
+    val reports: List<IntelReportView> = emptyList(),
+    val board: BoardView? = null,
+    val boardTrust: Int = 0,
+    val boardRecord: String = ""
+)
+
+/** B2: satu segmen konsumen di tab Segmen. */
+data class SegmentRowView(
+    val code: String,
+    val label: String,
+    val weightText: String,
+    val surveyText: String,
+    val adoptionText: String,
+    val level: Int,
+    /** Alasan penolakan untuk memilih tingkat 0, 1, 2 (null = boleh). */
+    val blocks: List<String?>
+)
+
+/** B2: tampilan tab Segmen (pasar produk). */
+data class ProductMarketView(
+    val rows: List<SegmentRowView> = emptyList(),
+    val brandText: String = "",
+    val focusText: String = "",
+    val costText: String = ""
+)
+
+/** B3: satu jabatan karyawan kunci. */
+data class StaffRowView(
+    val code: String,
+    val label: String,
+    val present: Boolean,
+    val skillText: String,
+    val loyaltyText: String,
+    val salaryText: String,
+    val canHire: Boolean,
+    val canFire: Boolean,
+    val canRaise: Boolean
+)
+
+/** B3: tampilan tab Operasi (SDM, R&D, logistik, armada). */
+/** B4c: anak usaha yang dapat dijual sebagian ke investor minoritas. */
+data class StakeRowView(
+    val countryId: String,
+    val name: String,
+    val statusText: String,
+    val blockText: String?
+)
+
+/** B4b: baris derivatif: jenis, ringkasan kontrak aktif (atau null), alasan terblokir per porsi 25/50/100%, dan premi per porsi. */
+data class DerivRowView(
+    val code: String,
+    val label: String,
+    val activeText: String?,
+    val blocks: List<String?>,
+    val premiums: List<Double>,
+    val hint: String
+)
+
+data class OperationsView(
+    val staff: List<StaffRowView> = emptyList(),
+    val hireCosts: List<String> = emptyList(),
+    val rdLevel: Int = 0,
+    val rdText: String = "",
+    val logisticsLevel: Int = 0,
+    val logisticsText: String = "",
+    val fleetText: String = "",
+    val costText: String = "",
+    // B4a: keuangan lanjut
+    val insuranceLevel: Int = 0,
+    val insuranceText: String = "",
+    val tradeFinance: Boolean = false,
+    val tradeFinanceText: String = "",
+    val leaseText: String = "",
+    val leaseBlocks: List<String?> = emptyList(),
+    // B4b: derivatif
+    val derivs: List<DerivRowView> = emptyList(),
+    // B4c: saham minoritas anak usaha dan grafik harga saham
+    val stakes: List<StakeRowView> = emptyList(),
+    val stockSeries: List<Double> = emptyList(),
+    // C2: riwayat bulanan (maks. 60 bulan terakhir) untuk grafik kas, ekuitas, dan laba bersih
+    val cashSeries: List<Double> = emptyList(),
+    val equitySeries: List<Double> = emptyList(),
+    val niSeries: List<Double> = emptyList(),
+    val historyText: String = "",
+    val stockText: String = "",
+    // B5: forensik
+    val auditorLevel: Int = 0,
+    val auditText: String = "",
+    val mScoreText: String = "",
+    val mScoreFlag: Boolean = false,
+    val dressText: String = "",
+    val dressBlocks: List<String?> = emptyList(),
+    val spvText: String = "",
+    val spvBlocks: List<String?> = emptyList(),
+    val lawText: String = ""
 )
 
 data class GanttTask(
     val id: String,
     val projectName: String,
     val phaseName: String,
-    val startMonth: Int,
+    val startMonth: Int, // 1..12
     val durationMonths: Int,
     val progressMonth: Int,
     val budgetRsMillion: Int,
@@ -186,7 +337,7 @@ data class GanttTask(
 
 data class ContractItem(
     val id: String,
-    val category: String,
+    val category: String, // "Kredit Bank", "Term Sheet", "Pemasok Tier-1..3", " Pelanggan Ritel"
     val counterparty: String,
     val countryName: String,
     val valueText: String,
@@ -194,17 +345,15 @@ data class ContractItem(
     val covenantOrClause: String,
     val hiddenRiskNote: String,
     val tone: SemanticTone,
-    val apCostToAct: Int = 1,
-    val actionLabel: String = "Tinjau dengan konsultan hukum (1 AP)",
+    val apCostToAct: Int = 2,
+    val actionLabel: String = "Negosiasi / Tinjau",
     val originInfo: DataOriginInfo,
-    val reviewed: Boolean = false,
-    val revealedClause: String = "",
-    val canAct: Boolean = true
+    val actions: List<ContractActionItem> = emptyList()
 )
 
 data class MarketInstrument(
     val id: String,
-    val category: String,
+    val category: String, // "Komoditas", "Kurs Valas", "Saham & Korporasi"
     val name: String,
     val ticker: String,
     val priceText: String,
@@ -214,9 +363,7 @@ data class MarketInstrument(
     val fanProjectionMedian: List<Float>,
     val fanProjectionSpread: List<Float>,
     val forensicMScoreNote: String? = null,
-    val originInfo: DataOriginInfo,
-    val actionLabel: String? = null,
-    val actionEnabled: Boolean = false
+    val originInfo: DataOriginInfo
 )
 
 data class EventOptionItem(
@@ -228,13 +375,25 @@ data class EventOptionItem(
     val tone: SemanticTone
 )
 
+data class InvestItem(
+    val id: String,
+    val title: String,
+    val description: String,
+    val costText: String,
+    val durationText: String,
+    val benefitText: String,
+    val apCost: Int,
+    val enabled: Boolean,
+    val blockReason: String?,
+    val statusText: String
+)
+
 data class EventDialogModel(
     val id: String,
     val title: String,
     val contextDescription: String,
     val earlyWarningNote: String,
-    val options: List<EventOptionItem>,
-    val isCascadingChain: Boolean = false
+    val options: List<EventOptionItem>
 )
 
 data class FinancialRowItem(
@@ -250,7 +409,7 @@ data class FinancialRowItem(
 data class PairwiseTension(
     val pairLabel: String,
     val straitOrBorder: String,
-    val score: Int,
+    val score: Int, // 0..100
     val escalationStage: String,
     val businessEffect: String,
     val tone: SemanticTone
@@ -267,202 +426,14 @@ data class ChronicleEntry(
     val actionIndex: Int? = null
 )
 
-data class TurnReportItem(val text: String, val tone: SemanticTone)
-
-data class MemoItem(val execId: String, val from: String, val role: String, val text: String)
-
-data class SaveSlotInfo(
-    val slot: Int,
-    val exists: Boolean,
-    val summary: String
-)
-
-data class RivalRow(
+/** Pesaing di pasar tekstil Sundara (harga hasil estimasi intel pasar, bukan data pasti). */
+data class RivalItem(
     val id: String,
     val name: String,
-    val archetype: String,
-    val priceRelText: String,
-    val shareText: String,
-    val statusText: String,
-    val tone: SemanticTone,
-    val activeStrategyText: String = "Bersaing normal",
-    val warningSignalText: String = "",
-    val canAcquire: Boolean = false,
-    val acquireCostText: String = "",
-    val acquireBlockReason: String? = null
-)
-
-data class InvestCard(
-    val id: String,
-    val title: String,
-    val desc: String,
-    val costText: String,
-    val durationText: String,
-    val apCost: Int,
-    val accountingNote: String,
-    val benefitText: String,
-    val statusText: String,
-    val canStart: Boolean,
-    val blockReason: String?
-)
-
-/** Model UI untuk Anak Usaha Multinasional (Era 2 Ekspansi Lintas Negara). */
-data class SubsidiaryCardUi(
-    val countryId: String,
-    val countryName: String,
-    val currencyCode: String,
-    val title: String,
-    val desc: String,
-    val costText: String,
-    val buildMonths: Int,
-    val apCost: Int,
-    val benefitText: String,
-    val riskText: String,
-    val statusText: String,
-    val isActive: Boolean,
-    val isBuilding: Boolean,
-    val retainedForeignText: String,
-    val retainedRsEquivalentText: String,
-    val withholdingTaxText: String,
-    val canOpen: Boolean,
-    val openBlockReason: String?,
-    val canRepatriate: Boolean,
-    val tone: SemanticTone
-)
-
-/** Model UI untuk Kampanye Evaluasi 5 Komponen & Skor Etika (Tahap C). */
-data class CampaignEvaluationUi(
-    val nilaiPerusahaanScore: Int,
-    val ketahananScore: Int,
-    val kualitasKeputusanScore: Int,
-    val etikaReputasiScore: Int,
-    val dampakSosialScore: Int,
-    val totalScore: Int,
-    val grade: String,
-    val archetypeTitle: String,
-    val summaryText: String,
-    val boardTrust: Int,
-    val ethicsRiskLabel: String,
-    val ethicsEvidencesCount: Int,
-    val scandalsCount: Int
-)
-
-data class StatementNote(
-    val number: Int,
-    val title: String,
-    val body: String
-)
-
-data class ReportCheck(
-    val balanceOk: Boolean,
-    val assetsText: String,
-    val liabPlusEqText: String,
-    val cashFlowOk: Boolean,
-    val cfSumText: String,
-    val dCashText: String,
-    val equityOk: Boolean,
-    val eqCalcText: String,
-    val eqActualText: String
-)
-
-data class StockQuarter(
-    val label: String,
-    val revenue: String, val cogs: String, val opex: String, val dep: String,
-    val ebit: String, val interest: String, val tax: String, val ni: String,
-    val ar: String, val inv: String, val fa: String, val ap: String, val debt: String, val equity: String,
-    val cfo: String, val capex: String, val dDebt: String, val dividend: String, val cashStart: String, val cashEnd: String,
-    val surprise: String
-)
-
-data class StockCard(
-    val id: String,
-    val ticker: String,
-    val name: String,
-    val sector: String,
-    val blurb: String,
-    val riskNote: String,
-    val listed: Boolean,
     val priceText: String,
-    val changePctText: String,
-    val tone: SemanticTone,
-    val sparkline: List<Float>,
-    val perText: String,
-    val pbvText: String,
-    val divYieldText: String,
-    val roeText: String,
-    val debtEbitdaText: String,
-    val marketCapText: String,
-    val lastQuarterLabel: String,
-    val surpriseNote: String,
-    val quarters: List<StockQuarter>,
-    val heldLots: Int,
-    val heldValueText: String,
-    val avgCostText: String,
-    val unrealizedText: String,
-    val unrealizedTone: SemanticTone,
-    val lotCostText: String,
-    val canBuy1: Boolean,
-    val canBuy10: Boolean,
-    val canSell1: Boolean,
-    val canSellAll: Boolean
-)
-
-data class HoldingRow(
-    val id: String,
-    val ticker: String,
-    val name: String,
-    val lots: Int,
-    val avgPriceText: String,
-    val lastPriceText: String,
-    val valueText: String,
-    val pnlText: String,
-    val pnlTone: SemanticTone
-)
-
-data class BankCard(
-    val id: String,
-    val name: String,
-    val banker: String,
-    val bankerRole: String,
-    val kindLabel: String,
-    val foreign: Boolean,
-    val indicativeRateText: String,
-    val feeText: String,
-    val maxTenor: Int,
-    val maxAmountText: String,
-    val reviewTurns: Int,
-    val covenantText: String,
-    val relationshipScore: Int,
-    val style: String,
-    val incentive: String,
-    val tell: String,
-    val estimatedChance: String,
-    val weakestFactor: String,
-    val canApply: Boolean,
-    val blockReason: String?
-)
-
-data class CreditAppUi(
-    val id: String,
-    val bankName: String,
-    val banker: String,
-    val amountText: String,
-    val tenorText: String,
-    val purposeText: String,
-    val structureText: String,
-    val statusLabel: String,
-    val statusTone: SemanticTone,
-    val stageText: String,
-    val officialReason: String,
-    val informalNote: String,
-    val offerSummary: String,
-    val offerTerms: List<String>,
-    val hiddenTerms: List<String>,
-    val reviewed: Boolean,
-    val canReview: Boolean,
-    val canAccept: Boolean,
-    val canDecline: Boolean,
-    val expiresText: String
+    val vsYouText: String,
+    val statusText: String,
+    val tone: SemanticTone
 )
 
 data class GameState(
@@ -475,106 +446,231 @@ data class GameState(
     val apMax: Int = 7,
     val runwayMonths: Int = 5,
     val activeRole: String = "CEO PT Benang Sundara",
-    val isDarkTheme: Boolean = false,
-    val seed: Long = 203303L,
-    val scenarioTitle: String = "",
-    val scenarioStory: String = "",
-    val difficultyName: String = "MANAJER",
-    val difficultyLabel: String = "Manajer",
-    val difficultyDesc: String = "",
-    val isIronman: Boolean = false,
+    val isDarkTheme: Boolean? = null, // null = ikuti setelan HP
+    val seed: Long = 0L,
+    val covenantTone: SemanticTone = SemanticTone.WARNING_YELLOW,
+    val memos: List<MemoItem> = emptyList(),
+    val monthlyReportTitle: String = "",
+    val monthlyReportLines: List<ReportLineItem> = emptyList(),
+    val showMonthlyReport: Boolean = false,
     val gameOverReason: String? = null,
-    val isVictory: Boolean = false,
+    val evaluationTitle: String = "",
+    val evaluationRows: List<Pair<String, String>> = emptyList(),
+    val postMortemLines: List<String> = emptyList(),
+    val difficultyLabel: String = "",
+    val cashRs: Double = 0.0,
+    val equityRs: Double = 0.0,
+    val autosaves: List<AutosaveView> = emptyList(),
+    val prediction: PredictionView = PredictionView(),
+    val salesSchemeLabel: String = "",
+    val factorySchemeLabel: String = "",
+    val salesSchemeOptions: List<Pair<String, String>> = emptyList(),
+    val factorySchemeOptions: List<Pair<String, String>> = emptyList(),
+    val priceAdjPct: Int = 0,
+    val counterfactualText: String? = null,
+    val ganttTitle: String = "",
+    val ganttTotalMonths: Int = 12,
+    val periodLabel: String = "",
+    val prevPeriodLabel: String = "",
+    val accrualWarning: String? = null,
+    val hasSavedGame: Boolean = false,
+    val companyEquityText: String = "",
+    val rivals: List<RivalItem> = emptyList(),
+    val bourse: BourseState = BourseState(),
+    val actionPoints: Int = 0,
+    val credit: CreditViewState = CreditViewState(),
+    val actors: List<ActorItem> = emptyList(),
+    val playerShareText: String = "",
+    val unemploymentText: String = "",
+    val marketNote: String = "",
 
+    // Peringatan Covenant di Markas
     val covenantWarningTitle: String = "Jarak ke covenant 6%",
     val covenantWarningSubtitle: String = "Uji kuartalan Bank B dalam 1 giliran",
-    val covenantTone: SemanticTone = SemanticTone.WARNING_YELLOW,
-    val covenantBreaches: Int = 0,
-    val canEquityCure: Boolean = false,
-    val equityCureAmountText: String = "4.000 jt RS",
     val covenantOrigin: DataOriginInfo,
 
+    // Kartu Koran Pagi Ringkas di Markas
     val featuredNewsSource: String = "Harian Bisnis",
     val featuredNewsConfidence: ConfidenceTier = ConfidenceTier.MEDIUM,
     val featuredNewsHeadline: String = "Kestrel dikabarkan batasi ekspor logam langka",
-    val featuredNewsFooter: String = "+4 sudut pandang lain · ketuk untuk periksa silang",
+    val featuredNewsFooter: String = "+4 berita lain · 2 rumor · 1 rilis data",
 
+    // 4 Indikator Utama di Markas (Grid 2 Kolom)
     val markasIndicators: List<Indicator>,
 
+    // FanChart Proyeksi Kas 6 Bulan ke Depan
     val cashHistoryPoints: List<Float>,
     val cashFanMedianPoints: List<Float>,
     val cashFanBand50Points: List<Float>,
     val cashFanBand90Points: List<Float>,
 
+    // Daftar Menunggu Keputusan di Markas
     val pendingDecisions: List<Decision>,
     val completedJournals: List<CompletedJournalEntry>,
 
+    // Layar Koran Pagi (5 Media)
     val morningPaperEdition: List<NewsItem>,
 
+    // Layar Peta & Dunia (8 Negara Inti)
     val countries: List<Country>,
     val mapPieces: List<MapPiece>,
     val activeMapLayer: MapLayerFilter = MapLayerFilter.PELAYARAN,
     val pairwiseTensions: List<PairwiseTension>,
+    val worldLayer: WorldLayerView = WorldLayerView(),
+    val intel: IntelView = IntelView(),
+    val productMarket: ProductMarketView = ProductMarketView(),
+    val operations: OperationsView = OperationsView(),
 
+    // Layar Perusahaan (Laporan Keuangan, Organisasi, Proyek Gantt, Kontrak)
     val incomeStatementRows: List<FinancialRowItem>,
     val balanceSheetRows: List<FinancialRowItem>,
     val cashFlowRows: List<FinancialRowItem>,
-    val equityStatementRows: List<FinancialRowItem> = emptyList(),
-    val financialNotes: List<StatementNote> = emptyList(),
-    val reportCheck: ReportCheck? = null,
-    val periodLabel: String = "Maret 2033",
-    val priorPeriodLabel: String = "Februari 2033",
-    val accrualTrapActive: Boolean = true,
-    val accrualTrapSummary: String = "",
+    val equityRows: List<FinancialRowItem> = emptyList(),
+    val notesRows: List<FinancialRowItem> = emptyList(),
+    val groupRows: List<FinancialRowItem> = emptyList(),
+    val entityRows: List<FinancialRowItem> = emptyList(),
+    val investments: List<InvestItem> = emptyList(),
+    val investSummary: List<Pair<String, String>> = emptyList(),
     val executives: List<Executive>,
-    val activeIncentiveScheme: String = "Bonus berbasis omzet",
-    val activeFactoryScheme: String = "KPI penghematan biaya kuartalan",
     val ganttTasks: List<GanttTask>,
     val contracts: List<ContractItem>,
 
+    // Layar Pasar (Komoditas, Kurs RS/A$, Saham & Forensik)
     val marketInstruments: List<MarketInstrument>,
-    val bourseIndexText: String = "1.000",
-    val bourseChangeText: String = "0,0%",
-    val bourseSparkline: List<Float> = emptyList(),
-    val portfolioValueText: String = "0 jt RS",
-    val portfolioPnlText: String = "0 jt RS",
-    val dividendsTotalText: String = "0 jt RS",
-    val holdings: List<HoldingRow> = emptyList(),
-    val stocks: List<StockCard> = emptyList(),
 
-    val banks: List<BankCard> = emptyList(),
-    val creditApps: List<CreditAppUi> = emptyList(),
-    val creditMetricsSummary: String = "",
-    val freeCollateralText: String = "",
-
-    val brierScore: Double = 0.25,
+    // Fitur PDF: Skor Kalibrasi Brier, Bias Kognitif, & Kronik Dunia
+    val brierScore: Double = 0.16,
+    val evaluatedJournals: Int = 0,
     val detectedBiases: List<String>,
     val worldChronicles: List<ChronicleEntry>,
 
-    val turnReportTitle: String = "",
-    val turnReport: List<TurnReportItem> = emptyList(),
-    val showTurnReportDialog: Boolean = false,
-    val memos: List<MemoItem> = emptyList(),
-    val saveSlots: List<SaveSlotInfo> = emptyList(),
-    val showSaveDialog: Boolean = false,
-    val statusBanner: String? = null,
-    val priceAdjustmentPct: Int = 0,
-    val playerShareText: String = "20%",
-    val rivalLearningProfile: String = "",
-    val rivals: List<RivalRow> = emptyList(),
-    val scheduledChainCount: Int = 0,
-    val investments: List<InvestCard> = emptyList(),
-    val subsidiaries: List<SubsidiaryCardUi> = emptyList(),
-    val transferPricingModeName: String = "WAJAR",
-    val transferPricingLabel: String = "Harga Wajar (Arm's Length)",
-    val effectiveTaxRateText: String = "22,0%",
-    val fxHedgeActive: Boolean = false,
-    val fxHedgeStatusText: String = "Belum dilindung nilai (terbuka terhadap lonjakan kurs A$)",
-    val campaignEvaluation: CampaignEvaluationUi? = null,
-    val capacitySummary: String = "",
-
+    // Kartu Event Dialog & Bottom Sheet Asal Data
     val activeEventDialog: EventDialogModel,
+    val eventOutcomeText: String? = null,
     val showEventDialog: Boolean = false,
     val inspectedDataOrigin: DataOriginInfo? = null,
     val selectedCountryForSheet: Country? = null
+)
+
+/** Bursa saham: satu emiten beserta laporan keuangan resminya. */
+data class StockItem(
+    val id: String,
+    val ticker: String,
+    val name: String,
+    val sector: String,
+    val blurb: String,
+    val riskNote: String,
+    val listed: Boolean,
+    val priceText: String,
+    val changeText: String,
+    val changeTone: SemanticTone,
+    val holdingLots: Int,
+    val holdingText: String,
+    val lotCostText: String,
+    val unrealizedText: String,
+    val unrealizedTone: SemanticTone,
+    val spark: List<Float>,
+    val ratios: List<Pair<String, String>>,
+    val reportLabel: String,
+    val reportNote: String,
+    val income: List<FinancialRowItem>,
+    val balance: List<FinancialRowItem>,
+    val cashFlow: List<FinancialRowItem>,
+    val canBuy: Boolean,
+    val buyBlockReason: String
+)
+
+data class BourseState(
+    val indexText: String = "",
+    val indexChangeText: String = "",
+    val indexTone: SemanticTone = SemanticTone.NEUTRAL_GRAY,
+    val indexSpark: List<Float> = emptyList(),
+    val cashText: String = "",
+    val portfolioText: String = "",
+    val unrealizedText: String = "",
+    val dividendText: String = "",
+    val stocks: List<StockItem> = emptyList(),
+    val headlines: List<String> = emptyList()
+)
+
+/** Meja kredit dan pelaku. */
+data class BankItem(
+    val id: String,
+    val name: String,
+    val banker: String,
+    val bankerRole: String,
+    val style: String,
+    val incentive: String,
+    val tell: String,
+    val tellKnown: Boolean,
+    val relationText: String,
+    val relationTone: SemanticTone,
+    val rateText: String,
+    val speedText: String,
+    val maxTenor: Int,
+    val maxAmountText: String,
+    val foreign: Boolean,
+    val canApply: Boolean,
+    val blockReason: String
+)
+
+data class OfferItem(
+    val amountText: String,
+    val rateText: String,
+    val tenorText: String,
+    val feeText: String,
+    val covenantText: String,
+    val structureText: String,
+    val extraTerms: List<String>,
+    val hiddenTerms: List<String>,
+    val hiddenKnown: Boolean,
+    val validText: String
+)
+
+data class CreditAppItem(
+    val id: String,
+    val bankName: String,
+    val banker: String,
+    val amountText: String,
+    val purposeText: String,
+    val statusLabel: String,
+    val statusTone: SemanticTone,
+    val stageText: String,
+    val offer: OfferItem?,
+    val officialReason: String,
+    val informalNote: String,
+    val canReview: Boolean,
+    val canAccept: Boolean,
+    val canDecline: Boolean
+)
+
+data class LoanItem(
+    val lender: String,
+    val balanceText: String,
+    val rateText: String,
+    val maturityText: String,
+    val repaymentText: String,
+    val covenantText: String,
+    val flags: List<String>
+)
+
+data class CreditViewState(
+    val ratios: List<Pair<String, String>> = emptyList(),
+    val collateral: List<Pair<String, String>> = emptyList(),
+    val banks: List<BankItem> = emptyList(),
+    val applications: List<CreditAppItem> = emptyList(),
+    val loans: List<LoanItem> = emptyList(),
+    val note: String = ""
+)
+
+data class ActorItem(
+    val id: String,
+    val group: String,
+    val name: String,
+    val role: String,
+    val goal: String,
+    val lastAction: String,
+    val signals: List<String>,
+    val advice: String,
+    val tone: SemanticTone
 )

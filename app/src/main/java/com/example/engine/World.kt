@@ -1,10 +1,6 @@
 package com.example.engine
 
-import kotlin.math.exp
-import kotlin.math.ln
 import kotlin.math.max
-import kotlin.math.pow
-import kotlin.math.sqrt
 import kotlin.random.Random
 
 /**
@@ -93,10 +89,8 @@ class World(
     var lastLearnedAttackTrigger: String? = null; private set
     private var monthsElapsed = 0
 
-    // ---- Rumah tangga ----
-    private val employed = BooleanArray(households)
-    private val income = DoubleArray(households)
-    private val mpc = DoubleArray(households)
+    // ---- Rumah tangga (kohort pendapatan; lihat Agents.kt) ----
+    val householdSector = HouseholdSector(households)
     private var baseConsumption = 1.0
 
     // ---- Keadaan makro ----
@@ -115,26 +109,10 @@ class World(
     var taylorStar = 6.5; private set
 
     init {
-        val r = Random(20330301L)
-        for (i in 0 until households) {
-            employed[i] = r.nextDouble() > 0.05
-            val z = gauss(r)
-            income[i] = exp(0.55 * z)
-            mpc[i] = (0.97 - 0.30 * (income[i] / (income[i] + 1.5))).coerceIn(0.55, 0.97)
-        }
-        baseConsumption = rawConsumption()
+        baseConsumption = householdSector.consumption()
     }
 
-    private fun gauss(r: Random): Double {
-        val u1 = max(r.nextDouble(), 1e-9)
-        return sqrt(-2.0 * ln(u1)) * kotlin.math.cos(2.0 * Math.PI * r.nextDouble())
-    }
-
-    private fun rawConsumption(): Double {
-        var s = 0.0
-        for (i in 0 until households) if (employed[i]) s += income[i] * mpc[i]
-        return s
-    }
+    private fun gauss(r: Random): Double = stdNormal(r)
 
     // =====================================================================
     // Pasar produk: pangsa pemain sebagai fungsi harga relatif
@@ -180,7 +158,12 @@ class World(
         kursChangeMonthly: Double,
         kurs: Double,
         extraDemandShock: Double = 0.0,
-        obs: PlayerObservation? = null
+        obs: PlayerObservation? = null,
+        policyBias: Double = 0.0,
+        /** Selisih inflasi yang DIUMUMKAN (rilis awal berisik, tertunda) dikurangi inflasi sebenarnya; bank sentral bereaksi pada angka rilis. */
+        inflationMisread: Double = 0.0,
+        /** Mode peran Gubernur (C4): bila tidak null, suku bunga acuan ditetapkan pemain, bukan aturan Taylor. */
+        policyOverride: Double? = null
     ): Output {
         val events = mutableListOf<String>()
         monthsElapsed++
@@ -195,17 +178,8 @@ class World(
         val gapLag = gap
         val sep = (SEP_BASE * (1.0 - 4.0 * gapLag)).coerceIn(0.004, 0.045)
         val find = (FIND_BASE * (1.0 + 4.0 * gapLag)).coerceIn(0.08, 0.60)
-        var emp = 0
-        var consumption = 0.0
-        for (i in 0 until households) {
-            if (employed[i]) { if (r.nextDouble() < sep) employed[i] = false }
-            else { if (r.nextDouble() < find) employed[i] = true }
-            if (employed[i]) {
-                emp++
-                consumption += income[i] * mpc[i]
-            }
-        }
-        unemployment = 100.0 * (1.0 - emp.toDouble() / households)
+        val consumption = householdSector.step(r, sep, find)
+        unemployment = householdSector.unemploymentPct()
 
         // ---- 3. Permintaan agregat ----
         demand = ((consumption / baseConsumption) * (1.0 + confidence + rateDrag)).coerceIn(0.80, 1.20)
@@ -283,10 +257,11 @@ class World(
         kursHistory.addLast(kurs); if (kursHistory.size > 4) kursHistory.removeFirst()
         val depr3m = if (kursHistory.size >= 4) (kurs / kursHistory.first() - 1.0) * 100.0 else 0.0
         val star = neutralRealRate + inflation + 0.5 * (inflation - inflationTarget) +
-            0.5 * (gap * 100.0) + 0.12 * max(0.0, depr3m - 1.5)
+            0.5 * (gap * 100.0) + 0.12 * max(0.0, depr3m - 1.5) + policyBias + 1.5 * inflationMisread
         taylorStar = star
         shadowRate += (0.30 * (star - shadowRate)).coerceIn(-0.5, 0.5)
         shadowRate = shadowRate.coerceIn(2.0, 14.0)
+        if (policyOverride != null) shadowRate = policyOverride.coerceIn(0.5, 20.0)
         val newPolicy = Math.round(shadowRate / 0.25) * 0.25
         val changed = newPolicy != policyRate
         policyRate = newPolicy

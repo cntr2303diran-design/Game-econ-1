@@ -28,6 +28,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -236,6 +238,9 @@ private fun WorldPolygonCanvasCard(
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
+                .semantics {
+                    contentDescription = "Peta dunia dengan ${countries.size} negara inti. Peta hanya bisa dipilih dengan sentuhan; untuk detail tiap negara gunakan daftar negara di sebelah atau di bawah peta."
+                }
                 .pointerInput(countries) {
                     detectTapGestures { tapOffset ->
                         val w = size.width.toFloat().coerceAtLeast(1f)
@@ -557,6 +562,7 @@ private fun CountrySummaryBottomSheetContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
             .padding(bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -566,7 +572,7 @@ private fun CountrySummaryBottomSheetContent(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "${country.name} (${country.currencyCode})",
                     style = MaterialTheme.typography.headlineMedium,
@@ -660,8 +666,8 @@ private fun CountrySummaryBottomSheetContent(
             Button(
                 onClick = onDismiss,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = KapitalSemanticColors.blue,
-                    contentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 shape = RoundedCornerShape(6.dp),
                 modifier = Modifier

@@ -8,8 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.AccountTree
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Replay
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,16 +20,17 @@ import androidx.compose.ui.unit.dp
 import com.example.model.ChronicleEntry
 import com.example.ui.theme.KapitalSemanticColors
 import com.example.ui.theme.MonoFontFamily
-import com.example.ui.theme.NotoSerifFontFamily
 
 @Composable
 fun KronikDuniaScreen(
     chronicles: List<ChronicleEntry>,
+    counterfactualText: String?,
+    onRunCounterfactual: (Int) -> Unit,
     onBack: () -> Unit,
-    onBranchCounterfactual: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     BackHandler(onBack = onBack)
+    val counterfactualResult = counterfactualText
 
     Column(
         modifier = modifier
@@ -45,7 +45,7 @@ fun KronikDuniaScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(
@@ -55,20 +55,19 @@ fun KronikDuniaScreen(
                             .testTag("kronik_back_button")
                     ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Kembali",
-                            tint = MaterialTheme.colorScheme.onSurface
+                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = "Kembali"
                         )
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Kronik Dunia & Pohon Sebab-Akibat",
+                            text = "Kronik dunia",
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Jejak keputusan & fitur 'Bagaimana Jika' (Counterfactual Replay dengan seed yang sama)",
-                            style = MaterialTheme.typography.labelSmall,
+                            text = "Rantai sebab-akibat · \"Bagaimana Jika\" untuk keputusan ≥12 giliran lalu",
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -77,14 +76,39 @@ fun KronikDuniaScreen(
             }
         }
 
-        val scrollState = rememberScrollState()
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(scrollState)
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (counterfactualResult != null) {
+                Surface(
+                    color = KapitalSemanticColors.blueContainer,
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, KapitalSemanticColors.blue, RoundedCornerShape(6.dp))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "Hasil Simulasi Ulang 'Bagaimana Jika' (Counterfactual Replay):",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = KapitalSemanticColors.blue
+                        )
+                        Text(
+                            text = counterfactualResult,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+
             chronicles.forEach { entry ->
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
@@ -104,7 +128,7 @@ fun KronikDuniaScreen(
                         ) {
                             Text(
                                 text = "Giliran ${entry.turn} · ${entry.dateLabel}",
-                                style = MaterialTheme.typography.labelMedium.copy(
+                                style = MaterialTheme.typography.labelLarge.copy(
                                     fontFamily = MonoFontFamily,
                                     fontWeight = FontWeight.Bold
                                 ),
@@ -119,10 +143,7 @@ fun KronikDuniaScreen(
 
                         Text(
                             text = entry.title,
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontFamily = NotoSerifFontFamily,
-                                fontWeight = FontWeight.Bold
-                            ),
+                            style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onSurface
                         )
 
@@ -137,44 +158,31 @@ fun KronikDuniaScreen(
                             shape = RoundedCornerShape(4.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Row(
-                                modifier = Modifier.padding(10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.AccountTree,
-                                    contentDescription = null,
-                                    tint = KapitalSemanticColors.blue,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Text(
-                                    text = "Rantai Sebab-Akibat: ${entry.causalChain}",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = MonoFontFamily),
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
+                            Text(
+                                text = "Rantai Sebab-Akibat: ${entry.causalChain}",
+                                style = MaterialTheme.typography.labelSmall.copy(fontFamily = MonoFontFamily),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(8.dp)
+                            )
                         }
 
-                        if (entry.canReplayCounterfactual && entry.actionIndex != null) {
+                        val idx = entry.actionIndex
+                        if (entry.canReplayCounterfactual && idx != null) {
                             OutlinedButton(
-                                onClick = {
-                                    onBranchCounterfactual(entry.actionIndex)
-                                    onBack()
-                                },
+                                onClick = { onRunCounterfactual(idx) },
                                 shape = RoundedCornerShape(6.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = 48.dp)
+                                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Replay,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
+                                Icon(Icons.Outlined.Replay, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Buka Cabang 'Bagaimana Jika' Sebelum Keputusan Ini (Seed Tetap)")
+                                Text("Bagaimana jika tidak dilakukan?")
                             }
+                        } else if (idx != null) {
+                            Text(
+                                text = "\"Bagaimana Jika\" tersedia 12 giliran setelah keputusan.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }

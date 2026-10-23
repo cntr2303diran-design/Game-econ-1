@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
@@ -13,6 +15,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -219,7 +223,8 @@ fun FanChart(
     spread50Points: List<Float>,
     spread90Points: List<Float>,
     unitLabel: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    dangerLevel: Float? = null
 ) {
     val lineColor = KapitalSemanticColors.blue
     val dangerColor = KapitalSemanticColors.red
@@ -260,11 +265,25 @@ fun FanChart(
                 )
             }
 
+            val fanDescription = run {
+                fun f(v: Float) = String.format(java.util.Locale.forLanguageTag("id-ID"), "%.1f", v)
+                if (historyPoints.isEmpty() || medianFuturePoints.isEmpty()) "Grafik proyeksi $title belum punya data."
+                else {
+                    val last = medianFuturePoints.last()
+                    val s50 = spread50Points.lastOrNull(); val s90 = spread90Points.lastOrNull()
+                    "Grafik proyeksi $title, satuan $unitLabel. Nilai terakhir ${f(historyPoints.last())}. " +
+                        "Median di ujung proyeksi ${f(last)}" +
+                        (if (s50 != null) ", rentang 50 persen ${f(last - s50)} sampai ${f(last + s50)}" else "") +
+                        (if (s90 != null) ", rentang 90 persen ${f(last - s90)} sampai ${f(last + s90)}" else "") + "." +
+                        (if (dangerLevel != null) " Batas bahaya ${f(dangerLevel)}." else "")
+                }
+            }
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(130.dp)
                     .padding(vertical = 4.dp)
+                    .semantics { contentDescription = fanDescription }
             ) {
                 val w = size.width
                 val h = size.height
@@ -383,12 +402,12 @@ fun FanChart(
                     center = Offset(splitX, mapY(lastHistVal))
                 )
 
-                // Zero / Covenant Danger Line if minVal < 2000
-                if (minVal < 2500f && maxVal > 2500f) {
-                    val dangerY = mapY(2000f)
+                // Garis bahaya (misalnya kas nol), hanya bila diminta dan berada dalam rentang grafik
+                if (dangerLevel != null && dangerLevel > minVal && dangerLevel < maxVal) {
+                    val dangerY = mapY(dangerLevel)
                     drawLine(
                         color = dangerColor.copy(alpha = 0.65f),
-                        start = Offset(splitX, dangerY),
+                        start = Offset(0f, dangerY),
                         end = Offset(w, dangerY),
                         strokeWidth = 1.5f,
                         pathEffect = dash
@@ -425,7 +444,14 @@ fun Sparkline(
     modifier: Modifier = Modifier
 ) {
     val strokeColor = semanticToneColor(tone)
-    Canvas(modifier = modifier) {
+    val sparkDescription = if (points.size < 2) "Grafik tren belum punya data."
+    else {
+        val first = points.first(); val last = points.last()
+        val change = if (kotlin.math.abs(first) > 1e-6f) (last - first) / kotlin.math.abs(first) * 100f else 0f
+        val dir = when { change > 0.05f -> "naik"; change < -0.05f -> "turun"; else -> "datar" }
+        "Grafik tren ${points.size} titik: dari ${String.format(java.util.Locale.forLanguageTag("id-ID"), "%.1f", first)} ke ${String.format(java.util.Locale.forLanguageTag("id-ID"), "%.1f", last)}, $dir ${String.format(java.util.Locale.forLanguageTag("id-ID"), "%.1f", kotlin.math.abs(change))} persen."
+    }
+    Canvas(modifier = modifier.semantics { contentDescription = sparkDescription }) {
         if (points.size < 2) return@Canvas
         val w = size.width
         val h = size.height
@@ -466,6 +492,7 @@ fun DataOriginBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -490,7 +517,8 @@ fun DataOriginBottomSheet(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text("Indikator:", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(originInfo.title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(originInfo.title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
             }
 
             Row(
@@ -570,8 +598,8 @@ fun DataOriginBottomSheet(
             Button(
                 onClick = onDismiss,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = KapitalSemanticColors.blue,
-                    contentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 shape = RoundedCornerShape(6.dp),
                 modifier = Modifier
@@ -591,7 +619,8 @@ fun DataOriginBottomSheet(
 fun EventCardDialogModal(
     eventDialog: EventDialogModel,
     onDismiss: () -> Unit,
-    onSelectOption: (EventOptionItem) -> Unit
+    onSelectOption: (EventOptionItem) -> Unit,
+    apCurrent: Int = 99
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -602,7 +631,9 @@ fun EventCardDialogModal(
                 .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(8.dp))
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Surface(
@@ -644,9 +675,11 @@ fun EventCardDialogModal(
 
                 eventDialog.options.forEach { opt ->
                     val borderCol = semanticToneColor(opt.tone)
+                    val affordable = apCurrent >= opt.apCost
                     Surface(
                         color = MaterialTheme.colorScheme.surface,
                         shape = RoundedCornerShape(6.dp),
+                        enabled = affordable,
                         onClick = { onSelectOption(opt) },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -682,7 +715,8 @@ fun EventCardDialogModal(
                                 }
                             }
                             Text(
-                                text = "${opt.impactEstimate} (${opt.advisorAttribution})",
+                                text = if (affordable) "${opt.impactEstimate} (${opt.advisorAttribution})"
+                                else "AP tidak cukup (sisa $apCurrent AP). ${opt.impactEstimate}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = borderCol
                             )
@@ -698,6 +732,165 @@ fun EventCardDialogModal(
                 ) {
                     Text("Tunda / Tutup", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Laporan akhir bulan: apa yang berubah dan mengapa.
+ */
+@Composable
+fun MonthlyReportDialog(
+    title: String,
+    lines: List<ReportLineItem>,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(8.dp))
+        ) {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                lines.forEach { line ->
+                    val col = if (line.tone == SemanticTone.NEUTRAL_GRAY) MaterialTheme.colorScheme.onSurfaceVariant
+                    else semanticToneColor(line.tone)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .padding(top = 6.dp)
+                                .size(8.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(col)
+                        )
+                        Text(
+                            text = line.text,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .testTag("monthly_report_close")
+                ) {
+                    Text("Lanjutkan")
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Layar akhir permainan dengan post-mortem singkat.
+ */
+@Composable
+fun GameOverPanel(
+    reason: String,
+    turn: Int,
+    dateText: String,
+    onNewGame: () -> Unit,
+    onOpenChronicle: () -> Unit,
+    modifier: Modifier = Modifier,
+    evaluationTitle: String = "",
+    evaluationRows: List<Pair<String, String>> = emptyList(),
+    postMortem: List<String> = emptyList()
+) {
+    Surface(
+        color = KapitalSemanticColors.redContainer,
+        shape = RoundedCornerShape(8.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .border(1.dp, KapitalSemanticColors.red.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "Permainan berakhir · $dateText (giliran ${turn - 1})",
+                style = MaterialTheme.typography.headlineMedium,
+                color = KapitalSemanticColors.red
+            )
+            Text(
+                text = reason,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (evaluationRows.isNotEmpty()) {
+                Text(
+                    text = evaluationTitle,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                evaluationRows.forEach { (k, v) ->
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(k, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(v, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+            }
+            if (postMortem.isNotEmpty()) {
+                Text(
+                    text = "Post-mortem",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                postMortem.forEach { line ->
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Text(
+                text = "Buka Kronik Dunia untuk melihat rantai keputusan yang membawa ke sini, lalu coba lagi dengan dunia baru.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = onOpenChronicle,
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 48.dp)
+                ) { Text("Kronik") }
+                Button(
+                    onClick = onNewGame,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 48.dp)
+                        .testTag("new_game_button")
+                ) { Text("Permainan baru") }
             }
         }
     }

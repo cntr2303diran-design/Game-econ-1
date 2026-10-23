@@ -1,124 +1,230 @@
 package com.example.data
 
-import android.content.Context
-import android.content.SharedPreferences
-import com.example.engine.*
+import com.example.engine.Action
+import com.example.engine.BiasDetector
+import com.example.engine.PredictionMarket
+import com.example.engine.Board
+import com.example.engine.Challenge
+import com.example.engine.ChallengeVerifier
+import com.example.engine.Role
+import com.example.engine.Submission
+import com.example.engine.Countries
+import com.example.engine.DataKind
+import com.example.engine.DerivKind
+import com.example.engine.Difficulty
+import com.example.engine.FactoryScheme
+import com.example.engine.KapitalEngine
 import com.example.engine.KapitalEngine.Companion.dateText
-import com.example.engine.KapitalEngine.Companion.era
 import com.example.engine.KapitalEngine.Companion.fmt
 import com.example.engine.KapitalEngine.Companion.fmt1
 import com.example.engine.KapitalEngine.Companion.fmt2
 import com.example.engine.KapitalEngine.Companion.signed
+import com.example.engine.IntelKind
+import com.example.engine.IntelTier
+import com.example.engine.Ladder
+import com.example.engine.ProductMarket
+import com.example.engine.Segment
+import com.example.engine.StaffRole
+import com.example.engine.SalesScheme
+import com.example.engine.Tech
+import com.example.engine.Tone
 import com.example.model.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
-import kotlin.random.Random
+import kotlin.math.sqrt
 
-/**
- * Menghubungkan [KapitalEngine] ke [GameState] untuk UI, dan menyimpan permainan sebagai
- * seed + daftar tindakan ke SharedPreferences (deterministik, dapat dimainkan ulang).
- */
-class GameRepository(context: Context? = null) {
+/** Penyimpanan permainan: seed + daftar tindakan (satu baris per tindakan). */
+interface SaveStore {
+    fun read(): String?
+    fun write(text: String)
+}
 
-    private val prefs: SharedPreferences? =
-        context?.getSharedPreferences("kapital_saves", Context.MODE_PRIVATE)
+/** Slot autosave (B8): lima slot bergilir, ditulis tiap [EVERY] giliran; tidak ditulis pada kesulitan Ironman. */
+interface SlotStore {
+    fun readSlot(slot: Int): String?
+    fun writeSlot(slot: Int, text: String)
+}
 
-    private var seed: Long = DEFAULT_SEED
-    private val log = mutableListOf<Action>()
-    private var eng = KapitalEngine(seed)
+object Autosave {
+    const val SLOTS = 5
+    const val EVERY = 6
+    /** Slot (1..5) untuk autosave pada giliran [turn]; urutan bergilir menurut kalender sehingga deterministik. */
+    fun slotFor(turn: Int): Int = (turn / EVERY) % SLOTS + 1
+    const val META = "META:"
+}
 
-    private var isDark = false
-    private var role = "CEO PT Benang Sundara"
-    private var mapLayer = MapLayerFilter.PELAYARAN
-    private var selectedCountryId: String? = null
-    private var inspected: DataOriginInfo? = null
-    private var activeEventId: String? = null
-    private var showReport = false
-    private var showSaves = false
-    private var banner: String? = null
+/** Status tampilan yang bukan bagian dari simulasi. */
+private data class UiFlags(
+    val isDarkTheme: Boolean? = null,
+    val activeMapLayer: MapLayerFilter = MapLayerFilter.PELAYARAN,
+    val showEventDialog: Boolean = false,
+    val activeEventId: String? = null,
+    val eventOutcome: String? = null,
+    val showMonthlyReport: Boolean = false,
+    val inspectedOrigin: DataOriginInfo? = null,
+    val selectedCountry: Country? = null,
+    val counterfactualText: String? = null
+)
 
-    private val _gameState = MutableStateFlow(toState())
-    val gameState: StateFlow<GameState> = _gameState.asStateFlow()
+/** Tantangan CEO selalu satu kampanye penuh (480 bulan) atau sampai perusahaan berakhir. */
+const val CEO_CHALLENGE_HORIZON = 480
+
+class GameRepository(
+    private val store: SaveStore? = null,
+    seedOverride: Long? = null,
+    private val slots: SlotStore? = null,
+    private val newSeed: () -> Long = { System.currentTimeMillis() }
+) {
+    private var seed: Long
+    private val log = mutableListOf<String>()
+    private var engine: KapitalEngine
+    private var ui = UiFlags()
 
     init {
-        if (prefs != null && prefs.contains("autosave")) {
-            loadRaw(prefs.getString("autosave", null))
+        val saved = store?.read()
+        val lines = saved?.lines()?.filter { it.isNotBlank() }.orEmpty()
+        val savedSeed = lines.firstOrNull()?.removePrefix("SEED:")?.toLongOrNull()
+        if (seedOverride == null && savedSeed != null) {
+            seed = savedSeed
+            engine = KapitalEngine(seed)
+            for (l in lines.drop(1)) {
+                if (l.startsWith(Autosave.META)) continue
+                val a = Action.decode(l) ?: continue
+                if (engine.apply(a)) log += l
+            }
+        } else {
+            seed = seedOverride ?: System.currentTimeMillis()
+            engine = KapitalEngine(seed)
+            persist()
         }
-        refresh()
     }
 
-    private fun recordAndApply(a: Action, showReportAfter: Boolean = false): Boolean {
-        val ok = eng.apply(a)
+    private val _gameState = MutableStateFlow(buildState())
+    val gameState: StateFlow<GameState> = _gameState.asStateFlow()
+
+    // ------------------------------------------------------------------
+    // Perintah dari UI
+    // ------------------------------------------------------------------
+    private fun perform(action: Action): Boolean {
+        val ok = engine.apply(action)
         if (ok) {
-            log += a
-            if (showReportAfter) showReport = true
-            autosave()
+            log += action.encode()
+            persist()
+            if (action == Action.EndTurn) autosave()
         }
-        refresh()
+        publish()
         return ok
     }
 
-    private fun refresh() {
-        _gameState.value = toState()
+    /** Tulis autosave bergilir (B8). Ironman tidak boleh punya autosave: tak ada jalan mundur. */
+    private fun autosave() {
+        val st = slots ?: return
+        if (engine.difficulty.ironman || engine.gameOverReason != null || engine.turn % Autosave.EVERY != 0) return
+        val meta = listOf(engine.turn, dateText(engine.turn), engine.difficulty.name, engine.equity.roundToInt()).joinToString("|")
+        st.writeSlot(Autosave.slotFor(engine.turn), (listOf("SEED:$seed", Autosave.META + meta) + log).joinToString("\n"))
     }
 
-    // =====================================================================
-    // Perintah dari UI
-    // =====================================================================
-    fun toggleTheme() { isDark = !isDark; refresh() }
-    fun setMapLayer(layer: MapLayerFilter) { mapLayer = layer; refresh() }
-    fun selectCountryForBottomSheet(c: Country?) { selectedCountryId = c?.id; refresh() }
-    fun inspectDataOrigin(o: DataOriginInfo?) { inspected = o; refresh() }
-    fun openEventDialog(show: Boolean, eventId: String? = null) {
-        activeEventId = if (show) (eventId ?: eng.openEvents.firstOrNull()?.id) else null
-        refresh()
+    /** Ringkasan kelima slot (kosong bila belum ada), diurutkan dari yang terbaru. */
+    private fun autosaveViews(): List<AutosaveView> {
+        val st = slots ?: return emptyList()
+        return (1..Autosave.SLOTS).map { i ->
+            val m = st.readSlot(i)?.lineSequence()?.firstOrNull { it.startsWith(Autosave.META) }?.removePrefix(Autosave.META)?.split("|")
+            if (m == null || m.size < 4) AutosaveView(i, 0, "Slot $i · kosong")
+            else AutosaveView(i, m[0].toIntOrNull() ?: 0, "Slot $i · ${m[1]} (giliran ${m[0]}) · ${Difficulty.entries.firstOrNull { it.name == m[2] }?.label ?: m[2]} · ekuitas ${m[3]} jt RS")
+        }.sortedByDescending { it.turn }
     }
-    fun dismissTurnReport() { showReport = false; refresh() }
-    fun openSaveDialog(show: Boolean) { showSaves = show; refresh() }
-    fun clearBanner() { banner = null; refresh() }
-    fun switchRole(roleName: String) { role = roleName; refresh() }
 
-    fun setDifficulty(difficultyName: String) {
-        val diff = Difficulty.entries.firstOrNull { it.name == difficultyName } ?: return
-        if (recordAndApply(Action.SetDifficulty(diff))) {
-            banner = "Tingkat kesulitan diubah ke ${diff.label}: ${diff.description}"
-            refresh()
+    /** Muat autosave: mainkan ulang log slot dari seed-nya. Ditolak selama permainan Ironman masih berjalan. */
+    fun loadSlot(slot: Int): Boolean {
+        val st = slots ?: return false
+        if (engine.difficulty.ironman && engine.gameOverReason == null) return false
+        val lines = st.readSlot(slot)?.lines()?.filter { it.isNotBlank() } ?: return false
+        val s = lines.firstOrNull()?.removePrefix("SEED:")?.toLongOrNull() ?: return false
+        val e = KapitalEngine(s)
+        val newLog = mutableListOf<String>()
+        for (l in lines.drop(1)) {
+            if (l.startsWith(Autosave.META)) continue
+            val a = Action.decode(l) ?: continue
+            if (e.apply(a)) newLog += l
         }
+        seed = s; engine = e; log.clear(); log.addAll(newLog)
+        ui = UiFlags(isDarkTheme = ui.isDarkTheme)
+        persist(); publish()
+        return true
     }
 
-    fun changeIncentiveScheme(schemeName: String) {
-        val target = if (schemeName.contains("kas", ignoreCase = true)) SalesScheme.KAS else SalesScheme.OMZET
-        if (!recordAndApply(Action.SetSalesScheme(target))) {
-            banner = if (eng.ap < 1) "AP tidak cukup (butuh 1 AP)." else "Skema ini sudah aktif."
-            refresh()
-        } else {
-            banner = if (target == SalesScheme.KAS)
-                "Skema penjualan diubah ke bonus kas tertagih. Obral kredit berhenti, omzet turun ±3%, DSO membaik ke 50 hari."
-            else "Skema penjualan diubah ke bonus omzet. Omzet naik, tetapi piutang macet kembali menumpuk."
-            refresh()
-        }
+    private fun persist() {
+        store?.write((listOf("SEED:$seed") + log).joinToString("\n"))
     }
 
-    fun changeFactoryScheme(schemeName: String) {
-        val target = if (schemeName.contains("andal", ignoreCase = true)) FactoryScheme.ANDAL else FactoryScheme.HEMAT
-        if (!recordAndApply(Action.SetFactoryScheme(target))) {
-            banner = if (eng.ap < 1) "AP tidak cukup (butuh 1 AP)." else "Skema ini sudah aktif."
-        } else {
-            banner = if (target == FactoryScheme.ANDAL)
-                "KPI pabrik diubah ke keandalan mesin. Perawatan kembali normal dan tunggakan perawatan dikikis."
-            else "KPI pabrik diubah ke penghematan biaya. Kas hemat sekarang, tetapi risiko mesin rusak naik."
-        }
-        refresh()
+    private fun publish() {
+        _gameState.value = buildState()
     }
 
-    fun crossCheckNewsItem(newsId: String) {
-        if (!recordAndApply(Action.CrossCheck(newsId))) {
-            banner = "Periksa silang membutuhkan 1 AP."
-            refresh()
+    private fun setUi(f: (UiFlags) -> UiFlags) {
+        ui = f(ui)
+        publish()
+    }
+
+    fun toggleTheme(currentlyDark: Boolean) = setUi { it.copy(isDarkTheme = !currentlyDark) }
+    fun setMapLayer(layer: MapLayerFilter) = setUi { it.copy(activeMapLayer = layer) }
+    fun selectCountryForBottomSheet(country: Country?) = setUi { it.copy(selectedCountry = country) }
+    fun inspectDataOrigin(origin: DataOriginInfo?) = setUi { it.copy(inspectedOrigin = origin) }
+    fun openEventDialog(show: Boolean, id: String? = null) = setUi { it.copy(showEventDialog = show, activeEventId = if (show) id else null) }
+    fun clearEventOutcome() = setUi { it.copy(eventOutcome = null) }
+    fun dismissMonthlyReport() = setUi { it.copy(showMonthlyReport = false) }
+    fun showMonthlyReport() = setUi { it.copy(showMonthlyReport = true) }
+    fun clearCounterfactual() = setUi { it.copy(counterfactualText = null) }
+
+    fun setSalesScheme(id: String) {
+        SalesScheme.entries.firstOrNull { it.name == id }?.let { perform(Action.SetSalesScheme(it)) }
+    }
+
+    fun setFactoryScheme(id: String) {
+        FactoryScheme.entries.firstOrNull { it.name == id }?.let { perform(Action.SetFactoryScheme(it)) }
+    }
+
+    fun adjustPrice(deltaPct: Int) = perform(Action.AdjustPrice(deltaPct))
+    fun setSegmentFocus(segment: String, level: Int) = perform(Action.SetSegmentFocus(segment, level))
+    fun hireStaff(role: String, tier: Int) = perform(Action.HireStaff(role, tier))
+    fun fireStaff(role: String) = perform(Action.FireStaff(role))
+    fun raiseSalary(role: String) = perform(Action.RaiseSalary(role))
+    fun setRdLevel(level: Int) = perform(Action.SetRdLevel(level))
+    fun setLogistics(level: Int) = perform(Action.SetLogistics(level))
+    fun setInsurance(level: Int) = perform(Action.SetInsurance(level))
+    fun setTradeFinance(on: Boolean) = perform(Action.SetTradeFinance(on))
+    fun saleLeaseback(pct: Int) = perform(Action.SaleLeaseback(pct))
+    fun buyDerivative(kind: String, pct: Int) = perform(Action.BuyDerivative(kind, pct))
+    fun windowDress(pct: Int) = perform(Action.WindowDress(pct))
+    fun setAuditor(level: Int) = perform(Action.SetAuditor(level))
+    fun openSpv(amountRs: Int) = perform(Action.OpenSpv(amountRs))
+    fun predict(qid: Int, yes: Boolean, stake: Int) = perform(Action.Predict(qid, yes, stake))
+    fun sellSubStake(countryId: String, pct: Int, askDiscountPct: Int) = perform(Action.SellSubStake(countryId, pct, askDiscountPct))
+    fun buyIntel(kind: String, subject: String, tier: Int) = perform(Action.BuyIntel(kind, subject, tier))
+    fun answerBoard(claim: String) = perform(Action.BoardAnswer(claim))
+    fun applyCredit(bankId: String, amount: Int, tenor: Int, purpose: String, floating: Boolean, bullet: Boolean) =
+        perform(Action.ApplyCredit(bankId, amount, tenor, purpose, floating, bullet))
+    fun reviewOffer(appId: String) = perform(Action.ReviewOffer(appId))
+    fun acceptOffer(appId: String) = perform(Action.AcceptOffer(appId))
+    fun declineOffer(appId: String) = perform(Action.DeclineOffer(appId))
+    fun buyStock(id: String, lots: Int) = perform(Action.BuyStock(id, lots))
+    fun sellStock(id: String, lots: Int) = perform(Action.SellStock(id, lots))
+    fun crossCheckNewsItem(newsId: String) = perform(Action.CrossCheck(newsId))
+    fun auditExecutive(id: String) = perform(Action.Audit(id))
+    fun confrontExecutive(id: String) = perform(Action.Confront(id))
+    fun fireExecutive(id: String) = perform(Action.Fire(id))
+
+    fun contractAction(contractId: String, actionId: String) {
+        when (actionId) {
+            "review" -> perform(Action.ReviewContract(contractId))
+            "dual" -> perform(Action.DualSourcing)
+            "hedge" -> perform(Action.HedgeCotton)
+            "cure" -> perform(Action.EquityCure)
         }
     }
 
@@ -128,318 +234,296 @@ class GameRepository(context: Context? = null) {
         strategicReason: String,
         numericPrediction: String,
         confidencePct: Int,
+        predictedCash: Double,
         failureScenario: String
-    ) {
-        val num = Regex("""\d[\d.,]*""").find(numericPrediction)?.value
-            ?.replace(".", "")?.replace(",", ".")?.toDoubleOrNull() ?: eng.cash
-        val ok = recordAndApply(Action.Journal(decisionId, optionId, confidencePct, num, strategicReason, numericPrediction, failureScenario))
-        banner = if (ok) "Keputusan dieksekusi dan dicatat di jurnal (dievaluasi 6 giliran lagi)."
-        else "AP tidak cukup atau keputusan sudah diambil."
-        refresh()
+    ): Boolean = perform(
+        Action.Journal(decisionId, optionId, confidencePct, predictedCash, strategicReason, numericPrediction, failureScenario)
+    )
+
+    fun invest(typeId: String) = perform(Action.Invest(typeId))
+
+    /** Aksi korporasi/multinasional (anak usaha, repatriasi, transfer pricing, valas, obligasi, IPO, dst.) dari kode simpanan. */
+    fun corporateAction(code: String): Boolean {
+        val a = try { Action.decode(code) } catch (ex: Exception) { null } ?: return false
+        return perform(a)
     }
 
-    fun rejectProposal(decisionId: String) {
-        if (recordAndApply(Action.RejectProposal(decisionId))) {
-            banner = "Proposal pabrik pemintalan ditolak. Kas terjaga, tetapi rasio HPP tetap bergantung pada benang impor."
-            refresh()
-        }
-    }
+    fun rejectDecision(decisionId: String) = perform(Action.RejectProposal(decisionId))
 
     fun resolveEventOption(option: EventOptionItem) {
-        val evId = activeEventId ?: eng.openEvents.firstOrNull()?.id ?: return
-        val ok = recordAndApply(Action.EventChoice(evId, option.id))
-        if (ok) {
-            activeEventId = null
-            banner = eng.lastEventResult
-        } else {
-            banner = "AP tidak cukup untuk pilihan ini (butuh ${option.apCost} AP)."
+        val id = ui.activeEventId ?: engine.openEvents.firstOrNull()?.id ?: return
+        ui = ui.copy(showEventDialog = false, activeEventId = null)
+        if (perform(Action.EventChoice(id, option.id))) {
+            ui = ui.copy(eventOutcome = engine.lastEventResult)
+            publish()
         }
-        refresh()
-    }
-
-    fun executeContractAction(contractId: String) {
-        val ok = when (contractId) {
-            "act_cure" -> recordAndApply(Action.EquityCure)
-            "act_hedge" -> recordAndApply(Action.HedgeCotton)
-            "act_hedge_fx" -> recordAndApply(Action.HedgeFx)
-            "act_dual" -> recordAndApply(Action.DualSourcing)
-            else -> recordAndApply(Action.ReviewContract(contractId))
-        }
-        banner = if (ok) when (contractId) {
-            "act_cure" -> "Pemegang saham menyuntik ${fmt(eng.sc.equityCure)} jt RS. Kas bertambah dan 1 tingkat pelanggaran covenant dipulihkan."
-            "act_hedge" -> "Harga kapas dikunci untuk 6 bulan ke depan (biaya premi 60 jt RS)."
-            "act_hedge_fx" -> "Kontrak Forward Valas RS/A$ dikunci untuk 6 bulan ke depan (premi ${fmt(75.0 * eng.sc.size)} jt RS)."
-            "act_dual" -> "Pemasok kedua diaktifkan: bebas penahanan kiriman Kestrel dan risiko sanksi, HPP +1,2%."
-            else -> "Klausul tersembunyi kontrak dibuka oleh konsultan hukum (biaya 50 jt RS)."
-        } else "Tindakan tidak tersedia atau AP tidak cukup."
-        refresh()
-    }
-
-    fun auditExecutive(execId: String) {
-        if (recordAndApply(Action.Audit(execId))) {
-            banner = "Audit forensik dimulai (2 AP, 150 jt RS). Hasil keluar di akhir giliran ini."
-        } else banner = "Butuh 2 AP, atau eksekutif sedang tidak bisa diaudit."
-        refresh()
-    }
-
-    fun confrontExecutive(execId: String) {
-        if (recordAndApply(Action.Confront(execId))) {
-            banner = eng.exec(execId).lastOutcome
-        } else banner = "Konfrontasi membutuhkan hasil audit positif dan 1 AP."
-        refresh()
-    }
-
-    fun fireExecutive(execId: String) {
-        if (recordAndApply(Action.Fire(execId))) {
-            banner = eng.exec(execId).lastOutcome
-        } else banner = "Butuh 1 AP untuk memberhentikan eksekutif."
-        refresh()
-    }
-
-    fun adjustPrice(deltaPct: Int) {
-        if (recordAndApply(Action.AdjustPrice(deltaPct))) {
-            val p = eng.priceAdjPct
-            banner = "Harga jual disetel ${if (p >= 0) "+$p%" else "$p%"} terhadap harga acuan; pangsa pasar kini ${fmt1(eng.playerShare() * 100)}%."
-        } else banner = "Butuh 1 AP atau sudah mencapai batas (±15%)."
-        refresh()
-    }
-
-    fun applyCredit(bankId: String, amount: Int, tenor: Int, purpose: String, floating: Boolean, bullet: Boolean) {
-        if (recordAndApply(Action.ApplyCredit(bankId, amount, tenor, purpose, floating, bullet))) {
-            val b = eng.credit.bank(bankId)!!
-            banner = "Pengajuan kredit ${fmt(amount.toDouble())} jt RS dikirim ke ${b.name} (${b.banker}). Keputusan dalam ±${b.reviewTurns} giliran."
-        } else banner = "Pengajuan gagal: pastikan AP ≥ 2, belum ada pengajuan aktif di bank ini, dan jumlah antara 500–60.000 jt RS."
-        refresh()
-    }
-
-    fun reviewCreditOffer(appId: String) {
-        if (recordAndApply(Action.ReviewOffer(appId))) {
-            banner = "Konsultan hukum membuka semua klausul tersembunyi di draf perjanjian kredit (50 jt RS)."
-        } else banner = "Butuh 1 AP."
-        refresh()
-    }
-
-    fun acceptCreditOffer(appId: String) {
-        if (recordAndApply(Action.AcceptOffer(appId))) {
-            banner = "Penawaran diterima. Dana cair pada akhir giliran ini."
-        } else banner = "Butuh 1 AP atau penawaran sudah tidak berlaku."
-        refresh()
-    }
-
-    fun declineCreditOffer(appId: String) {
-        if (recordAndApply(Action.DeclineOffer(appId))) {
-            banner = "Penawaran ditolak."
-        }
-        refresh()
-    }
-
-    fun startInvestment(typeId: String) {
-        val block = eng.investBlock(typeId)
-        if (recordAndApply(Action.Invest(typeId))) {
-            val s = eng.investSpec(typeId)!!
-            banner = "${s.title} dimulai (${s.months} bulan, total ${fmt(eng.investCost(s))} jt RS)."
-        } else banner = block ?: "Investasi tidak dapat dimulai."
-        refresh()
-    }
-
-    fun openSubsidiary(countryId: String) {
-        val block = eng.subsidiaryBlock(countryId)
-        if (recordAndApply(Action.OpenSubsidiary(countryId))) {
-            val spec = eng.subsidiarySpec(countryId)!!
-            banner = "Pembangunan anak usaha dimulai: ${spec.title} di ${spec.countryName} (${spec.buildMonths} bulan, ${fmt(eng.subsidiaryCostRs(spec))} jt RS)."
-        } else banner = block ?: "Anak usaha tidak dapat dibuka."
-        refresh()
-    }
-
-    fun repatriateSubsidiary(countryId: String) {
-        if (recordAndApply(Action.Repatriate(countryId))) {
-            val sub = eng.subsidiaries[countryId]
-            banner = "Dividen valas dari ${sub?.spec?.countryName ?: countryId} berhasil direpatriasi ke kas induk (masuk laporan bulan ini)."
-        } else banner = "Butuh 1 AP dan saldo laba ditahan anak usaha harus di atas 0."
-        refresh()
-    }
-
-    fun setTransferPricingMode(modeName: String) {
-        val mode = TransferPricingMode.entries.firstOrNull { it.name == modeName } ?: return
-        if (recordAndApply(Action.SetTransferPricing(mode))) {
-            banner = "Kebijakan Transfer Pricing diubah ke ${mode.label}. Tarif PPh efektif grup kini ${fmt1(eng.effectiveTaxRate() * 100)}%."
-        } else banner = "Butuh 1 AP atau mode tersebut sudah aktif."
-        refresh()
-    }
-
-    fun acquireRival(rivalId: String) {
-        val block = eng.acquireRivalBlock(rivalId)
-        if (recordAndApply(Action.AcquireRival(rivalId))) {
-            banner = "Akuisisi pesaing berhasil! Goodwill & aset tetap wajar dicatat di neraca, kapasitas +1 lini."
-        } else banner = block ?: "Akuisisi gagal."
-        refresh()
-    }
-
-    fun borrowForeignSub(countryId: String, amountLocal: Int) {
-        if (recordAndApply(Action.BorrowForeignSub(countryId, amountLocal))) {
-            val sub = eng.subsidiaries[countryId]
-            banner = "Fasilitas kredit bank lokal ${sub?.spec?.countryName ?: countryId} sebesar $amountLocal jt ${sub?.spec?.currencyCode ?: ""} berhasil ditarik."
-        } else banner = "Gagal menarik kredit lokal: butuh 1 AP, anak usaha harus aktif, dan belum melebihi batas utang lokal."
-        refresh()
-    }
-
-    fun issueCorporateBond(amountRs: Int, tenorMonths: Int) {
-        if (recordAndApply(Action.IssueCorporateBond(amountRs, tenorMonths))) {
-            banner = "Penerbitan Obligasi Korporasi ${fmt(amountRs.toDouble())} jt RS (tenor $tenorMonths bln) dijadwalkan cair akhir bulan ini."
-        } else banner = "Gagal menerbitkan obligasi: butuh 2 AP dan nominal 1.000–50.000 jt RS."
-        refresh()
-    }
-
-    fun executeIpo(floatPct: Int, dualClassShares: Boolean) {
-        if (recordAndApply(Action.ExecuteIpo(floatPct, dualClassShares))) {
-            banner = "IPO berhasil! Perusahaan kini tercatat di Bursa Efek Sundara dengan $floatPct% saham publik."
-        } else banner = "IPO gagal: butuh 3 AP, belum pernah IPO, dan tidak sedang menjalankan obral kredit (channel stuffing)."
-        refresh()
-    }
-
-    fun openCaptiveBank() {
-        if (recordAndApply(Action.OpenCaptiveBank)) {
-            banner = "Unit Bank & Asuransi Grup resmi didirikan dengan rasio kecukupan modal (CAR) ≥ 12%."
-        } else banner = "Gagal mendirikan Bank Grup: butuh 3 AP, belum berdiri, dan kas induk mencukupi."
-        refresh()
-    }
-
-    fun mediaLobby(kind: String) {
-        if (recordAndApply(Action.MediaLobby(kind))) {
-            banner = if (kind == "media") "Akuisisi grup media nasional selesai." else "Program lobi parlemen & asosiasi industri dijalankan."
-        } else banner = "Gagal: butuh 2 AP dan kas mencukupi."
-        refresh()
-    }
-
-    fun carbonAction(kind: String, units: Int) {
-        if (recordAndApply(Action.CarbonAction(kind, units))) {
-            banner = if (kind == "buy") "Membeli $units kredit karbon di bursa emisi." else "Menjual $units kredit karbon surplus."
-        } else banner = "Gagal transaksi karbon: butuh 1 AP dan saldo kas / kredit karbon mencukupi."
-        refresh()
-    }
-
-    fun appointSuccessor(candidateId: String) {
-        if (recordAndApply(Action.AppointSuccessor(candidateId))) {
-            banner = "Kandidat suksesi CEO ($candidateId) ditetapkan dan mulai menjalani kaderisasi."
-        } else banner = "Gagal menetapkan suksesor: butuh 2 AP."
-        refresh()
-    }
-
-    fun buyStock(companyId: String, lots: Int) {
-        val c = eng.bourse.company(companyId) ?: return
-        if (recordAndApply(Action.BuyStock(companyId, lots))) {
-            banner = "Membeli $lots lot ${c.spec.ticker} (${fmt(lots * KapitalEngine.LOT * c.price)} jt RS + biaya pialang)."
-        } else banner = "Gagal membeli: butuh 1 AP, kas tersisa minimal 1.500 jt RS, dan nilai beli ≤ 50% aset."
-        refresh()
-    }
-
-    fun sellStock(companyId: String, lots: Int) {
-        val c = eng.bourse.company(companyId) ?: return
-        if (recordAndApply(Action.SellStock(companyId, lots))) {
-            banner = "Menjual $lots lot ${c.spec.ticker} (${fmt(lots * KapitalEngine.LOT * c.price)} jt RS dipotong biaya & pajak)."
-        } else banner = "Gagal menjual: butuh 1 AP dan kepemilikan cukup."
-        refresh()
     }
 
     fun advanceTurn() {
-        recordAndApply(Action.EndTurn, showReportAfter = true)
+        if (engine.gameOverReason != null) return
+        ui = ui.copy(showMonthlyReport = true)
+        perform(Action.EndTurn)
     }
 
-    // =====================================================================
-    // Simpan / Muat / Cabang "Bagaimana Jika"
-    // =====================================================================
-    private fun encodeGame(): String =
-        buildString {
-            appendLine("SEED|$seed")
-            log.forEach { appendLine(it.encode()) }
-        }
-
-    private fun loadRaw(raw: String?): Boolean {
-        if (raw.isNullOrBlank()) return false
-        val lines = raw.lines().filter { it.isNotBlank() }
-        if (lines.isEmpty() || !lines.first().startsWith("SEED|")) return false
-        val newSeed = lines.first().removePrefix("SEED|").toLongOrNull() ?: return false
-        val actions = lines.drop(1).mapNotNull { Action.decode(it) }
-        val fresh = KapitalEngine(newSeed)
-        actions.forEach { fresh.apply(it) }
-        seed = newSeed
-        log.clear(); log += actions
-        eng = fresh
-        return true
-    }
-
-    private fun autosave() {
-        prefs?.edit()?.putString("autosave", encodeGame())?.apply()
-    }
-
-    fun saveToSlot(slot: Int) {
-        val summary = "${dateText(eng.turn)} · Giliran ${eng.turn} · Kas ${fmt(eng.cash)} jt RS · ${eng.sc.title}"
-        prefs?.edit()
-            ?.putString("slot_$slot", encodeGame())
-            ?.putString("slot_${slot}_summary", summary)
-            ?.apply()
-        banner = "Permainan disimpan di Slot $slot ($summary)."
-        refresh()
-    }
-
-    fun loadFromSlot(slot: Int) {
-        if (eng.difficulty.ironman) {
-            banner = "Mode Krisis Abadi (Ironman) aktif: dilarang memuat ulang simpanan."
-            refresh()
-            return
-        }
-        val raw = prefs?.getString("slot_$slot", null)
-        if (loadRaw(raw)) {
-            autosave()
-            showSaves = false
-            showReport = false
-            banner = "Slot $slot dimuat (${eng.sc.title})."
-        } else banner = "Slot $slot masih kosong."
-        refresh()
-    }
-
-    fun newGame(newSeed: Long = Random(System.nanoTime() xor (seed * 6364136223846793005L + 1L)).nextLong(100_000L, 999_999L)) {
-        val prevDiff = eng.difficulty
-        seed = newSeed
+    /** Permainan baru; tanpa argumen, kesulitan diwarisi dari permainan yang sedang/baru berakhir (B8). */
+    fun newGame(difficulty: Difficulty? = null) {
+        val d = difficulty ?: engine.difficulty
+        seed = newSeed()
         log.clear()
-        eng = KapitalEngine(seed)
-        if (prevDiff != Difficulty.MANAJER) {
-            eng.apply(Action.SetDifficulty(prevDiff))
-            log += Action.SetDifficulty(prevDiff)
+        engine = KapitalEngine(seed)
+        val first = Action.SetDifficulty(d)
+        if (engine.apply(first)) log += first.encode()
+        ui = UiFlags(isDarkTheme = ui.isDarkTheme)
+        persist()
+        publish()
+    }
+
+    /** Tantangan CEO: dunia dengan seed dan kesulitan yang sama dengan pemain lain (permainan sebelumnya diganti). */
+    fun newGameFromChallenge(c: Challenge) {
+        seed = c.seed
+        log.clear()
+        engine = KapitalEngine(seed)
+        val first = Action.SetDifficulty(c.difficulty)
+        if (engine.apply(first)) log += first.encode()
+        ui = UiFlags(isDarkTheme = ui.isDarkTheme)
+        persist()
+        publish()
+    }
+
+    /** True bila kampanye CEO sudah berakhir (kalah, menang, atau giliran terakhir tercapai). */
+    fun ceoFinished(): Boolean = engine.gameOverReason != null || engine.turn >= CEO_CHALLENGE_HORIZON + 1
+
+    /**
+     * Teks hasil tantangan CEO untuk dibagikan, atau null bila kampanye belum berakhir. Log dikirim tanpa baris kesulitan
+     * (kesulitan ada di kode tantangan), sehingga penerima memutar ulang dari seed yang sama dan menghitung skor sendiri.
+     */
+    fun ceoSubmission(player: String): String? {
+        if (!ceoFinished()) return null
+        val diff = engine.difficulty
+        val actions = log.filter { !it.startsWith("DIF|") }
+        val c = Challenge(Role.CEO, seed, CEO_CHALLENGE_HORIZON, diff)
+        return Submission(player, c, actions, ChallengeVerifier.ceoScore(engine)).encode()
+    }
+
+    /**
+     * "Bagaimana Jika": mainkan ulang seluruh riwayat dengan seed yang sama, tetapi tanpa
+     * tindakan nomor [actionIndex]. Dunia (cuaca, pemilu, rumor) identik; hanya pilihan Anda berbeda.
+     */
+    fun runCounterfactual(actionIndex: Int) {
+        if (engine.difficulty.ironman) return
+        val alt = KapitalEngine(seed)
+        log.forEachIndexed { i, line ->
+            if (i == actionIndex) return@forEachIndexed
+            Action.decode(line)?.let { alt.apply(it) }
         }
-        showSaves = false
-        showReport = true
-        banner = "Skenario baru (seed $seed): ${eng.sc.title} — ${eng.sc.story}"
-        autosave()
-        refresh()
-    }
-
-    fun branchFromAction(actionIndex: Int) {
-        if (eng.difficulty.ironman) {
-            banner = "Mode Krisis Abadi (Ironman) aktif: fitur cabang 'Bagaimana Jika' dikunci."
-            refresh()
-            return
+        val skipped = Action.decode(log.getOrNull(actionIndex) ?: "")
+        val label = when (skipped) {
+            is Action.Journal -> "tanpa keputusan \"${skipped.decisionId.removePrefix("dec_")}\""
+            is Action.EventChoice -> "tanpa pilihan Anda pada salah satu kartu kejadian"
+            is Action.RejectProposal -> "tanpa menolak proposal pemintalan (proposal dibiarkan menggantung)"
+            else -> "tanpa tindakan tersebut"
         }
-        if (actionIndex < 0 || actionIndex > log.size) return
-        val slice = log.take(actionIndex)
-        val fresh = KapitalEngine(seed)
-        slice.forEach { fresh.apply(it) }
-        log.clear(); log += slice
-        eng = fresh
-        autosave()
-        banner = "Cabang 'Bagaimana Jika' dibuka kembali pada ${dateText(eng.turn)} (Giliran ${eng.turn}). Dunia ke depan menggunakan seed yang sama."
-        refresh()
+        val text = buildString {
+            append("Seandainya Anda bermain $label, ")
+            if (alt.gameOverReason != null && engine.gameOverReason == null) {
+                append("perusahaan sudah berakhir: ${alt.gameOverReason}")
+            } else {
+                append("kas sekarang ${fmt(alt.cash)} jt RS (aktual ${fmt(engine.cash)}, selisih ${signed(alt.cash - engine.cash)}), ")
+                append("ekuitas ${fmt(alt.equity)} jt RS (aktual ${fmt(engine.equity)}).")
+                if (alt.gameOverReason != null) append(" Di cabang itu permainan juga berakhir: ${alt.gameOverReason}")
+            }
+        }
+        setUi { it.copy(counterfactualText = text) }
     }
 
-    private fun slotList(): List<SaveSlotInfo> = (1..3).map { s ->
-        val sum = prefs?.getString("slot_${s}_summary", null)
-        SaveSlotInfo(s, sum != null, sum ?: "Kosong")
+    // ------------------------------------------------------------------
+    // Pemetaan mesin → model tampilan
+    // ------------------------------------------------------------------
+
+    // ------------------------------------------------------------------
+    // Lapisan dunia dinamis → model tampilan
+    // ------------------------------------------------------------------
+
+    private fun predictionView(e: KapitalEngine): PredictionView {
+        val m = e.predMarket
+        val qs = m.open().map { q ->
+            val pos = m.positionOf(q.id)
+            PredictionQuestionView(q.id, q.text, (q.crowdYes * 100).roundToInt(), (q.resolveTurn - e.turn).coerceAtLeast(0),
+                pos?.let { "Posisi ${if (it.yes) "YA" else "TIDAK"}: ${it.stake.toInt()} poin pada harga ${(it.price * 100).roundToInt()}%" })
+        }
+        val settled = m.positions.filter { it.payout != null }
+        val summary = "Poin ${m.points.roundToInt()} (awal ${PredictionMarket.START_POINTS.toInt()}) · ${settled.count { it.won == true }}/${settled.size} posisi menang · bonus skor +${m.scoreBonus()}"
+        val recent = m.resolved().takeLast(5).reversed().map { q ->
+            "${q.text} → ${if (q.outcome == true) "YA" else "TIDAK"} (kerumunan ${(q.crowdYes * 100).roundToInt()}% YA)"
+        }
+        return PredictionView(m.points.roundToInt(), m.maxStake(), qs, summary, recent)
     }
 
-    // =====================================================================
-    // Pemetaan keadaan mesin -> GameState UI
-    // =====================================================================
-    private fun toneOf(t: Tone): SemanticTone = when (t) {
+    private fun intelView(e: KapitalEngine): IntelView {
+        val kinds = IntelKind.values().map { k -> Triple(k.code, k.label, e.intelSubjects(k)) }
+        val tiers = (1..3).map { t -> "Tingkat $t: ${fmt(e.intelCostRs(t))} jt RS (galat ±${(IntelTier.errorSd(t) * 100).roundToInt()}%)" }
+        val reports = e.intelReports.takeLast(12).reversed().map { r ->
+            IntelReportView(
+                title = "${r.kind.label}: ${r.subjectLabel}",
+                metric = r.metric,
+                estimateText = "${fmt2(r.estimate)} ${r.unit}",
+                bandText = "± ${fmt2(r.errorBand)}",
+                whenText = dateText(r.turn),
+                tierText = "tingkat ${r.tier}"
+            )
+        }
+        val q = e.boardQuestion
+        val board = q?.let {
+            BoardView(it.member, it.text, Board.METRICS.getValue(it.metric), "Dinilai ${dateText(it.dueTurn)}", it.answer)
+        }
+        val record = "benar ${e.boardCorrect} · salah ${e.boardWrong} · mengelak ${e.boardAbstained} · tak dijawab ${e.boardIgnored}"
+        return IntelView(kinds, tiers, reports, board, e.boardTrust, record)
+    }
+
+
+    private fun productMarketView(e: KapitalEngine): ProductMarketView {
+        val m = e.market
+        val rows = Segment.values().map { sg ->
+            val i = sg.ordinal
+            val sec = m.secular(sg, e.turn)
+            SegmentRowView(
+                code = sg.code, label = sg.label,
+                weightText = "${(sg.weight * 100).roundToInt()}% dari pasar",
+                surveyText = "survei ${fmt2(m.survey[i])} (berderau ±${(ProductMarket.SURVEY_NOISE * 100).roundToInt()}%)",
+                adoptionText = if (sec >= 1.0) "adopsi jangka panjang +${fmt1((sec - 1.0) * 100)}%" else "adopsi jangka panjang ${fmt1((sec - 1.0) * 100)}%",
+                level = m.level[i],
+                blocks = (0..2).map { e.segmentFocusBlock(sg.code, it) }
+            )
+        }
+        return ProductMarketView(
+            rows = rows,
+            brandText = "Merek ${fmt1(m.brand)}/100 (netral ${ProductMarket.BRAND_NEUTRAL.roundToInt()})",
+            focusText = "Fokus terpakai ${m.focusUsed()}/${ProductMarket.focusCap(e.currentEra)}",
+            costText = "Biaya pemasaran ${fmt(m.monthlyCost(e.sc.baseRevenue, e.costIndex))} jt RS per bulan"
+        )
+    }
+
+
+    private fun operationsView(e: KapitalEngine): OperationsView {
+        val rows = StaffRole.values().map { role ->
+            val st = e.staffPool.of(role)
+            StaffRowView(
+                code = role.code, label = role.label, present = st.present,
+                skillText = if (!st.present) "kosong (efek hilang)" else if (st.revealed) "skill ${fmt2(st.skill)} (terukur)" else "kesan wawancara ${fmt2(st.interviewEstimate)} (berderau)",
+                loyaltyText = if (st.present) "loyalitas ${(st.loyalty * 100).roundToInt()}%" else "-",
+                salaryText = if (st.present) "gaji ${(st.salaryMult * 100).roundToInt()}% upah pasar" else "-",
+                canHire = e.staffBlock(role.code, "hire") == null,
+                canFire = e.staffBlock(role.code, "fire") == null,
+                canRaise = e.staffBlock(role.code, "raise") == null
+            )
+        }
+        return OperationsView(
+            staff = rows,
+            hireCosts = (1..3).map { "Tingkat $it: ${fmt(e.hireCostRs(it))} jt RS" },
+            rdLevel = e.rd.level,
+            rdText = "R&D tingkat ${e.rd.level} · kualitas produk +${fmt2(e.rd.quality * 100)}% · ${e.rd.innovations} inovasi",
+            logisticsLevel = e.logisticsLevel,
+            logisticsText = "Logistik tingkat ${e.logisticsLevel} (meredam guncangan biaya pasokan ${(35 * e.logisticsLevel)}%)",
+            fleetText = if (e.fleetOwned) "Armada sendiri aktif" else "Armada sendiri: belum (investasi di tab Investasi)",
+            costText = "Biaya operasi tambahan ${fmt(e.operationsMonthlyCost())} jt RS per bulan",
+            insuranceLevel = e.insuranceLevel,
+            insuranceText = "Asuransi tingkat ${e.insuranceLevel} (0 tanpa, 1 menanggung 60%, 2 menanggung 85% biaya perbaikan mesin) · klaim 24 bulan terakhir ${e.insuranceClaimTurns.count { e.turn - it <= 24 }} (premi naik 15% per klaim)",
+            tradeFinance = e.tradeFinance,
+            tradeFinanceText = if (e.tradeFinance) "L/C aktif: utang dagang 50 hari, biaya ${fmt(KapitalEngine.LC_FEE * e.sc.size * e.costIndex)} jt RS per bulan" else "L/C mati: utang dagang 35 hari. Mengaktifkan memperpanjang menjadi 50 hari (kas lebih longgar) dengan biaya bulanan.",
+            leaseText = "Aset tetap disewa kembali ${fmt(e.leasedBackRs)} jt RS (sewa ${fmt(e.leasedBackRs * KapitalEngine.LEASE_RATE)} jt RS per bulan). Dijual pada nilai buku, batas ${(KapitalEngine.LEASEBACK_MAX * 100).toInt()}% aset tetap, tidak bisa dibeli kembali.",
+            leaseBlocks = listOf(5, 10, 20).map { e.saleLeasebackBlock(it) },
+            stakes = e.subsidiaries.values.filter { it.active && !it.nationalized }.map { sb ->
+                val id = sb.spec.countryId
+                StakeRowView(
+                    countryId = id, name = sb.spec.countryName,
+                    statusText = "Nilai wajar 100%: ${fmt(e.subValueRs(id))} jt RS · minoritas sekarang ${fmt1(sb.nciPct * 100)}%" +
+                        if (sb.nciPct >= e.NCI_VETO_PCT - 1e-9) " · memegang hak veto transfer pricing agresif" else "",
+                    blockText = e.nciSaleBlock(id, 5, 20)
+                )
+            },
+            cashSeries = e.history.takeLast(60).map { it.cash },
+            equitySeries = e.history.takeLast(60).map { it.equity },
+            niSeries = e.history.takeLast(60).map { it.ni },
+            historyText = e.history.lastOrNull()?.let { h -> "Kas ${fmt(h.cash)} · ekuitas ${fmt(h.equity)} · laba bersih bulan lalu ${fmt(h.ni)} (jt RS)" } ?: "",
+            stockSeries = if (e.isPublicCompany) e.stockHistory.takeLast(60).toList() else emptyList(),
+            stockText = if (e.isPublicCompany) "Harga ${fmt(e.stockPrice)} RS · kapitalisasi ${fmt(e.stockPrice * e.sharesOutM)} jt RS" else "",
+            auditorLevel = e.auditorLevel,
+            auditText = "Auditor ${listOf("tidak ada", "regional", "internasional")[e.auditorLevel]} · biaya ${fmt(e.auditFee())} jt RS per bulan · koreksi laporan sejauh ini ${e.restatements}x. Auditor memeriksa percantikan laporan tiap bulan; temuan berakibat denda 30% dari jumlah yang dipercantik, jauh lebih ringan daripada skandal.",
+            mScoreText = e.mScore()?.let { "Skor-M Beneish ${"%.2f".format(it)} (ambang ${"%.2f".format(com.example.engine.ForensicBook.THRESHOLD)}): " + if (e.mScoreFlag()) "laporan Anda tampak seperti dimanipulasi" else "wajar" } ?: "Skor-M tersedia setelah 24 bulan riwayat.",
+            mScoreFlag = e.mScoreFlag(),
+            dressText = "Percantikan laporan: kapitalisasi biaya operasi ke persediaan menaikkan laba bulan ini (membantu ICR dan harga saham) lalu berbalik sebagai beban dalam beberapa bulan; pajak dibayar lebih awal, kas tidak berubah. Meninggalkan bukti etika. Sisa belum berbalik ${fmt(e.dressedRs)} jt RS.",
+            dressBlocks = listOf(10, 25, 50).map { e.windowDressBlock(it) },
+            spvText = "SPV di luar laporan resmi: utang tersembunyi ${fmt(e.spvHiddenRs())} jt RS (utang nyata ${fmt(e.totalDebt())}, tampak bagi kreditur ${fmt(e.reportedDebt())}). Biaya struktur 3%, bunga kebijakan + 5,5%, bullet 36 bulan, maks. 30% aset. Tiap bulan ada peluang terbongkar (lebih besar dengan auditor, skor-M tinggi, atau covenant gagal): denda 20% utang, skandal, kredit mengetat. Terbongkar ${e.spvRevealed}x.",
+            spvBlocks = listOf(2000, 5000, 10000).map { e.spvBlock(it) },
+            lawText = "Pangsa pasar ${fmt1(e.playerShare() * 100)}% (penyelidikan dominasi mulai ${(KapitalEngine.ANTITRUST_WATCH_SHARE * 100).toInt()}%, merger bersyarat ≥ ${(KapitalEngine.ANTITRUST_REMEDY_SHARE * 100).toInt()}%, diblokir ≥ ${(KapitalEngine.ANTITRUST_BLOCK_SHARE * 100).toInt()}%). Denda antimonopoli ${e.antitrustFines}x. Pembocor mengungkap bukti lama ${e.whistleblowerLeaks}x; bukti makin mudah bocor seiring umur dan kedaluwarsa setelah 60 bulan. Bukti aktif: ${e.ethicsEvidences.size}.",
+            derivs = DerivKind.values().map { k ->
+                val a = e.derivs.firstOrNull { it.kind == k }
+                DerivRowView(
+                    code = k.code, label = k.label,
+                    activeText = a?.let { "Pokok ${fmt(it.notional)} jt RS, jatuh tempo giliran ${it.expiryTurn}, premi dibayar ${fmt(it.premium)} jt RS" },
+                    blocks = listOf(25, 50, 100).map { e.derivBlock(k.code, it) },
+                    premiums = listOf(25, 50, 100).map { e.derivPremium(k, it) },
+                    hint = when (k) {
+                        DerivKind.FXOPT -> "Membayar bila kurs RS/A$ naik lebih dari 3% dalam 6 bulan. Melindungi utang A$ dan biaya impor. Rugi terbatas pada premi."
+                        DerivKind.COTFUT -> "Mengunci harga kapas 6 bulan: menerima selisih bila harga naik, membayar bila turun. Lindung nilai pembelian kapas."
+                        DerivKind.SWAP -> "Membayar bunga tetap, menerima suku bunga kebijakan selama 12 bulan, untuk utang rupiah berbunga mengambang."
+                    }
+                )
+            }
+        )
+    }
+
+    private fun liveTensions(e: KapitalEngine): List<PairwiseTension> {
+        val geo = e.dunia.geo
+        data class P(val a: String, val b: String, val label: String, val where: String, val strait: String?)
+        val pairs = listOf(
+            P("aurelia", "kestrel", "Aurelia ↔ Kestrel", "Selat Kestrel (jalur chip dan barang jadi)", "selat_chip"),
+            P("norvaldia", "halvenia", "Norvaldia ↔ Halvenia", "Selat Norvaldia–Halvenia (jalur energi)", "selat_energi"),
+            P("aurelia", "velmora", "Aurelia ↔ Velmora", "Sanksi dan mineral tanah jarang", null),
+            P("tarsis", "sundara", "Tarsis ↔ Sundara", "Selat Tarsis–Sundara (jalur pangan)", "selat_pangan")
+        )
+        return pairs.map { p ->
+            val v = geo.tension(p.a, p.b)
+            val lad = Ladder.of(v)
+            val closed = p.strait?.let { geo.strait(it) } ?: 0.0
+            PairwiseTension(
+                pairLabel = p.label,
+                straitOrBorder = if (closed > 0.0) "${p.where} · tertutup ${(closed * 100).roundToInt()}%" else p.where,
+                score = v.roundToInt().coerceIn(0, 100),
+                escalationStage = "${lad.label} (skor ≥${lad.from})",
+                businessEffect = lad.effect,
+                tone = when { lad.rung <= 0 -> SemanticTone.GOOD_GREEN; lad.rung <= 2 -> SemanticTone.WARNING_YELLOW; else -> SemanticTone.DANGER_RED }
+            )
+        }
+    }
+
+    private fun worldLayerView(e: KapitalEngine): WorldLayerView {
+        val d = e.dunia
+        val rows = Countries.coreIds.map { id ->
+            val s = d.macro.state(id)
+            WorldLayerRow(
+                countryName = id.replaceFirstChar { it.uppercase() },
+                rating = s.rating.label,
+                debtText = "utang ${fmt1(s.debtGdp)}% PDB",
+                yieldText = "imbal hasil 10 th ${fmt2(s.yield10)}%",
+                curveText = if (s.slope < 0) "kurva terbalik ${fmt2(s.slope)}" else "kurva normal +${fmt2(s.slope)}",
+                tone = when { s.rating.ordinal <= 2 -> SemanticTone.GOOD_GREEN; s.rating.ordinal <= 4 -> SemanticTone.WARNING_YELLOW; else -> SemanticTone.DANGER_RED }
+            )
+        }
+        val su = d.credit.countries.getValue("sundara")
+        val infl = d.data.latest("sundara", DataKind.INFLASI)
+        val lines = ArrayList<Pair<String, String>>()
+        lines += "Indeks panik Sundara" to "${fmt1(d.macro.panic)} / 100" + (if (d.macro.runMonthsLeft > 0) " · penarikan simpanan massal berlangsung" else "")
+        lines += "Bank Sundara" to "CAR rata-rata ${fmt1(su.meanCar)}% · ${(su.weakShare * 100).roundToInt()}% bank lemah · gagal bayar ${fmt1(su.defaultRate)}%/th · ${su.failuresTotal} bank pernah diselamatkan"
+        if (infl != null) lines += "Rilis inflasi terakhir" to "${fmt2(infl.value)}% (${if (infl.revision == 0) "perkiraan awal" else "revisi ke-${infl.revision}"}) — angka resmi bisa direvisi"
+        lines += "Suhu global" to "+${fmt2(d.cycles.temperature)} °C · ${d.cycles.events.size} kejadian ekstrem sejauh ini"
+        lines += "Adopsi teknologi" to Tech.values().joinToString(" · ") { "${it.label} ${(d.cycles.adoption(it, e.turn) * 100).roundToInt()}%" }
+        val dm = d.cycles.demography.getValue("sundara")
+        lines += "Demografi Sundara" to "usia 65+ ${fmt1(dm.old * 100)}% · usia kerja ${fmt1(dm.work * 100)}%"
+        return WorldLayerView(rows, lines)
+    }
+
+    private fun tone(t: Tone): SemanticTone = when (t) {
         Tone.BAD -> SemanticTone.DANGER_RED
         Tone.WARN -> SemanticTone.WARNING_YELLOW
         Tone.GOOD -> SemanticTone.GOOD_GREEN
@@ -447,1428 +531,755 @@ class GameRepository(context: Context? = null) {
         Tone.NEUTRAL -> SemanticTone.NEUTRAL_GRAY
     }
 
-    private fun toState(): GameState {
-        val t = eng.turn
-        val date = dateText(t)
-        val prevDate = dateText(t - 1)
-        val covDist = eng.covenantDistancePct()
-        val covMod = (3 - (t % 3)) % 3
-        val covWhen = if (covMod == 0) "Uji kuartalan di akhir giliran ini" else "Uji kuartalan dalam ${covMod + 1} giliran"
+    private fun conf(level: Int): ConfidenceTier = when {
+        level <= 0 -> ConfidenceTier.LOW
+        level == 1 -> ConfidenceTier.MEDIUM
+        else -> ConfidenceTier.HIGH
+    }
+
+    private fun origin(title: String, value: String, source: String, date: String, method: String, note: String, c: ConfidenceTier) =
+        DataOriginInfo(title, value, source, date, method, note, c)
+
+    private fun buildState(): GameState {
+        val e = engine
+        val turn = e.turn
+        val closed = dateText(turn - 1)
+        val prevClosed = dateText(turn - 2)
+        StaticWorldData.setDate(dateText(turn), closed, prevClosed)
+
+        // ---- Covenant ----
+        val th = e.covenantThreshold()
+        val dist = e.covenantDistancePct()
+        val k = (3 - turn % 3) % 3
+        val covTitle = when {
+            th <= 0.0 -> "Tidak ada covenant aktif"
+            dist < 0 -> "Covenant diperkirakan GAGAL (${dist.toInt()}%)"
+            else -> "Jarak ke covenant ${dist.toInt()}%"
+        }
+        val covSub = buildString {
+            append(if (k == 0) "Uji kuartalan di akhir giliran ini" else "Uji kuartalan dalam $k giliran")
+            if (e.covenantBreaches > 0) append(" · sudah gagal ${e.covenantBreaches}× berturut-turut")
+        }
         val covTone = when {
-            eng.covenantBreaches >= 2 || covDist < 0 -> SemanticTone.DANGER_RED
-            covDist < 12 -> SemanticTone.WARNING_YELLOW
+            th <= 0.0 -> SemanticTone.GOOD_GREEN
+            dist < 0 -> SemanticTone.DANGER_RED
+            dist < 15 -> SemanticTone.WARNING_YELLOW
             else -> SemanticTone.GOOD_GREEN
         }
-        val covTitle = when {
-            eng.covenantBreaches > 0 -> "Covenant dilanggar (${eng.covenantBreaches}x) · ICR proyeksi ${fmt2(eng.projectedIcr())}x"
-            covDist < 0 -> "Proyeksi ICR di bawah batas (${fmt2(eng.projectedIcr())}x < ${fmt2(eng.covenantThreshold())}x)"
-            else -> "Jarak ke covenant ${covDist.roundToInt()}% (ICR ${fmt2(eng.projectedIcr())}x, batas ${fmt2(eng.covenantThreshold())}x)"
-        }
-        val eval = eng.evaluateCampaign()
-        val evalUi = CampaignEvaluationUi(
-            nilaiPerusahaanScore = eval.nilaiPerusahaanScore,
-            ketahananScore = eval.ketahananScore,
-            kualitasKeputusanScore = eval.kualitasKeputusanScore,
-            etikaReputasiScore = eval.etikaReputasiScore,
-            dampakSosialScore = eval.dampakSosialScore,
-            totalScore = eval.totalScore,
-            grade = eval.grade,
-            archetypeTitle = eval.archetypeTitle,
-            summaryText = eval.summaryText,
-            boardTrust = eng.boardTrust,
-            ethicsRiskLabel = when {
-                eng.ethicsLoad >= 4.0 -> "Tinggi (Rentan skandal / penyelidikan)"
-                eng.ethicsLoad >= 1.5 -> "Sedang (Ada jejak jalan pintas)"
-                else -> "Bersih"
-            },
-            ethicsEvidencesCount = eng.ethicsEvidences.size,
-            scandalsCount = eng.scandalsTriggered
+        val covOrigin = origin("Jarak ke covenant", "ICR proyeksi ${fmt2(e.projectedIcr())}x vs batas ${fmt2(th)}x",
+            "Divisi Treasury (perkiraan bulan berjalan)", "Proyeksi ${dateText(turn)}",
+            "ICR = EBIT 3 bulan / beban bunga 3 bulan. Bulan berjalan memakai perkiraan tanpa kejadian acak. Juga diuji: utang bersih/EBITDA ≤ 3,5x.",
+            "Perkiraan tidak memasukkan mogok, kerusakan mesin, atau kredit macet yang belum terjadi.", ConfidenceTier.MEDIUM)
+
+        // ---- Indikator ----
+        val burn = e.monthlyBurn()
+        val ccc = e.dso() + e.dio() - e.dpo()
+        val util = (88.0 * e.lastProdFactor).toInt()
+        val inflLo = e.inflationAnnual - 1.0
+        val indicators = listOf(
+            Indicator("ind_kas", "Kas", "${fmt(e.cash)} jt RS",
+                if (burn > 0) "−${fmt(burn)}/bulan" else "+${fmt(-burn)}/bulan",
+                if (burn > 0) SemanticTone.DANGER_RED else SemanticTone.GOOD_GREEN,
+                "Akhir $closed", "Rekening bank", ConfidenceTier.HIGH,
+                origin("Saldo kas", "${fmt(e.cash)} jt RS", "Mutasi rekening bank", "Akhir $closed",
+                    "Kas awal + arus kas operasi + investasi + pendanaan. Rata-rata perubahan 3 bulan terakhir: ${signed(-burn)} jt RS/bulan.",
+                    "Saldo bank akurat, kecuali ada window dressing menjelang tanggal laporan.", ConfidenceTier.HIGH)),
+            Indicator("ind_utilisasi", "Utilisasi pabrik", "$util%",
+                if (e.lastProdFactor < 1.0) "produksi terganggu" else "normal",
+                if (e.lastProdFactor < 1.0) SemanticTone.DANGER_RED else SemanticTone.GOOD_GREEN,
+                "Laporan $closed", "Kepala Pabrik", ConfidenceTier.MEDIUM,
+                origin("Utilisasi pabrik", "$util%", "Laporan Kepala Pabrik", closed,
+                    "Output aktual dibagi kapasitas terpasang.",
+                    "Angka utilisasi tidak memberi tahu kondisi mesin. Bandingkan belanja perawatan dengan kebutuhan teknis.", ConfidenceTier.MEDIUM)),
+            Indicator("ind_ccc", "Siklus kas", "${ccc.toInt()} hari",
+                "DSO ${e.dso().toInt()} · DIO ${e.dio().toInt()} · DPO ${e.dpo().toInt()}",
+                if (ccc > 90) SemanticTone.WARNING_YELLOW else SemanticTone.GOOD_GREEN,
+                "Akhir $closed", "Akuntansi CFO", ConfidenceTier.MEDIUM,
+                origin("Siklus konversi kas", "${ccc.toInt()} hari", "Laporan modal kerja CFO", closed,
+                    "CCC = DSO + DIO − DPO = ${e.dso().toInt()} + ${e.dio().toInt()} − ${e.dpo().toInt()}.",
+                    "DSO yang naik bersamaan dengan omzet bisa berarti penjualan kredit ke pelanggan berisiko.", ConfidenceTier.MEDIUM)),
+            Indicator("ind_inflasi", "Inflasi Sundara", "${fmt1(inflLo)}–${fmt1(inflLo + 2.0)}%",
+                "data ${dateText(turn - 2)}", SemanticTone.NEUTRAL_GRAY,
+                "terlambat 2 bln", "Biro Statistik Sundara", ConfidenceTier.LOW,
+                origin("Inflasi tahunan Sundara", "${fmt1(inflLo)}–${fmt1(inflLo + 2.0)}%", "Biro Statistik Sundara",
+                    "${dateText(turn - 2)} (terlambat 2 giliran)", "Perubahan indeks harga konsumen tahun ke tahun.",
+                    "Pemerintah politis cenderung mempercantik angka menjelang pemilu.", ConfidenceTier.LOW))
         )
 
-        val eraNum = era(t)
-        val eraTitle = when (eraNum) {
-            1 -> "Era 1: Bertahan Hidup"
-            2 -> "Era 2: Ekspansi Multinasional"
-            3 -> "Era 3: Konglomerasi & Alokasi Modal"
-            4 -> "Era 4: Krisis Sistemik & Transisi"
-            else -> "Era 5: Suksesi & Warisan"
-        }
+        // ---- Proyeksi kas (FanChart) ----
+        val hist = e.cashHist.takeLast(6).map { it.toFloat() }
+        val median = (1..6).map { (e.cash - burn * it).toFloat() }
+        val base50 = max(300.0, abs(e.cash) * 0.05)
+        val s50 = (1..6).map { (base50 * sqrt(it.toDouble())).toFloat() }
+        val s90 = s50.map { it * 2f }
 
-        return GameState(
-            dateText = date,
-            turn = t,
-            totalTurns = 480,
-            eraNumber = eraNum,
-            eraName = eraTitle,
-            apCurrent = eng.ap,
-            apMax = eng.apMax,
-            runwayMonths = eng.runwayMonths(),
-            activeRole = role,
-            isDarkTheme = isDark,
-            seed = seed,
-            scenarioTitle = eng.sc.title,
-            scenarioStory = eng.sc.story,
-            difficultyName = eng.difficulty.name,
-            difficultyLabel = eng.difficulty.label,
-            difficultyDesc = eng.difficulty.description,
-            isIronman = eng.difficulty.ironman,
-            gameOverReason = eng.gameOverReason,
-            isVictory = eng.isVictory,
-
-            covenantWarningTitle = covTitle,
-            covenantWarningSubtitle = "$covWhen · Kepercayaan Dewan ${eng.boardTrust}/100 · Suku bunga acuan ${fmt2(eng.policyRate)}%",
-            covenantTone = covTone,
-            covenantBreaches = eng.covenantBreaches,
-            canEquityCure = !eng.cureUsed && eng.covenantBreaches >= 1 && eng.gameOverReason == null && eng.ap >= 2,
-            equityCureAmountText = "${fmt(eng.sc.equityCure)} jt RS",
-            covenantOrigin = DataOriginInfo(
-                title = "Jarak Covenant Kredit",
-                displayedValue = "${covDist.roundToInt()}% (ICR ${fmt2(eng.projectedIcr())}x)",
-                sourceName = "Meja Tresuri Internal & Perjanjian Kredit Bank B",
-                dataDate = "$date (proyeksi kuartal berjalan)",
-                calculationMethod = "ICR = Σ EBIT 3 bulan / Σ Beban Bunga 3 bulan. Batas minimum ${fmt2(eng.covenantThreshold())}x; utang bersih/EBITDA ≤ 3,5x.",
-                uncertaintyAndBiasNote = if (eng.stuffingActive)
-                    "EBIT saat ini terdongkrak omzet kredit 90 hari yang belum tertagih kas. Jika bunga naik atau piutang dihapusbukukan, ICR turun tajam."
-                else "Perhitungan memakai proyeksi bulan ini ditambah realisasi dua bulan terakhir.",
-                confidence = ConfidenceTier.MEDIUM
-            ),
-
-            featuredNewsSource = "Harian Bisnis",
-            featuredNewsConfidence = ConfidenceTier.MEDIUM,
-            featuredNewsHeadline = eng.news.firstOrNull()?.headline ?: "",
-            featuredNewsFooter = "+4 media lain dengan bias berbeda · ketuk untuk periksa silang (1 AP)",
-
-            markasIndicators = buildIndicators(date),
-
-            cashHistoryPoints = eng.cashHist.takeLast(6).map { it.toFloat() },
-            cashFanMedianPoints = buildCashFanMedian(),
-            cashFanBand50Points = List(6) { i -> (450f + i * 320f) * eng.difficulty.noiseMult.toFloat().coerceAtLeast(0.5f) },
-            cashFanBand90Points = List(6) { i -> (950f + i * 700f) * eng.difficulty.noiseMult.toFloat().coerceAtLeast(0.5f) },
-
-            pendingDecisions = buildDecisions(),
-            completedJournals = eng.journals.map { j ->
-                val brier = j.outcome?.let { o ->
-                    val p = j.confidencePct / 100.0; val x = if (o) 1.0 else 0.0; (p - x) * (p - x)
-                }
-                CompletedJournalEntry(
-                    id = j.id,
-                    decisionTitle = j.decisionTitle,
-                    turnSubmitted = j.turnSubmitted,
-                    evaluateAtTurn = j.evaluateAtTurn,
-                    strategicReason = j.reason,
-                    numericPrediction = j.prediction,
-                    confidencePct = j.confidencePct,
-                    failureScenario = j.failure,
-                    evaluated = j.outcome != null,
-                    brierScoreContribution = brier,
-                    outcomeText = j.actualCash?.let { "Kas aktual giliran ${j.evaluateAtTurn}: ${fmt(it)} jt RS (${if (j.outcome == true) "prediksi tepat" else "meleset"})" }
-                )
-            },
-
-            morningPaperEdition = buildNews(date),
-            countries = buildCountries(date),
-            mapPieces = buildMapPieces(),
-            activeMapLayer = mapLayer,
-            pairwiseTensions = buildTensions(),
-
-            incomeStatementRows = buildIncomeRows(date),
-            balanceSheetRows = buildBalanceRows(date),
-            cashFlowRows = buildCashFlowRows(date),
-            equityStatementRows = buildEquityRows(date),
-            financialNotes = buildFinancialNotes(),
-            reportCheck = buildReportCheck(),
-            periodLabel = prevDate,
-            priorPeriodLabel = dateText(t - 2),
-            accrualTrapActive = (eng.lastIncome["ni"] ?: 0.0) > 0 && (eng.lastCashFlow["cfo"] ?: 0.0) < 0,
-            accrualTrapSummary = buildAccrualSummary(),
-            executives = buildExecutives(date),
-            activeIncentiveScheme = eng.salesScheme.label,
-            activeFactoryScheme = eng.factoryScheme.label,
-            ganttTasks = buildGantt(),
-            contracts = buildContracts(date),
-
-            marketInstruments = buildMarkets(date),
-            bourseIndexText = fmt1(eng.bourse.index),
-            bourseChangeText = run {
-                val h = eng.bourse.indexHist.toList()
-                val chg = if (h.size >= 2) (h.last() / h[h.size - 2] - 1.0) * 100.0 else 0.0
-                "${if (chg >= 0) "+" else ""}${fmt1(chg)}%"
-            },
-            bourseSparkline = eng.bourse.indexHist.map { it.toFloat() },
-            portfolioValueText = "${fmt(eng.portfolioValue())} jt RS",
-            portfolioPnlText = run {
-                val basis = eng.costBasis.values.sum()
-                val u = eng.portfolioValue() - basis
-                "Belum realisasi ${signed(u)} · Realisasi ${signed(eng.realizedGainTotal)}"
-            },
-            dividendsTotalText = "${fmt(eng.dividendsReceivedTotal)} jt RS",
-            holdings = buildHoldings(),
-            stocks = buildStocks(),
-            banks = buildBanks(),
-            creditApps = buildCreditApps(),
-            creditMetricsSummary = run {
-                val m = eng.creditMetrics(0.0)
-                val icr = m.ebit12 / max(1.0, m.interest12)
-                val lev = (m.debt - m.cash) / max(1.0, m.ebitda12)
-                val cr = m.currentAssets / max(1.0, m.currentLiabilities)
-                "Rasio Anda di mata bank: ICR ${fmt2(icr)}x · Utang bersih/EBITDA ${fmt2(lev)}x · Current ratio ${fmt2(cr)}x · Agunan bebas ${fmt(m.freeCollateral)} jt RS · Pelanggaran covenant ${m.covenantBreaches}x"
-            },
-            freeCollateralText = "${fmt(eng.creditMetrics(0.0).freeCollateral)} jt RS",
-
-            brierScore = eng.brierScore(),
-            detectedBiases = buildBiases(),
-            worldChronicles = eng.chronicle.asReversed().map { c ->
-                ChronicleEntry(
-                    turn = c.turn,
-                    dateLabel = dateText(c.turn),
-                    eraLabel = "Era ${era(c.turn)}",
-                    title = c.title,
-                    description = c.description,
-                    causalChain = c.causalChain,
-                    canReplayCounterfactual = c.actionIndex != null && !eng.difficulty.ironman,
-                    actionIndex = c.actionIndex
-                )
-            },
-
-            turnReportTitle = eng.lastReportTitle,
-            turnReport = eng.lastReport.map { TurnReportItem(it.text, toneOf(it.tone)) },
-            showTurnReportDialog = showReport,
-            memos = eng.memos.map { MemoItem(it.execId, it.from, it.role, it.text) },
-            saveSlots = slotList(),
-            showSaveDialog = showSaves,
-            statusBanner = banner,
-            priceAdjustmentPct = eng.priceAdjPct,
-            playerShareText = "${fmt1(eng.playerShare() * 100.0)}%",
-            rivalLearningProfile = eng.world.learnedPlayerProfile,
-            rivals = eng.world.rivals.map { rv ->
-                val rel = 1.0 + eng.priceAdjPct / 100.0
-                val sh = eng.world.rivalShareOf(rv.id, rel * eng.fxPassLevel()) * 100.0
-                val acqBlock = eng.acquireRivalBlock(rv.id)
-                val acqCost = eng.acquireRivalCostRs(rv.id)
-                RivalRow(
-                    id = rv.id,
-                    name = rv.name,
-                    archetype = rv.archetype,
-                    priceRelText = "${fmt1((rv.price - 1.0) * 100.0)}%",
-                    shareText = if (rv.active) "${fmt1(sh)}%" else "Keluar",
-                    statusText = when {
-                        !rv.active -> "Bangkrut / keluar pasar"
-                        rv.weakMonths >= 5 -> "Tertekan (${rv.weakMonths} bln rugi)"
-                        else -> "Aktif (${rv.activeStrategy.label})"
-                    },
-                    tone = when {
-                        !rv.active -> SemanticTone.NEUTRAL_GRAY
-                        rv.activeStrategy != World.RivalStrategy.NORMAL -> SemanticTone.DANGER_RED
-                        rv.weakMonths >= 5 -> SemanticTone.WARNING_YELLOW
-                        rv.price < rel * eng.fxPassLevel() - 0.03 -> SemanticTone.DANGER_RED
-                        else -> SemanticTone.PRIMARY_BLUE
-                    },
-                    activeStrategyText = rv.activeStrategy.label,
-                    warningSignalText = rv.warningSignal,
-                    canAcquire = acqBlock == null,
-                    acquireCostText = "${fmt(acqCost)} jt RS (3 AP)",
-                    acquireBlockReason = acqBlock
-                )
-            },
-            scheduledChainCount = eng.scheduledChainEvents.size,
-            investments = KapitalEngine.INVEST.map { spec ->
-                val running = eng.projectsInv.firstOrNull { it.type == spec.id && !it.done }
-                val count = eng.investCount(spec.id)
-                val block = eng.investBlock(spec.id)
-                val cost = eng.investCost(spec)
-                InvestCard(
-                    id = spec.id,
-                    title = spec.title,
-                    desc = spec.desc,
-                    costText = "${fmt(cost)} jt RS (${fmt(cost / spec.months)}/bln)",
-                    durationText = "${spec.months} bulan",
-                    apCost = spec.ap,
-                    accountingNote = if (spec.capex) "CapEx → menambah Aset Tetap & penyusutan" else "OpEx → langsung mengurangi laba selama proyek berjalan",
-                    benefitText = spec.benefit,
-                    statusText = when {
-                        running != null -> "Berjalan: ${fmt(running.spent)} / ${fmt(running.totalCost)} jt RS"
-                        count > 0 -> "Selesai ($count/${spec.maxCount})"
-                        else -> "Belum dimulai (0/${spec.maxCount})"
-                    },
-                    canStart = block == null,
-                    blockReason = block
-                )
-            },
-            subsidiaries = buildSubsidiaries(),
-            transferPricingModeName = eng.transferPricingMode.name,
-            transferPricingLabel = eng.transferPricingMode.label,
-            effectiveTaxRateText = "${fmt1(eng.effectiveTaxRate() * 100.0)}%",
-            fxHedgeActive = eng.fxHedgeActive,
-            fxHedgeStatusText = if (eng.fxHedgeActive)
-                "Aktif s.d. ${dateText(eng.fxHedgeUntilTurn)} (Kurs terkunci ${fmt(eng.hedgedKurs)} RS/A$)"
-            else "Tidak aktif (Eksposur utang A$ & impor mengikuti kurs spot ${fmt(eng.kurs)} RS/A$)",
-            campaignEvaluation = evalUi,
-            capacitySummary = "Permintaan ${fmt1(eng.demandIdx() * 100)}% vs kapasitas ${fmt1(eng.capacityIdx() * 100)}% · Utilisasi ${fmt1((eng.utilization() * 100).coerceAtMost(100.0))}% · Lini tambahan ${eng.extraLines} · Anak usaha aktif ${eng.subsidiaries.values.count { it.active && !it.nationalized }} · Karyawan ${eng.headcountProd() + eng.headcountStaff()} orang · Tarif PPh efektif ${fmt1(eng.effectiveTaxRate() * 100)}%",
-
-            activeEventDialog = buildEventDialog(),
-            showEventDialog = activeEventId != null && eng.openEvents.any { it.id == activeEventId },
-            inspectedDataOrigin = inspected,
-            selectedCountryForSheet = selectedCountryId?.let { id -> buildCountries(date).firstOrNull { it.id == id } }
-        )
-    }
-
-    private fun buildSubsidiaries(): List<SubsidiaryCardUi> =
-        KapitalEngine.SUBSIDIARIES.map { spec ->
-            val st = eng.subsidiaries[spec.countryId]
-            val running = eng.projectsInv.firstOrNull { it.type == "sub_${spec.countryId}" && !it.done }
-            val meta = eng.foreignMeta.getValue(spec.countryId)
-            val cost = eng.subsidiaryCostRs(spec)
-            val block = eng.subsidiaryBlock(spec.countryId)
-            val retainedFor = st?.retainedForeign ?: 0.0
-            val retainedRs = retainedFor * meta.fxToRs
-            val hasMeridia = eng.subsidiaries["meridia"]?.let { it.active && !it.nationalized } == true
-            val effWht = if (hasMeridia && spec.countryId != "meridia") meta.profile.withholdingTaxPct * 0.5 else meta.profile.withholdingTaxPct
-            SubsidiaryCardUi(
-                countryId = spec.countryId,
-                countryName = spec.countryName,
-                currencyCode = spec.currencyCode,
-                title = spec.title,
-                desc = spec.desc,
-                costText = "${fmt(cost)} jt RS (${spec.buildMonths} bln · ${spec.apCost} AP)",
-                buildMonths = spec.buildMonths,
-                apCost = spec.apCost,
-                benefitText = spec.benefitText,
-                riskText = spec.riskText,
-                statusText = when {
-                    st?.nationalized == true -> "Dinasionalisasi / Dibekukan"
-                    st?.active == true -> "Beroperasi · Kurs 1 ${spec.currencyCode} = ${fmt1(meta.fxToRs)} RS · Tarif Impor ${fmt1(meta.tariffPct)}%"
-                    running != null -> "Konstruksi berjalan: ${fmt(running.spent)} / ${fmt(running.totalCost)} jt RS"
-                    else -> "Belum didirikan (PPh lokal ${fmt1(meta.profile.corpTaxPct)}%, Pajak dividen ${fmt1(meta.profile.withholdingTaxPct)}%)"
-                },
-                isActive = st?.active == true && !st.nationalized,
-                isBuilding = running != null,
-                retainedForeignText = "${fmt1(retainedFor)} jt ${spec.currencyCode}",
-                retainedRsEquivalentText = "≈ ${fmt(retainedRs)} jt RS",
-                withholdingTaxText = "Pajak dividen repatriasi ${fmt1(effWht)}%${if (hasMeridia && spec.countryId != "meridia") " (diskon 50% via Holding Meridia)" else ""}",
-                canOpen = block == null,
-                openBlockReason = block,
-                canRepatriate = st?.active == true && !st.nationalized && retainedRs >= 10.0 && eng.ap >= 1,
-                tone = when {
-                    st?.nationalized == true -> SemanticTone.DANGER_RED
-                    st?.active == true -> SemanticTone.GOOD_GREEN
-                    running != null -> SemanticTone.PRIMARY_BLUE
-                    else -> SemanticTone.NEUTRAL_GRAY
-                }
-            )
-        }
-
-    private fun buildCashFanMedian(): List<Float> {
-        val est = eng.estimateMonth()
-        val monthlyDrift = (est.getValue("ni") + est.getValue("dep") - 550.0).toFloat()
-        return List(6) { i -> max(0f, eng.cash.toFloat() + monthlyDrift * (i + 1)) }
-    }
-
-    private fun buildIndicators(date: String): List<Indicator> {
-        val lastNet = eng.lastCashFlow["net"] ?: 0.0
-        val utilPct = (eng.utilization() * 100.0 * eng.lastProdFactor).roundToInt().coerceIn(20, 100)
-        val ccc = (eng.dso() + eng.dio() - eng.dpo()).roundToInt()
-        val infCenter = eng.inflationAnnual
-        val noise = eng.difficulty.noiseMult
-        val infLow = max(0.0, infCenter - 1.2 * noise).roundToInt()
-        val infHigh = (infCenter + 1.4 * noise).roundToInt()
-        val twoMonthsAgo = dateText(eng.turn - 2)
-        return listOf(
-            Indicator(
-                id = "ind_kas",
-                label = "Kas",
-                valueText = "${fmt(eng.cash)} jt RS",
-                deltaOrSubText = "${signed(lastNet)}/bulan",
-                tone = if (lastNet < 0 || eng.cash < 3000) SemanticTone.DANGER_RED else SemanticTone.GOOD_GREEN,
-                dataDate = "$date (T+0)",
-                source = "Tresuri Internal",
-                confidence = ConfidenceTier.HIGH,
-                originInfo = DataOriginInfo(
-                    title = "Posisi Kas Likuid",
-                    displayedValue = "${fmt(eng.cash)} jt RS (${signed(lastNet)}/bulan)",
-                    sourceName = "Rekening Bank Operasional Sundara",
-                    dataDate = "$date (T+0, waktu nyata)",
-                    calculationMethod = "Saldo kas akhir = kas awal + arus kas operasi + arus kas investasi + arus kas pendanaan.",
-                    uncertaintyAndBiasNote = "Kas di rekening bank adalah satu-satunya angka tanpa bias di seluruh perusahaan.",
-                    confidence = ConfidenceTier.HIGH
-                )
-            ),
-            Indicator(
-                id = "ind_utilisasi",
-                label = "Utilisasi pabrik",
-                valueText = "$utilPct%",
-                deltaOrSubText = when {
-                    eng.strikeMonthsLeft > 0 -> "Mogok (${eng.strikeMonthsLeft} bln)"
-                    eng.breakdownMonthsLeft > 0 -> "Lini 3 rusak (${eng.breakdownMonthsLeft} bln)"
-                    eng.deferralActive -> "Perawatan ditunda (${eng.deferredMonths} bln)"
-                    else -> "Perawatan normal"
-                },
-                tone = if (utilPct < 75 || eng.deferralActive) SemanticTone.WARNING_YELLOW else SemanticTone.GOOD_GREEN,
-                dataDate = "$date (T-3 hari)",
-                source = "Laporan Kepala Pabrik",
-                confidence = if (eng.deferralActive) ConfidenceTier.MEDIUM else ConfidenceTier.HIGH,
-                originInfo = DataOriginInfo(
-                    title = "Utilisasi Pabrik Kalimas",
-                    displayedValue = "$utilPct%",
-                    sourceName = "Laporan Operasional Kepala Pabrik",
-                    dataDate = "$date",
-                    calculationMethod = "Jam tenun efektif dibagi kapasitas terpasang (4 lini di Kalimas + lini ekspansi).",
-                    uncertaintyAndBiasNote = if (eng.deferralActive)
-                        "Tunggakan perawatan ${eng.deferredMonths} bulan. Probabilitas mesin rusak bulan depan ${(1.5 * (1 + 0.5 * eng.deferredMonths)).roundToInt()}%."
-                    else "Jadwal perawatan dipatuhi.",
-                    confidence = if (eng.deferralActive) ConfidenceTier.MEDIUM else ConfidenceTier.HIGH
-                )
-            ),
-            Indicator(
-                id = "ind_siklus_kas",
-                label = "Siklus kas",
-                valueText = "$ccc hari",
-                deltaOrSubText = "DSO ${eng.dso().roundToInt()} · DIO ${eng.dio().roundToInt()} · DPO ${eng.dpo().roundToInt()}",
-                tone = if (ccc > 90) SemanticTone.WARNING_YELLOW else SemanticTone.GOOD_GREEN,
-                dataDate = date,
-                source = "Akuntansi Manajemen",
-                confidence = ConfidenceTier.MEDIUM,
-                originInfo = DataOriginInfo(
-                    title = "Siklus Konversi Kas (CCC)",
-                    displayedValue = "$ccc hari",
-                    sourceName = "Divisi Akuntansi Manajemen",
-                    dataDate = date,
-                    calculationMethod = "CCC = DSO (${eng.dso().roundToInt()} hr) + DIO (${eng.dio().roundToInt()} hr) − DPO (${eng.dpo().roundToInt()} hr).",
-                    uncertaintyAndBiasNote = "Piutang berisiko dari obral termin 90 hari saat ini ${fmt(eng.stuffedTotal())} jt RS (sekitar 45% macet saat jatuh tempo 6 bulan).",
-                    confidence = ConfidenceTier.MEDIUM
-                )
-            ),
-            Indicator(
-                id = "ind_inflasi",
-                label = "Inflasi Sundara",
-                valueText = "$infLow–$infHigh%",
-                deltaOrSubText = "data $twoMonthsAgo · bunga ${fmt2(eng.policyRate)}%",
-                tone = SemanticTone.NEUTRAL_GRAY,
-                dataDate = "$twoMonthsAgo (terlambat 2 bln)",
-                source = "Biro Pusat Statistik Sundara",
-                confidence = ConfidenceTier.LOW,
-                originInfo = DataOriginInfo(
-                    title = "Inflasi Tahunan (IHK) Sundara",
-                    displayedValue = "$infLow–$infHigh% YoY",
-                    sourceName = "Biro Pusat Statistik (BPS) Sundara",
-                    dataDate = "$twoMonthsAgo (lag publikasi 2 bulan)",
-                    calculationMethod = "Survei harga konsumen di 48 kota; rentang mencerminkan revisi dan ketidakpastian.",
-                    uncertaintyAndBiasNote = "Bank sentral memakai aturan Taylor: suku bunga cenderung naik bila inflasi di atas 3% atau kurs melemah cepat.",
-                    confidence = ConfidenceTier.LOW
-                )
-            )
-        )
-    }
-
-    private fun buildDecisions(): List<Decision> =
-        eng.pendingDecisions().map { d ->
-            val opts = when (d.id) {
-                "dec_pemintalan" -> listOf(
-                    DecisionOption("approve", "Setujui proyek pemintalan (15 bulan)", "CapEx bertahap ±${fmt(14000.0 * eng.sc.size)} jt RS; rasio HPP turun 5 poin setelah selesai", "Setujui", SemanticTone.PRIMARY_BLUE)
-                )
-                "dec_termsheet" -> listOf(
-                    DecisionOption("cnt_ts_1", "Bank Pembangunan Sundara (${fmt(eng.termSheetAmount())} jt RS, tetap ${fmt2(eng.termSheetFixedRate())}%, 4 thn)",
-                        "Tanpa risiko kurs; cicilan pokok ±${fmt(eng.termSheetAmount() / 48.0)} jt RS/bulan; melarang dividen", "Pilih RS", SemanticTone.PRIMARY_BLUE),
-                    DecisionOption("cnt_ts_2", "Aurelia Global CitiTrust (setara ${fmt(eng.termSheetAudAmountRs())} jt RS dalam A$, tetap 5,2%, 3 thn)",
-                        "Bunga murah dan tanpa cicilan pokok bulanan; risiko kurs A$ dan klausul MAC 30%", "Pilih A$", SemanticTone.WARNING_YELLOW)
-                )
-                else -> emptyList()
-            }
+        // ---- Keputusan ----
+        val decisions = e.pendingDecisions().map { d ->
             Decision(
-                id = d.id,
-                title = d.title,
-                subtitle = d.subtitle,
-                apCost = d.apCost,
-                badgeText = d.badge,
-                tone = toneOf(d.tone),
-                assetSharePct = d.assetSharePct,
-                defaultContextNote = d.context,
-                isCompleted = false,
+                id = d.id, title = d.title, subtitle = d.subtitle, apCost = d.apCost, badgeText = d.badge,
+                tone = tone(d.tone), assetSharePct = d.assetSharePct, defaultContextNote = d.context,
                 opensEventDialog = d.isEvent,
-                canReject = d.id == "dec_pemintalan",
-                options = opts
+                options = if (d.id == "dec_termsheet") listOf(
+                    "cnt_ts_1" to "Bank Pembangunan Sundara · ${fmt(e.termSheetAmount())} jt RS · bunga tetap ${fmt2(e.termSheetFixedRate())}% · cicilan 48 bulan",
+                    "cnt_ts_2" to "Aurelia Global CitiTrust · 5,2% dalam A$ · bullet 36 bulan"
+                ) else emptyList(),
+                canReject = d.id == "dec_pemintalan"
             )
         }
 
-    private fun buildNews(date: String): List<NewsItem> =
-        eng.news.map { n ->
-            val slant = MediaSlant.valueOf(n.slant)
-            val conf = when (n.confidence) {
-                2 -> ConfidenceTier.HIGH
-                1 -> ConfidenceTier.MEDIUM
-                else -> ConfidenceTier.LOW
+        // ---- Koran pagi ----
+        val outletSource = mapOf(
+            "BISNIS" to "Harian Bisnis", "PRO_PEMERINTAH" to "Suara Sundara", "OPOSISI" to "Mimbar Rakyat",
+            "SENSASIONAL" to "Kilat Sore", "INDEPENDEN" to "Lensa Independen"
+        )
+        val newsItems = e.news.map { n ->
+            val c = when {
+                n.isRumor -> 0
+                n.crossChecked -> n.confidence + 1
+                else -> n.confidence
             }
-            val verifiedNote = if (n.crossChecked) {
-                when (slant) {
-                    MediaSlant.PRO_PEMERINTAH -> "VERIFIKASI SILANG: Pernyataan resmi ini memperhalus risiko sebenarnya."
-                    MediaSlant.SENSASIONAL -> "VERIFIKASI SILANG: Klaim ini dibesar-besarkan tanpa bukti primer."
-                    MediaSlant.INDEPENDEN -> "VERIFIKASI SILANG: Dikonfirmasi oleh data primer dan dokumen lapangan."
-                    else -> "VERIFIKASI SILANG: Fakta utama akurat, tetapi sudut pandang media memengaruhi penekanan."
-                }
-            } else "Belum diperiksa silang. Gunakan tombol 'Periksa silang (1 AP)' untuk menguji akurasi berita ini."
-
             NewsItem(
-                id = n.id,
-                mediaSlant = slant,
-                headline = n.headline,
-                summary = if (n.crossChecked) "${n.summary}\n\n[$verifiedNote]" else n.summary,
-                dateLabel = date,
-                confidence = if (n.crossChecked) ConfidenceTier.HIGH else conf,
-                isRumor = n.isRumor,
-                isMacroRelease = slant == MediaSlant.BISNIS,
-                crossChecked = n.crossChecked,
-                originInfo = DataOriginInfo(
-                    title = "${slant.outletName} (${slant.slantLabel})",
-                    displayedValue = n.headline,
-                    sourceName = slant.outletName,
-                    dataDate = date,
-                    calculationMethod = slant.editorialProfile,
-                    uncertaintyAndBiasNote = verifiedNote,
-                    confidence = if (n.crossChecked) ConfidenceTier.HIGH else conf
+                id = n.id, mediaSlant = MediaSlant.valueOf(n.slant), headline = n.headline, summary = n.summary,
+                dateLabel = "1 ${dateText(turn)}${if (n.isRumor) " · Kolom rumor" else ""}",
+                confidence = conf(c), isRumor = n.isRumor, crossChecked = n.crossChecked,
+                originInfo = origin("Berita: ${outletSource[n.slant]}", n.headline, outletSource[n.slant] ?: n.slant,
+                    "1 ${dateText(turn)}",
+                    if (n.crossChecked) "Sudah diperiksa silang dengan sumber lain." else "Belum diperiksa silang.",
+                    when (n.slant) {
+                        "INDEPENDEN" -> "Sumber paling independen, tetapi tetap bisa keliru."
+                        "PRO_PEMERINTAH" -> "Cenderung memperhalus kabar buruk demi pemerintah."
+                        "OPOSISI" -> "Cenderung membesar-besarkan kabar buruk."
+                        "SENSASIONAL" -> "Sering ditunggangi spekulan atau short-seller."
+                        else -> "Akurat soal data pasar, tetapi pengiklannya punya kepentingan."
+                    }, conf(c))
+            )
+        }
+        val featured = newsItems.firstOrNull()
+
+        // ---- Negara dan pasar (Sundara dan kurs dinamis) ----
+        val monthsToElection = e.electionTurn - turn
+        val geoNow = e.dunia.geo
+        val countries = StaticWorldData.countries().map { c0 ->
+            val c = c0.copy(tensionScore = (if (c0.id == "sundara") geoNow.meanTensionOf("sundara") else geoNow.tension("sundara", c0.id)).roundToInt().coerceIn(0, 100))
+            if (c.id == "sundara") c.copy(
+                inflationRange = "${fmt1(inflLo)}–${fmt1(inflLo + 2.0)}%",
+                policyRate = "${fmt2(e.policyRate)}%",
+                electionCountdown = if (monthsToElection > 0) "$monthsToElection bulan lagi" else "Selesai (${dateText(e.electionTurn)})"
+            ) else e.foreign[c.id]?.let { f ->
+                // Perkiraan statistik asing punya ketidakpastian ±0,6 pp (imperfect information)
+                val lo = f.inflation - 0.6
+                val mte = geoNow.monthsToElection(c.id, turn)
+                c.copy(
+                    inflationRange = "${fmt1(max(0.0, lo))}–${fmt1(max(0.0, lo) + 1.2)}%",
+                    policyRate = "${fmt2(f.policyRate)}%",
+                    electionCountdown = if (mte > 0) "$mte bulan lagi" else "Bulan ini"
                 )
-            )
+            } ?: c
         }
-
-    private fun buildIncomeRows(date: String): List<FinancialRowItem> {
-        val m = eng.lastIncome
-        val p = eng.prevIncome
-        fun row(label: String, key: String, neg: Boolean = false, bold: Boolean = false, tone: SemanticTone = SemanticTone.NEUTRAL_GRAY, note: String, formula: String): FinancialRowItem {
-            val cur = m[key] ?: 0.0
-            val prv = p[key] ?: 0.0
-            val fCur = if (neg && cur > 0) "(${fmt(cur)})" else if (cur < 0) "(${fmt(-cur)})" else fmt(cur)
-            val fPrv = if (neg && prv > 0) "(${fmt(prv)})" else if (prv < 0) "(${fmt(-prv)})" else fmt(prv)
-            return FinancialRowItem(
-                label = label, currentVal = fCur, priorVal = fPrv, note = note, isHeaderOrTotal = bold, tone = tone,
-                originInfo = DataOriginInfo(label, "$fCur jt RS", "Buku Besar Akrual PT Benang Sundara", date, formula, note, ConfidenceTier.HIGH)
-            )
-        }
-        val rev = m["revenue"] ?: 0.0; val cogs = m["cogs"] ?: 0.0
-        val gp = rev - cogs
-        val gpPrev = (p["revenue"] ?: 0.0) - (p["cogs"] ?: 0.0)
-        return listOf(
-            row("Pendapatan Penjualan (Akrual)", "revenue", false, true, SemanticTone.PRIMARY_BLUE,
-                if (eng.stuffingActive) "Termasuk ±8% obral kredit 90 hari ke peritel rapuh" else "Kebijakan kredit ketat (DSO ±50 hari)",
-                "Volume × harga × permintaan makro × faktor produksi."),
-            row("Harga Pokok Penjualan (HPP)", "cogs", true, false, SemanticTone.DANGER_RED,
-                "Rasio HPP ${(eng.cogsRatio() * 100).roundToInt()}% (dipengaruhi kurs, kapas, energi, pemasok, & anak usaha)",
-                "Bahan baku kapas, benang, pewarna, listrik tenun, dan tenaga kerja langsung."),
-            row("  · Bahan baku (kapas, benang, zat warna)", "cogs_mat", true, false, SemanticTone.NEUTRAL_GRAY,
-                "50% HPP; mengikuti indeks kapas ${fmt2(eng.commodities.cotton.index)}x", "Bagian bahan baku langsung dari HPP."),
-            row("  · Energi & uap pabrik", "cogs_energy", true, false, SemanticTone.NEUTRAL_GRAY,
-                "15% HPP; mengikuti minyak ${fmt2(eng.commodities.oil.index)}x", "Listrik tenun dan boiler pewarnaan."),
-            row("  · Upah tenaga kerja langsung (${eng.headcountProd()} orang)", "cogs_labor", true, false, SemanticTone.NEUTRAL_GRAY,
-                "25% HPP; pabrik domestik & ${eng.foreignWorkers()} pekerja anak usaha", "Upah operator mesin tenun dan pewarnaan."),
-            row("  · Overhead pabrik", "cogs_oh", true, false, SemanticTone.NEUTRAL_GRAY,
-                "10% HPP", "Bahan pembantu, pengawasan lini, dan utilitas pabrik."),
-            FinancialRowItem("Laba Kotor", fmt(gp), fmt(gpPrev), "Margin kotor ${if (rev > 0) (gp / rev * 100).roundToInt() else 0}%",
-                true, SemanticTone.GOOD_GREEN, DataOriginInfo("Laba Kotor", "${fmt(gp)} jt RS", "Buku Besar", date, "Pendapatan − HPP", "", ConfidenceTier.HIGH)),
-            row("Beban Operasional (SG&A)", "opex", true, false, SemanticTone.NEUTRAL_GRAY,
-                "Gaji staf (${eng.headcountStaff()} orang), pemasaran, logistik, dan biaya satu kali", "Beban tetap + tambahan upah + biaya kejadian."),
-            row("  · Gaji manajemen, staf & tunjangan", "op_salary", true, false, SemanticTone.NEUTRAL_GRAY,
-                "Termasuk kenaikan upah permanen (${fmt(eng.wageAddOn)} jt RS/bln)", "Gaji kantor pusat, administrasi, dan penjualan."),
-            row("  · Pemasaran & distribusi", "op_mkt", true, false, SemanticTone.NEUTRAL_GRAY, "Pengiriman ke ritel, komisi, promosi", "15% dari beban operasional dasar."),
-            row("  · Administrasi, umum, listrik kantor & asuransi", "op_admin", true, false, SemanticTone.NEUTRAL_GRAY, "Sewa kantor, TI, audit rutin", "Administrasi dan utilitas non-pabrik."),
-            row("  · Biaya operasi lini tambahan & anak usaha", "op_lines", true, false, SemanticTone.NEUTRAL_GRAY, "Biaya tetap ekspansi domestik & cabang luar negeri", "Biaya tetap kapasitas baru."),
-            row("  · Program berjalan (R&D / merek)", "op_proj", true, false, SemanticTone.NEUTRAL_GRAY, "Investasi non-aset yang langsung dibebankan", "Anggaran program dibagi durasi bulan."),
-            row("  · Biaya luar biasa / denda / konsultan", "op_oneoff", true, false, SemanticTone.WARNING_YELLOW, "Denda, biaya hukum, audit, provisi kredit, pajak dividen", "Biaya satu kali periode ini."),
-            row("  · Pendapatan lain-lain / klaim / repatriasi", "op_gain", false, false, SemanticTone.GOOD_GREEN, "Insentif pemerintah, klaim asuransi, atau dividen anak usaha", "Pengurang beban periode ini."),
-            row("Beban Perawatan Mesin", "maint", true, false, if (eng.deferralActive) SemanticTone.WARNING_YELLOW else SemanticTone.NEUTRAL_GRAY,
-                if (eng.deferralActive) "Ditekan di bawah standar (tunggakan ${eng.deferredMonths} bln)" else "Perawatan penuh",
-                "Perawatan rutin + perbaikan kerusakan mesin."),
-            row("Penyusutan Aset Tetap", "dep", true, false, SemanticTone.NEUTRAL_GRAY,
-                "Beban non-kas (ditambahkan kembali di arus kas)", "0,81% dari aset tetap per bulan."),
-            row("Penghapusan Piutang Macet", "baddebt", true, false, if ((m["baddebt"] ?: 0.0) > 0) SemanticTone.DANGER_RED else SemanticTone.NEUTRAL_GRAY,
-                "45% dari piutang rapuh yang berumur 6 bulan dihapusbukukan", "Kerugian piutang tak tertagih."),
-            row("Laba Usaha (EBIT)", "ebit", false, true, if ((m["ebit"] ?: 0.0) >= 0) SemanticTone.GOOD_GREEN else SemanticTone.DANGER_RED,
-                "Pembilang rasio ICR untuk uji covenant bank", "Laba Kotor − OpEx − Perawatan − Penyusutan − Piutang Macet."),
-            row("Beban Bunga Pinjaman", "interest", true, false, SemanticTone.DANGER_RED,
-                "Penyebut rasio ICR; naik saat bunga acuan atau kurs A$ naik", "Σ (Saldo pinjaman × bunga tahunan / 12)."),
-            row("Pendapatan Bunga Kas", "intinc", false, false, SemanticTone.GOOD_GREEN,
-                "Bunga giro/deposito atas saldo kas positif (suku bunga acuan − 3%)", "Kas × maks(0, bunga acuan − 3%) / 12."),
-            row("Pajak Penghasilan Badan & Withholding Dividen (Efektif Grup ${fmt1(eng.effectiveTaxRate() * 100)}%)", "tax", true, false, SemanticTone.NEUTRAL_GRAY,
-                "Termasuk pajak withholding repatriasi ${fmt(m["wht_tax"] ?: 0.0)} jt RS; kompensasi rugi: ${fmt(eng.taxLossCarryforward())} jt RS", "PPh badan 22% induk + pajak withholding dividen lintas batas."),
-            row("Laba Bersih Induk", "ni", false, true, if ((m["ni"] ?: 0.0) >= 0) SemanticTone.GOOD_GREEN else SemanticTone.DANGER_RED,
-                "Akrual Induk — Laba Bersih Konsolidasi Grup: ${fmt(eng.lastConsolidatedIncome["ni"] ?: (m["ni"] ?: 0.0))} jt RS", "EBIT − Bunga + Bunga Kas − Pajak.")
-        )
-    }
-
-    private fun buildBalanceRows(date: String): List<FinancialRowItem> {
-        val b = eng.balanceSnapshot()
-        val p = eng.prevBalance
-        val cons = eng.consolidatedBalanceSnapshot()
-        fun row(label: String, key: String, bold: Boolean = false, tone: SemanticTone = SemanticTone.NEUTRAL_GRAY, note: String): FinancialRowItem {
-            val cur = fmt(b[key] ?: 0.0)
-            val prv = fmt(p[key] ?: 0.0)
-            return FinancialRowItem(label, cur, prv, note, bold, tone,
-                DataOriginInfo(label, "$cur jt RS", "Neraca PT Benang Sundara & Konsolidasi Grup", date, "Identitas akuntansi: Aset = Liabilitas + Ekuitas.", note, ConfidenceTier.HIGH))
-        }
-        val ctaVal = cons["cta_equity"] ?: 0.0
-        val ctaTxt = if (ctaVal < -0.5) "(${fmt(-ctaVal)})" else fmt(ctaVal)
-        return listOf(
-            row("Kas dan Setara Kas", "cash", false, if (eng.cash < 3000) SemanticTone.DANGER_RED else SemanticTone.GOOD_GREEN, "Kas induk (Kas Konsolidasi Grup: ${fmt(cons["cash"] ?: eng.cash)} jt RS)"),
-            row("Piutang Usaha (Total)", "ar", false, if (eng.stuffedTotal() > 1500) SemanticTone.WARNING_YELLOW else SemanticTone.NEUTRAL_GRAY,
-                "DSO ${eng.dso().roundToInt()} hari"),
-            row("  · Piutang lancar (pelanggan sehat)", "ar_normal", false, SemanticTone.NEUTRAL_GRAY, "Termin normal 50–62 hari"),
-            row("  · Piutang berisiko (obral termin 90 hari)", "ar_risky", false, if (eng.stuffedTotal() > 500) SemanticTone.DANGER_RED else SemanticTone.NEUTRAL_GRAY,
-                "Sekitar 45% macet saat berumur 6 bulan"),
-            row("Persediaan Bahan & Barang Jadi", "inv", false, SemanticTone.NEUTRAL_GRAY, "DIO ${eng.dio().roundToInt()} hari"),
-            row("Investasi Saham di Bursa (Nilai Pasar)", "pf", false, SemanticTone.PRIMARY_BLUE, "Portofolio saham tercatat (mark-to-market)"),
-            row("Investasi pada Anak Usaha (Biaya Historis)", "inv_subs", false, SemanticTone.PRIMARY_BLUE, "Dieliminasi penuh terhadap ekuitas lokal anak usaha saat konsolidasi grup"),
-            row("Goodwill Akuisisi (M&A)", "goodwill", false, SemanticTone.NEUTRAL_GRAY, "Selisih harga beli di atas aset bersih wajar pesaing; diuji penurunan nilai (impairment)"),
-            row("Modal Inti Unit Bank & Asuransi Grup", "captive_bank", false, SemanticTone.PRIMARY_BLUE, "Aset produktif unit jasa keuangan internal (CAR ≥ 12%)"),
-            row("Aset Tetap Bersih (Pabrik & Mesin Induk)", "fa", false, SemanticTone.NEUTRAL_GRAY, "Aset tetap konsolidasi grup: ${fmt(cons["fa"] ?: (b["fa"] ?: 0.0))} jt RS"),
-            row("TOTAL ASET", "assets", true, SemanticTone.PRIMARY_BLUE, "Total Aset Konsolidasi Grup: ${fmt(cons["assets"] ?: (b["assets"] ?: 0.0))} jt RS"),
-            row("Utang Dagang ke Pemasok", "payables", false, SemanticTone.NEUTRAL_GRAY, "DPO ${eng.dpo().roundToInt()} hari"),
-            row("Utang Bank Jangka Pendek (≤12 bln)", "debt_st", false, if ((b["debt_st"] ?: 0.0) > 0) SemanticTone.DANGER_RED else SemanticTone.NEUTRAL_GRAY,
-                "Pinjaman yang jatuh tempo dalam 12 giliran"),
-            row("Utang Bank & Obligasi Jangka Panjang (>12 bln)", "debt_lt", false, SemanticTone.WARNING_YELLOW, "Pinjaman bank & obligasi korporasi jatuh tempo > 12 giliran"),
-            row("TOTAL LIABILITAS", "liab", true, SemanticTone.WARNING_YELLOW, "Total Liabilitas Konsolidasi Grup: ${fmt(cons["liab"] ?: (b["liab"] ?: 0.0))} jt RS"),
-            FinancialRowItem("Selisih Kurs Translasi Konsolidasi (CTA)", ctaTxt, "0",
-                "Selisih translasi aset bersih valas anak usaha ke Rial Sundara (bagian dari Ekuitas Grup)", false, SemanticTone.PRIMARY_BLUE,
-                DataOriginInfo("Selisih Kurs Translasi (CTA)", "$ctaTxt jt RS", "Konsolidasi Grup", date, "Σ (Ekuitas Lokal × Kurs Akhir − Ekuitas Historis RS)", "Bukan laba operasi; dicatat di ekuitas konsolidasi.", ConfidenceTier.HIGH)),
-            row("TOTAL EKUITAS", "equity", true, SemanticTone.GOOD_GREEN, "Ekuitas Induk (Ekuitas Konsolidasi Grup: ${fmt(cons["equity"] ?: (b["equity"] ?: 0.0))} jt RS)")
-        )
-    }
-
-    private fun buildCashFlowRows(date: String): List<FinancialRowItem> {
-        val d = eng.lastDetail
-        val p = eng.prevDetail
-        fun fmtS(x: Double) = if (x < -0.5) "(${fmt(-x)})" else fmt(x)
-        fun r(label: String, key: String, bold: Boolean = false, tone: SemanticTone = SemanticTone.NEUTRAL_GRAY, note: String): FinancialRowItem {
-            val cur = d[key] ?: 0.0
-            val prv = p[key] ?: 0.0
-            return FinancialRowItem(label, fmtS(cur), fmtS(prv), note, bold, tone,
-                DataOriginInfo(label, "${fmtS(cur)} jt RS", "Laporan Arus Kas", date, "Metode tidak langsung.", note, ConfidenceTier.HIGH))
-        }
-        val cfo = d["cfo"] ?: 0.0
-        val net = d["net"] ?: 0.0
-        return listOf(
-            r("Laba Bersih", "d_ni", false, SemanticTone.NEUTRAL_GRAY, "Dari laporan laba rugi"),
-            r("(+) Penyusutan (beban non-kas)", "d_dep", false, SemanticTone.GOOD_GREEN, "Ditambahkan kembali"),
-            r("Perubahan Piutang Usaha (−ΔAR)", "d_ar", false, if ((d["d_ar"] ?: 0.0) < 0) SemanticTone.DANGER_RED else SemanticTone.GOOD_GREEN,
-                "Negatif = penjualan tertahan di piutang pelanggan"),
-            r("Perubahan Persediaan (−ΔInv)", "d_inv", false, SemanticTone.NEUTRAL_GRAY, "Negatif = kas terikat di gudang"),
-            r("Perubahan Utang Dagang (+ΔAP)", "d_pay", false, SemanticTone.NEUTRAL_GRAY, "Positif = pemasok membiayai modal kerja"),
-            r("A. ARUS KAS DARI AKTIVITAS OPERASI (CFO)", "cfo", true, if (cfo < 0) SemanticTone.DANGER_RED else SemanticTone.GOOD_GREEN,
-                "NI + Penyusutan − ΔAR − ΔInv + ΔAP"),
-            r("Belanja modal pengganti mesin", "d_capex_repl", false, SemanticTone.NEUTRAL_GRAY, "70% dari penyusutan untuk menjaga kapasitas"),
-            r("Belanja modal proyek pemintalan", "d_capex_spin", false, SemanticTone.WARNING_YELLOW, "Sesuai fase jadwal Gantt"),
-            r("Belanja modal ekspansi & setoran modal anak usaha", "d_capex_exp", false, SemanticTone.WARNING_YELLOW, "Lini baru, otomasi, gudang, IPAL, investasi anak usaha luar negeri"),
-            r("Pembelian saham / M&A goodwill / modal bank grup", "d_stock_buy", false, SemanticTone.NEUTRAL_GRAY, "Termasuk biaya pialang 0,15% & kas akuisisi"),
-            r("Penjualan saham di bursa", "d_stock_sell", false, SemanticTone.GOOD_GREEN, "Bersih setelah biaya & pajak"),
-            r("Dividen tunai saham & repatriasi anak usaha", "d_divin", false, SemanticTone.GOOD_GREEN, "Dieliminasi untuk porsi antar-entitas pada konsolidasi grup"),
-            r("B. ARUS KAS DARI AKTIVITAS INVESTASI (CFI)", "cfi", true, SemanticTone.NEUTRAL_GRAY,
-                "Jumlah seluruh arus kas investasi di atas"),
-            r("Pencairan pinjaman bank & obligasi baru", "d_newdebt", false, SemanticTone.GOOD_GREEN, "Kredit baru, obligasi korporasi, atau refinancing"),
-            r("Pembayaran pokok pinjaman terjadwal", "d_repay", false, SemanticTone.WARNING_YELLOW, "Cicilan bulanan atau pelunasan bullet"),
-            r("Penarikan / (pelunasan) fasilitas RCF", "d_rcf", false, SemanticTone.WARNING_YELLOW, "Fasilitas modal kerja otomatis"),
-            r("Pelunasan paksa covenant", "d_forced", false, SemanticTone.DANGER_RED, "15% pokok saat gagal covenant kedua"),
-            r("Pencairan anjak piutang (factoring)", "d_factor", false, SemanticTone.DANGER_RED, "Penjualan piutang darurat (potongan 4%)"),
-            r("Setoran modal (Equity Cure / IPO)", "d_cure", false, SemanticTone.GOOD_GREEN, "Suntikan pemegang saham atau dana bersih IPO"),
-            r("Pembayaran dividen ke pemegang saham", "d_divpaid", false, SemanticTone.WARNING_YELLOW, "Dividen tahunan / khusus"),
-            r("C. ARUS KAS DARI AKTIVITAS PENDANAAN (CFF)", "cff", true, SemanticTone.NEUTRAL_GRAY,
-                "Jumlah seluruh arus kas pendanaan di atas"),
-            r("PERUBAHAN KAS BERSIH (A + B + C)", "net", true, if (net < 0) SemanticTone.DANGER_RED else SemanticTone.GOOD_GREEN,
-                "Harus sama persis dengan Kas Akhir − Kas Awal")
-        )
-    }
-
-    private fun buildEquityRows(date: String): List<FinancialRowItem> {
-        val d = eng.lastDetail
-        val p = eng.prevDetail
-        fun fmtS(x: Double) = if (x < -0.5) "(${fmt(-x)})" else fmt(x)
-        fun r(label: String, key: String, bold: Boolean = false, tone: SemanticTone = SemanticTone.NEUTRAL_GRAY, note: String) =
-            FinancialRowItem(label, fmtS(d[key] ?: 0.0), fmtS(p[key] ?: 0.0), note, bold, tone,
-                DataOriginInfo(label, "${fmtS(d[key] ?: 0.0)} jt RS", "Laporan Perubahan Ekuitas", date, "Rekonsiliasi ekuitas awal ke ekuitas akhir.", note, ConfidenceTier.HIGH))
-        return listOf(
-            r("Ekuitas Awal Periode", "e_open", true, SemanticTone.NEUTRAL_GRAY, "Sama dengan ekuitas akhir bulan lalu"),
-            r("(+) Laba Bersih periode berjalan", "e_ni", false, SemanticTone.GOOD_GREEN, "Dari laporan laba rugi"),
-            r("(+) Dividen tunai portofolio saham", "e_divin", false, SemanticTone.GOOD_GREEN, "Pendapatan investasi saham"),
-            r("(+) Dividen repatriasi dari anak usaha (Induk)", "e_sub_div", false, SemanticTone.GOOD_GREEN, "Dieliminasi penuh pada ekuitas konsolidasi grup"),
-            r("(+/−) Selisih nilai pasar portofolio saham (MTM)", "e_mtm", false, SemanticTone.PRIMARY_BLUE, "Keuntungan/kerugian belum direalisasi"),
-            r("(−) Penurunan nilai Goodwill / Hapus buku aset", "e_impair", false, SemanticTone.WARNING_YELLOW, "Impairment goodwill M&A atau nasionalisasi"),
-            r("(−) Biaya transaksi jual-beli saham", "e_fees", false, SemanticTone.NEUTRAL_GRAY, "Komisi pialang & pajak bursa"),
-            r("(+/−) Selisih kurs atas pinjaman valas (A$)", "e_fx", false, SemanticTone.WARNING_YELLOW, "Perubahan kewajiban RS karena kurs A$"),
-            r("(−) Potongan anjak piutang (factoring 4%)", "e_factor", false, SemanticTone.DANGER_RED, "Diskon penjualan piutang darurat"),
-            r("(+) Setoran modal (Equity Cure / IPO)", "e_cure", false, SemanticTone.GOOD_GREEN, "Suntikan pemegang saham / penerbitan saham publik"),
-            r("(−) Dividen kepada pemegang saham", "e_div", false, SemanticTone.WARNING_YELLOW, "Pembagian laba"),
-            r("EKUITAS AKHIR PERIODE", "e_close", true, SemanticTone.GOOD_GREEN, "Harus cocok dengan Total Ekuitas di Neraca")
-        )
-    }
-
-    private fun buildReportCheck(): ReportCheck {
-        val b = eng.balanceSnapshot()
-        val assets = b["assets"] ?: 0.0
-        val lpe = (b["liab"] ?: 0.0) + (b["equity"] ?: 0.0)
-        val d = eng.lastDetail
-        val cfSum = (d["cfo"] ?: 0.0) + (d["cfi"] ?: 0.0) + (d["cff"] ?: 0.0)
-        val dCash = d["net"] ?: 0.0
-        val eqResid = abs(d["e_resid"] ?: 0.0)
-        return ReportCheck(
-            balanceOk = abs(assets - lpe) < 1.0,
-            assetsText = "${fmt(assets)} jt RS",
-            liabPlusEqText = "${fmt(lpe)} jt RS",
-            cashFlowOk = abs(cfSum - dCash) < 1.0,
-            cfSumText = "${signed(cfSum)} jt RS",
-            dCashText = "${signed(dCash)} jt RS",
-            equityOk = eqResid < 1.0,
-            eqCalcText = "${fmt((d["e_close"] ?: 0.0) - (d["e_resid"] ?: 0.0))} jt RS",
-            eqActualText = "${fmt(b["equity"] ?: 0.0)} jt RS"
-        )
-    }
-
-    private fun buildFinancialNotes(): List<StatementNote> {
-        val loanLines = eng.loans.filter { it.balance > 0.5 }.joinToString("\n") { l ->
-            val rs = eng.loanBalanceRs(l)
-            val cur = if (l.currencyAud) "${fmt1(l.balance)} jt A$ (setara ${fmt(rs)} jt RS pada kurs ${fmt(eng.kurs)})" else "${fmt(rs)} jt RS"
-            val rate = "${fmt2(l.annualRatePct)}% (${if (l.floatingSpreadPct != null) "mengambang: acuan + ${fmt2(l.floatingSpreadPct!!)}%" else "tetap"})"
-            val mat = if (l.maturityTurn < 900) "jatuh tempo ${dateText(l.maturityTurn)}" else "fasilitas bergulir"
-            val cov = if (l.covenantIcr > 0) ", covenant ICR ≥ ${fmt2(l.covenantIcr)}x" else ""
-            "• ${l.lender}: saldo $cur, bunga $rate, $mat$cov."
-        }.ifEmpty { "• Tidak ada pinjaman bank aktif." }
-
-        val ageBuckets = eng.stuffedBuckets.groupBy { (eng.turn - it.first).coerceIn(1, 6) }
-            .entries.sortedBy { it.key }
-            .joinToString(", ") { (m, list) -> "umur $m bln: ${fmt(list.sumOf { it.second })} jt RS" }
-            .ifEmpty { "tidak ada piutang obral" }
-
-        val consBal = eng.consolidatedBalanceSnapshot()
-        val subNote = if (eng.subsidiaries.isEmpty()) {
-            "Belum ada anak usaha luar negeri. Grup beroperasi sebagai entitas domestik di Sundara (PPh badan standar 22%)."
-        } else {
-            eng.subsidiaries.values.joinToString("\n") { s ->
-                val meta = eng.foreignMeta.getValue(s.spec.countryId)
-                "• ${s.spec.title} (${s.spec.countryName}, ${s.spec.currencyCode}): status ${if (s.nationalized) "Dinasionalisasi" else if (s.active) "Beroperasi" else "Konstruksi"}, aset lokal ${fmt1(s.totalAssetsLocal())} jt ${s.spec.currencyCode}, utang bank lokal ${fmt1(s.bankDebtLocal)} jt ${s.spec.currencyCode}, laba ditahan siap repatriasi ${fmt1(s.retainedForeign)} jt ${s.spec.currencyCode} (kurs ${fmt1(meta.fxToRs)} RS/${s.spec.currencyCode}), PPh lokal ${fmt1(meta.profile.corpTaxPct)}%."
-            }
-        }
-
-        return listOf(
-            StatementNote(1, "Kebijakan Akuntansi, Konsolidasi Grup & Pajak Multinasional",
-                "Laporan disusun dengan basis akrual dalam juta Rial Sundara (jt RS). Anak usaha luar negeri menyusun pembukuan penuh dalam mata uang lokal masing-masing (TRS, KST, HLV, MRD) dan dikonsolidasikan ke RS dengan eliminasi penuh atas investasi induk, transaksi royalti antar-entitas (${fmt(eng.lastConsolidatedIncome["elim_intercompany_rev"] ?: 0.0)} jt RS), serta dividen antar-entitas. Selisih Kurs Translasi (CTA) saat ini: ${fmt(consBal["cta_equity"] ?: 0.0)} jt RS. Tarif PPh efektif grup: ${fmt1(eng.effectiveTaxRate() * 100)}% (mode ${eng.transferPricingMode.label})."),
-            StatementNote(2, "Piutang Usaha & Kualitas Kredit Pelanggan",
-                "Piutang lancar sebesar ${fmt(eng.normalAR)} jt RS berasal dari peritel dengan termin standar (${if (eng.salesScheme == SalesScheme.OMZET) 62 else 50} hari). Piutang berisiko sebesar ${fmt(eng.stuffedTotal())} jt RS berasal dari penjualan dengan termin 90 hari kepada peritel kecil ($ageBuckets). Berdasarkan pengalaman historis, 45% dari piutang berisiko yang mencapai umur 6 bulan tidak tertagih dan dihapusbukukan."),
-            StatementNote(3, "Rincian Pinjaman Bank, Obligasi, Covenant & Lindung Nilai Valas",
-                "$loanLines\n• Status Lindung Nilai Forward Valas RS/A$: ${if (eng.fxHedgeActive) "Aktif hingga ${dateText(eng.fxHedgeUntilTurn)} pada kurs ${fmt(eng.hedgedKurs)} RS/A$" else "Tidak aktif"}."),
-            StatementNote(4, "Anak Usaha Lintas Negara (Era 2), Goodwill M&A (Era 3) & Transisi Hijau (Era 4)",
-                "$subNote\n• Goodwill Akuisisi: ${fmt(eng.goodwill)} jt RS · Modal Bank Grup: ${fmt(eng.captiveBankCapitalRs)} jt RS · Saham Publik (IPO): ${if (eng.isPublicCompany) "Tercatat (porsi pendiri ${fmt1(eng.founderSharePct)}%)" else "Tertutup"} · Kredit Karbon: ${eng.carbonCredits} unit · Suksesor CEO: ${eng.appointedSuccessorId ?: "Belum ditunjuk"}.")
-        )
-    }
-
-    private fun buildAccrualSummary(): String {
-        val ni = eng.lastIncome["ni"] ?: 0.0
-        val cfo = eng.lastCashFlow["cfo"] ?: 0.0
-        val net = eng.lastCashFlow["net"] ?: 0.0
-        return if (ni > 0 && cfo < 0)
-            "JEBAKAN AKRUAL: Bulan lalu Laba Bersih +${fmt(ni)} jt RS, tetapi Arus Kas Operasi ${signed(cfo)} jt RS dan kas berubah ${signed(net)} jt RS. Uang Anda tertahan di piutang dan persediaan."
-        else "Bulan lalu: Laba Bersih ${signed(ni)} jt RS · Arus Kas Operasi ${signed(cfo)} jt RS · Perubahan Kas Bersih ${signed(net)} jt RS."
-    }
-
-    private fun buildExecutives(date: String): List<Executive> =
-        eng.execs.map { e ->
-            val loyLabel = when {
-                !e.present -> "Kosong"
-                e.loyalty >= 0.7 -> "Tinggi?"
-                e.loyalty >= 0.4 -> "Sedang?"
-                else -> "Rendah?"
-            }
-            val loyTone = when {
-                !e.present -> SemanticTone.NEUTRAL_GRAY
-                e.loyalty >= 0.7 -> SemanticTone.GOOD_GREEN
-                e.loyalty >= 0.4 -> SemanticTone.WARNING_YELLOW
-                else -> SemanticTone.DANGER_RED
-            }
-            val scheme = when (e.id) {
-                "exec_sales" -> eng.salesScheme.label
-                "exec_factory" -> eng.factoryScheme.label
-                "exec_coo" -> "Gaji tetap + bonus proyek selesai tepat waktu"
-                else -> "Gaji tetap + bonus kepatuhan covenant & akurasi kas"
-            }
-            val suspect = when (e.id) {
-                "exec_sales" -> when {
-                    e.stopped -> "Telah dikonfrontasi; tidak lagi mengobral termin 90 hari."
-                    eng.stuffingActive -> "Memperpanjang termin ritel kecil ke 90 hari demi mengejar bonus omzet (piutang berisiko ${fmt(eng.stuffedTotal())} jt RS)."
-                    else -> "Mengikuti kebijakan penagihan kas; piutang berisiko lama sedang dicairkan."
+        val markets = StaticWorldData.marketInstruments().map { m ->
+            if (m.id == "mkt_kurs") {
+                val kh = e.kursHist.takeLast(6)
+                val ch = (kh.last() / kh[kh.size - 2] - 1.0) * 100.0
+                m.copy(
+                    priceText = "${fmt(e.kurs)} RS",
+                    changeText = if (ch >= 0) "Rial melemah ${fmt1(ch)}%" else "Rial menguat ${fmt1(-ch)}%",
+                    tone = if (ch >= 0) SemanticTone.DANGER_RED else SemanticTone.GOOD_GREEN,
+                    sparklineHistory = kh.map { it.toFloat() },
+                    fanProjectionMedian = (1..4).map { (e.kurs * (1 + 0.003 * it)).toFloat() },
+                    fanProjectionSpread = (1..4).map { (e.kurs * 0.02 * sqrt(it.toDouble()) * if (monthsToElection in 0..4) 3 else 1).toFloat() },
+                    originInfo = m.originInfo.copy(displayedValue = "${fmt(e.kurs)} RS per 1 A$", dataDate = dateText(turn))
+                )
+            } else {
+                val ser = when (m.id) {
+                    "mkt_kapas" -> e.commodities.cotton
+                    "mkt_minyak" -> e.commodities.oil
+                    "mkt_baja" -> e.commodities.steel
+                    else -> null
                 }
-                "exec_factory" -> when {
-                    e.stopped -> "Telah dikonfrontasi; mengikuti jadwal perawatan standar."
-                    eng.deferralActive -> "Menunda penggantian suku cadang (${eng.deferredMonths} bulan tertunda) agar biaya kuartal terlihat hemat."
-                    else -> "Perawatan mesin dijalankan penuh; tunggakan perawatan tersisa ${eng.deferredMonths} bulan."
+                if (ser == null) m else {
+                    val h = ser.history.toList()
+                    val ch = (h.last() / h[h.size - 2] - 1.0) * 100.0
+                    val unit = when (m.id) { "mkt_kapas" -> "A$/ton"; "mkt_minyak" -> "A$/bbl"; else -> "A$/ton" }
+                    val vol = ser.sigmaMonthly
+                    m.copy(
+                        priceText = "${fmt1(ser.price)} $unit",
+                        changeText = (if (ch >= 0) "+" else "") + "${fmt1(ch)}% bulan ini",
+                        tone = if (abs(ch) > 4.0) SemanticTone.DANGER_RED else if (abs(ch) > 2.0) SemanticTone.WARNING_YELLOW else SemanticTone.GOOD_GREEN,
+                        sparklineHistory = h.map { it.toFloat() },
+                        fanProjectionMedian = (1..4).map { (ser.base * StrictMath.exp(ser.logDev * StrictMath.pow(ser.rho, it.toDouble()))).toFloat() },
+                        fanProjectionSpread = (1..4).map { (ser.price * vol * 1.65 * sqrt(it.toDouble())).toFloat() },
+                        originInfo = m.originInfo.copy(displayedValue = "${fmt1(ser.price)} $unit (${if (ch >= 0) "+" else ""}${fmt1(ch)}%)", dataDate = dateText(turn),
+                            calculationMethod = "Proses mean-reverting (kecepatan ${fmt2(ser.rho)}/bulan) dengan guncangan pasokan dan permintaan global. Pita = 1,65 simpangan baku.")
+                    )
                 }
-                "exec_coo" -> if (eng.kickbackActive) "Harga bahan dari pemasok pilihannya ~1% di atas pasar; belum terbukti tanpa audit."
-                else "Rantai pasok dikelola wajar; fokus pada proyek pemintalan dan cabang luar negeri."
-                else -> "Melaporkan posisi kas, jarak covenant, dan tarif pajak efektif grup tanpa manipulasi."
             }
-            val auditTxt = when {
-                e.auditDueTurn >= 0 -> "Sedang diaudit (hasil akhir bulan ini)"
-                e.evidence == true -> "Audit: ditemukan indikasi pelanggaran (siap dikonfrontasi)"
-                e.evidence == false -> "Audit: tidak ditemukan bukti pelanggaran"
+        }
+
+        // ---- Investasi dan ekspansi ----
+        val investItems = KapitalEngine.INVEST.map { sp ->
+            val block = e.investBlock(sp.id)
+            val running = e.projectsInv.firstOrNull { it.type == sp.id && !it.done }
+            val count = e.investCount(sp.id)
+            InvestItem(sp.id, sp.title, sp.desc, "${fmt(e.investCost(sp))} jt RS", "${sp.months} bulan", sp.benefit, sp.ap, block == null, block,
+                when {
+                    running != null -> "Berjalan: ${fmt(running.spent)} dari ${fmt(running.totalCost)} jt RS dibayar"
+                    count > 0 -> "Selesai ($count)"
+                    else -> "Belum dimulai"
+                })
+        }
+        val investSummary = listOf(
+            "Kapasitas" to "${fmt1(e.capacityIdx() * 100)}% dari basis",
+            "Permintaan" to "${fmt1(e.demandIdx() * 100)}% dari basis",
+            "Utilisasi" to "${fmt1(e.utilization() * 100)}% ${if (e.utilization() > 1.0) "(pesanan tertolak, tambah kapasitas)" else "(ada ruang)"}",
+            "Lini tambahan" to "${e.extraLines} dari 3",
+            "Pekerja produksi" to "${e.headcountProd()}",
+            "Era sekarang" to "Era ${KapitalEngine.era(e.turn)}: ${KapitalEngine.ERA_NAMES[KapitalEngine.era(e.turn) - 1]}",
+            "Anak usaha, M&A, transfer pricing" to (e.eraBlock(2) ?: "Terbuka"),
+            "Obligasi, IPO, bank grup, lobi" to (e.eraBlock(3) ?: "Terbuka"),
+            "Karbon dan suksesi CEO" to (e.eraBlock(4) ?: "Terbuka")
+        ) + (if (e.isPublicCompany) listOf(
+            "Harga saham" to "${fmt(e.stockPrice)} RS (${fmt1(e.sharesOutM)} juta lembar; kapitalisasi ${fmt(e.stockPrice * e.sharesOutM)} jt RS)",
+            "Dividen/saham terakhir dan buyback" to "${fmt1(e.lastDividendPerShare)} RS; total buyback ${fmt(e.buybackTotalRs)} jt RS (${fmt1(e.sharesRetiredM)} juta lembar ditarik)",
+            "Porsi pendiri" to "${fmt1(e.founderSharePct)}%",
+            "Tren harga 12 bulan" to e.stockHistory.takeLast(12).let { h -> if (h.size < 2) "belum cukup data" else h.zipWithNext { a, b -> if (b > a * 1.005) "▲" else if (b < a * 0.995) "▼" else "■" }.joinToString("") + "  (${fmt1((h.last() / h.first() - 1) * 100)}%)" }
+        ) else emptyList()) + e.subsidiaries.values.map { sb ->
+            "Anak usaha ${sb.spec.countryName}" to when {
+                sb.nationalized -> "Dinasionalisasi"
+                sb.active -> "Aktif ${sb.monthsActive} bln; laba kumulatif ${fmt(sb.cumulativeTranslatedNiRs)} jt RS"
+                else -> "Dalam pembangunan"
+            }
+        }
+
+        // ---- Laporan keuangan ----
+        val inc = e.lastIncome
+        val pinc = e.prevIncome
+        fun iv(m: Map<String, Double>, key: String) = m[key] ?: 0.0
+        fun money(x: Double, negative: Boolean = false) =
+            if (negative) "(${fmt(x)})" else fmt(x)
+        val stmtOrigin = origin("Laporan keuangan", "Bulan $closed", "Akuntansi internal (Ratna Pramudita)", closed,
+            "Disusun otomatis dari transaksi dengan basis akrual. Neraca selalu seimbang (aset = liabilitas + ekuitas).",
+            "Laporan akurat atas transaksi yang tercatat; tidak menunjukkan piutang yang berisiko macet.", ConfidenceTier.HIGH)
+        fun row(label: String, key: String, note: String, negative: Boolean = false, total: Boolean = false, t: SemanticTone = SemanticTone.NEUTRAL_GRAY) =
+            FinancialRowItem(label, money(iv(inc, key), negative), money(iv(pinc, key), negative), note, total, t, stmtOrigin)
+        val gp = iv(inc, "revenue") - iv(inc, "cogs")
+        val pgp = iv(pinc, "revenue") - iv(pinc, "cogs")
+        val ebitda = iv(inc, "ebit") + iv(inc, "dep")
+        val pebitda = iv(pinc, "ebit") + iv(pinc, "dep")
+        val staff = e.headcountStaff(); val prod = e.headcountProd()
+        val salaryPer = if (staff > 0) iv(inc, "op_salary") / staff else 0.0
+        val laborPer = if (prod > 0) iv(inc, "cogs_labor") / prod else 0.0
+        fun sub(label: String, cur: Double, prior: Double, note: String, negative: Boolean = true, tone: SemanticTone = SemanticTone.NEUTRAL_GRAY) =
+            FinancialRowItem("    $label", money(cur, negative && cur != 0.0), money(prior, negative && prior != 0.0), note, false, tone, stmtOrigin)
+        fun optRow(label: String, key: String, note: String, negative: Boolean = true): List<FinancialRowItem> =
+            if (iv(inc, key) != 0.0 || iv(pinc, key) != 0.0) listOf(sub(label, iv(inc, key), iv(pinc, key), note, negative)) else emptyList()
+        val pebt = iv(pinc, "ebit") - iv(pinc, "interest") + iv(pinc, "intinc")
+        val ebt = iv(inc, "ebit") - iv(inc, "interest") + iv(inc, "intinc")
+        val incomeRows = listOf(
+            row("Pendapatan (akrual)", "revenue", "Termasuk penjualan kredit yang kasnya belum masuk", total = true),
+            row("Harga pokok penjualan", "cogs", "Rasio ${fmt1(iv(inc, "cogs") / max(1.0, iv(inc, "revenue")) * 100)}% dari pendapatan", negative = true),
+            sub("Bahan baku (kapas, benang)", iv(inc, "cogs_mat"), iv(pinc, "cogs_mat"), "Mengikuti indeks harga kapas ${fmt2(e.commodities.cotton.index)}"),
+            sub("Energi dan utilitas pabrik", iv(inc, "cogs_energy"), iv(pinc, "cogs_energy"), "Listrik, uap, bahan bakar"),
+            sub("Tenaga kerja langsung", iv(inc, "cogs_labor"), iv(pinc, "cogs_labor"), "$prod pekerja produksi · rata-rata ${fmt1(laborPer)} jt RS per orang per bulan"),
+            sub("Overhead pabrik", iv(inc, "cogs_oh"), iv(pinc, "cogs_oh"), "Suku cadang habis pakai, gudang, pengiriman masuk"),
+            FinancialRowItem("Laba kotor", money(gp), money(pgp), "Margin ${fmt1(gp / max(1.0, iv(inc, "revenue")) * 100)}%", true, SemanticTone.NEUTRAL_GRAY, stmtOrigin),
+            row("Beban operasional", "opex", "Total beban usaha di luar HPP dan perawatan", negative = true),
+            sub("Gaji staf dan manajemen", iv(inc, "op_salary"), iv(pinc, "op_salary"), "$staff karyawan · rata-rata ${fmt1(salaryPer)} jt RS per orang per bulan (termasuk kenaikan upah yang disepakati)"),
+            sub("Administrasi dan kantor", iv(inc, "op_admin"), iv(pinc, "op_admin"), "Sewa kantor, IT, perjalanan, profesional"),
+            sub("Pemasaran dan distribusi", iv(inc, "op_mkt"), iv(pinc, "op_mkt"), "Tim penjualan, pengiriman keluar, promosi"),
+            sub("Utilitas kantor dan gudang", iv(inc, "op_util"), iv(pinc, "op_util"), "Listrik, air, komunikasi"),
+            sub("Asuransi dan pajak bumi", iv(inc, "op_ins"), iv(pinc, "op_ins"), "Polis kebakaran dan pajak properti"),
+            sub("Beban lain-lain", iv(inc, "op_other"), iv(pinc, "op_other"), "Perlengkapan, perizinan, iuran asosiasi")
+        ) + optRow("Operasi lini dan fasilitas tambahan", "op_lines", "Tenaga dan utilitas dari ekspansi") +
+            optRow("Program investasi (R&D, pemasaran)", "op_proj", "Dibebankan sebagai biaya, bukan aset") +
+            optRow("Biaya satu kali (audit, hukum, pesangon, provisi, denda)", "op_oneoff", "Muncul karena keputusan atau kejadian bulan ini") +
+            optRow("Kerugian persediaan", "op_loss", "Banjir atau kerusakan stok") +
+            optRow("Pendapatan lain (asuransi, insentif, pemulihan)", "op_gain", "Mengurangi beban", negative = false) + listOf(
+            row("Perawatan mesin", "maint", "Bandingkan dengan kebutuhan teknis ±${fmt(e.sc.baseMaint * e.costIndex)} jt RS", negative = true),
+            row("Kredit macet dihapusbukukan", "baddebt", "Piutang berumur 6 bulan yang gagal ditagih", negative = true,
+                t = if (iv(inc, "baddebt") > 0) SemanticTone.DANGER_RED else SemanticTone.NEUTRAL_GRAY),
+            FinancialRowItem("EBITDA", money(ebitda), money(pebitda), "Acuan rasio utang bersih/EBITDA", true, SemanticTone.NEUTRAL_GRAY, stmtOrigin),
+            row("Penyusutan", "dep", "Mesin dan bangunan (0,81% per bulan dari nilai buku)", negative = true),
+            row("EBIT (laba operasi)", "ebit", "Acuan covenant ICR", total = true),
+            row("Beban bunga", "interest", "Mengikuti suku bunga dan saldo utang", negative = true, t = SemanticTone.DANGER_RED),
+            row("Pendapatan bunga deposito", "intinc", "Bunga atas kas mengendap"),
+            FinancialRowItem("Laba sebelum pajak", money(ebt), money(pebt), "Dasar pajak sebelum kompensasi rugi", true, SemanticTone.NEUTRAL_GRAY, stmtOrigin),
+            row("Pajak penghasilan badan", "tax", "22%, setelah kompensasi rugi fiskal ${fmt(e.taxLossCarryforward())} jt RS", negative = true),
+            row("Laba bersih", "ni", "Laba di atas kertas; cek arus kas", total = true,
+                t = if (iv(inc, "ni") >= 0) SemanticTone.GOOD_GREEN else SemanticTone.DANGER_RED)
+        )
+        val bal = e.balanceSnapshot()
+        val pbal = e.prevBalance
+        fun bv(m: Map<String, Double>, k: String) = m[k] ?: 0.0
+        fun brow(label: String, key: String, note: String, total: Boolean = false, t: SemanticTone = SemanticTone.NEUTRAL_GRAY) =
+            FinancialRowItem(label, money(bal[key] ?: 0.0), money(pbal[key] ?: 0.0), note, total, t, stmtOrigin)
+        fun bsub(label: String, key: String, note: String) =
+            FinancialRowItem("    $label", money(bv(bal, key)), money(bv(pbal, key)), note, false, SemanticTone.NEUTRAL_GRAY, stmtOrigin)
+        fun bsum(label: String, cur: Double, prior: Double, note: String, t: SemanticTone = SemanticTone.NEUTRAL_GRAY) =
+            FinancialRowItem(label, money(cur), money(prior), note, true, t, stmtOrigin)
+        val curA = bv(bal, "cash") + bv(bal, "ar") + bv(bal, "inv")
+        val pcurA = bv(pbal, "cash") + bv(pbal, "ar") + bv(pbal, "inv")
+        val curL = bv(bal, "payables") + bv(bal, "debt_st")
+        val pcurL = bv(pbal, "payables") + bv(pbal, "debt_st")
+        val balanceRows = listOf(
+            bsub("Kas dan setara kas", "cash", "Runway ${if (e.runwayMonths() >= 99) "> 24" else e.runwayMonths().toString()} bulan"),
+            bsub("Piutang usaha normal", "ar_normal", "DSO total ${e.dso().toInt()} hari"),
+            bsub("Piutang berisiko (obral kredit)", "ar_risky", "Rentan macet; lihat umur piutang di Catatan"),
+            bsub("Persediaan", "inv", "DIO ${e.dio().toInt()} hari"),
+            bsum("Total aset lancar", curA, pcurA, "Rasio lancar ${fmt2(curA / max(1.0, curL))}x", SemanticTone.PRIMARY_BLUE),
+            bsub("Aset tetap bersih", "fa", "Agunan utama pinjaman; perawatan tertunda ${e.deferredMonths} bulan"),
+            bsub("Investasi saham (nilai pasar)", "pf", "Portofolio di Bursa; selisih nilai masuk ekuitas"),
+            brow("Total aset", "assets", "Aset = liabilitas + ekuitas", true, SemanticTone.PRIMARY_BLUE),
+            bsub("Utang dagang", "payables", "DPO ${e.dpo().toInt()} hari"),
+            bsub("Utang bank jatuh tempo ≤12 bulan", "debt_st", "Risiko refinancing"),
+            bsum("Total liabilitas lancar", curL, pcurL, "Harus dibayar dalam 12 bulan", SemanticTone.WARNING_YELLOW),
+            bsub("Utang bank jangka panjang", "debt_lt", "Termasuk utang A$ dinilai dengan kurs hari ini"),
+            brow("Total liabilitas", "liab", "Utang dagang + utang bank", true),
+            brow("Total ekuitas", "equity", "Modal disetor + laba ditahan − rugi kurs", true, SemanticTone.GOOD_GREEN)
+        )
+        val cf = e.lastCashFlow
+        val pcf = e.prevCashFlow
+        val dt = e.lastDetail
+        val pdt = e.prevDetail
+        fun drow(label: String, key: String, note: String, total: Boolean = false, indent: Boolean = true, forceShow: Boolean = false): List<FinancialRowItem> {
+            val cur = dt[key] ?: 0.0; val pr = pdt[key] ?: 0.0
+            if (!total && !forceShow && abs(cur) < 0.5 && abs(pr) < 0.5) return emptyList()
+            return listOf(FinancialRowItem((if (indent && !total) "    " else "") + label, if (dt.isEmpty()) "—" else signed(cur), if (pdt.isEmpty()) "—" else signed(pr), note, total,
+                if (total && cur < 0) SemanticTone.DANGER_RED else if (total) SemanticTone.GOOD_GREEN else SemanticTone.NEUTRAL_GRAY, stmtOrigin))
+        }
+        val cashFlowRows = listOf(FinancialRowItem("A. ARUS KAS OPERASI", "", "", "", true, SemanticTone.NEUTRAL_GRAY, stmtOrigin)) +
+            drow("Laba bersih", "d_ni", "Titik awal rekonsiliasi", forceShow = true) +
+            drow("Penyusutan (non-kas)", "d_dep", "Ditambahkan kembali", forceShow = true) +
+            drow("Perubahan piutang", "d_ar", "Penjualan kredit menahan kas", forceShow = true) +
+            drow("Perubahan persediaan", "d_inv", "Stok menahan kas", forceShow = true) +
+            drow("Perubahan utang dagang", "d_pay", "Pemasok membiayai sebagian modal kerja", forceShow = true) +
+            drow("Arus kas operasi", "cfo", "Bisa negatif walau laba positif", true) +
+            listOf(FinancialRowItem("B. ARUS KAS INVESTASI", "", "", "", true, SemanticTone.NEUTRAL_GRAY, stmtOrigin)) +
+            drow("Penggantian mesin (belanja modal rutin)", "d_capex_repl", "70% dari penyusutan", forceShow = true) +
+            drow("Proyek pemintalan", "d_capex_spin", "Tahapan proyek hulu") +
+            drow("Ekspansi dan investasi lain", "d_capex_exp", "Lini baru, otomasi, gudang, IPAL, mesin bekas") +
+            drow("Pembelian saham", "d_stock_buy", "Termasuk komisi broker") +
+            drow("Penjualan saham", "d_stock_sell", "Dikurangi komisi dan pajak jual") +
+            drow("Dividen saham diterima", "d_divin", "Dari emiten yang dimiliki") +
+            drow("Arus kas investasi", "cfi", "Belanja modal dan portofolio", true) +
+            listOf(FinancialRowItem("C. ARUS KAS PENDANAAN", "", "", "", true, SemanticTone.NEUTRAL_GRAY, stmtOrigin)) +
+            drow("Pencairan kredit baru", "d_newdebt", "Termasuk refinancing") +
+            drow("Pembayaran pokok pinjaman", "d_repay", "Cicilan, pelunasan paksa, pelunasan refinancing") +
+            drow("Fasilitas modal kerja (tarik/lunasi)", "d_rcf", "Revolving otomatis saat kas menipis") +
+            drow("Pelunasan paksa covenant", "d_forced", "Tuntutan bank setelah pelanggaran") +
+            drow("Penjualan piutang (factoring)", "d_factor", "Dana darurat dengan potongan 4%") +
+            drow("Dividen dibayar", "d_divpaid", "RUPS atau dividen khusus") +
+            drow("Suntikan ekuitas", "d_cure", "Equity cure pemegang saham") +
+            drow("Arus kas pendanaan", "cff", "Pinjaman, pemegang saham", true) +
+            drow("Perubahan kas bersih", "net", "Sama dengan perubahan kartu Kas (A + B + C)", true)
+        val eqRows = listOf(
+            FinancialRowItem("Ekuitas awal periode", if (dt.isEmpty()) "—" else money(dt["e_open"] ?: 0.0), if (pdt.isEmpty()) "—" else money(pdt["e_open"] ?: 0.0), "Ekuitas akhir bulan lalu", true, SemanticTone.NEUTRAL_GRAY, stmtOrigin)) +
+            drow("Laba bersih", "e_ni", "Dari laporan laba rugi", forceShow = true) +
+            drow("Nilai pasar saham dan dividen saham", "e_mtm", "Kenaikan atau penurunan nilai portofolio belum direalisasi") .map { it } +
+            drow("Dividen saham diterima", "e_divin", "Langsung masuk ekuitas") +
+            drow("Biaya transaksi saham", "e_fees", "Komisi broker dan pajak jual") +
+            drow("Biaya factoring", "e_factor", "Potongan penjualan piutang") +
+            drow("Rugi selisih kurs utang A$", "e_fx", "Belum direalisasi") +
+            drow("Dividen dibayar", "e_div", "Pembagian laba kepada pemegang saham") +
+            drow("Suntikan ekuitas", "e_cure", "Modal baru dari pemegang saham") +
+            listOf(FinancialRowItem("Ekuitas akhir periode", money(bal["equity"] ?: 0.0), money(pbal["equity"] ?: 0.0), "Sama dengan ekuitas di neraca", true, SemanticTone.GOOD_GREEN, stmtOrigin))
+        fun nrow(label: String, value: String, note: String, header: Boolean = false) =
+            FinancialRowItem(label, value, "", note, header, SemanticTone.NEUTRAL_GRAY, stmtOrigin)
+        val ageSum = { lo: Int, hi: Int -> e.stuffedBuckets.filter { (turn - 1 - it.first) in lo..hi }.sumOf { it.second } }
+        val notesRows = mutableListOf<FinancialRowItem>()
+        notesRows += nrow("Umur piutang", "", "", true)
+        notesRows += nrow("    Piutang normal (termin ≤ 60 hari)", money(e.normalAR), "Pelanggan reguler")
+        notesRows += nrow("    Piutang berisiko 0–1 bulan", money(ageSum(0, 1)), "Obral kredit baru")
+        notesRows += nrow("    Piutang berisiko 2–3 bulan", money(ageSum(2, 3)), "Mulai perlu ditagih")
+        notesRows += nrow("    Piutang berisiko 4–6 bulan", money(ageSum(4, 6)), "Perkiraan ${fmt(ageSum(4, 6) * KapitalEngine.STUFFED_LOSS)} jt RS akan macet (45%)")
+        notesRows += nrow("Utang bank", "", "", true)
+        for (l in e.loans.filter { it.balance > 0.5 }) {
+            val bs = if (l.currencyAud) l.balance * e.kurs else l.balance
+            notesRows += nrow("    ${l.lender}", money(bs), "Bunga ${fmt2(l.annualRatePct)}%${if (l.floatingSpreadPct != null) " mengambang" else " tetap"} · ${if (l.maturityTurn < 900) "jatuh tempo ${dateText(l.maturityTurn)}" else "revolving"}" +
+                (if (l.amortPerMonth > 0) " · cicilan ${fmt(l.amortPerMonth * (if (l.currencyAud) e.kurs else 1.0))} jt RS/bulan" else ""))
+        }
+        notesRows += nrow("Karyawan dan kapasitas", "", "", true)
+        notesRows += nrow("    Pekerja produksi", "$prod", "Rata-rata ${fmt1(laborPer)} jt RS per orang per bulan (di HPP)")
+        notesRows += nrow("    Staf dan manajemen", "$staff", "Rata-rata ${fmt1(salaryPer)} jt RS per orang per bulan (di beban operasional)")
+        notesRows += nrow("    Utilisasi kapasitas", "${fmt1(e.utilization() * 100)}%", "Permintaan ${fmt1(e.demandIdx() * 100)}% dari basis · kapasitas ${fmt1(e.capacityIdx() * 100)}%")
+        notesRows += nrow("Rasio keuangan", "", "", true)
+        notesRows += nrow("    Margin EBIT", "${fmt1(iv(inc, "ebit") / max(1.0, iv(inc, "revenue")) * 100)}%", "EBIT / pendapatan")
+        notesRows += nrow("    Perputaran kas (DSO + DIO − DPO)", "${(e.dso() + e.dio() - e.dpo()).toInt()} hari", "Makin panjang makin banyak kas tertahan")
+        notesRows += nrow("    ICR (EBIT / bunga, 3 bulan)", "${fmt2(e.ebitHist.takeLast(3).sum() / max(1.0, e.interestHist.takeLast(3).sum()))}x", "Batas covenant ${fmt2(e.covenantThreshold())}x")
+        notesRows += nrow("    Utang bersih / EBITDA", "${fmt2((e.totalDebt() - e.cash) / max(1.0, (e.ebitHist.takeLast(3).sum() + 3 * iv(inc, "dep")) * 4.0))}x", "Batas covenant 3,5x")
+        notesRows += nrow("    Rasio lancar", "${fmt2(curA / max(1.0, curL))}x", "Aset lancar / liabilitas lancar")
+        val ni = iv(inc, "ni")
+        val cfo = cf["cfo"] ?: 0.0
+        val accrual = if (ni > 0 && cfo < 0)
+            "Jebakan akrual: laba bersih ${signed(ni)} jt RS, tetapi arus kas operasi ${signed(cfo)} jt RS karena kas tertahan di piutang dan persediaan."
+        else null
+
+        // ---- Laporan konsolidasi grup dan per entitas (hanya bila ada anak usaha) ----
+        val anySub = e.subsidiaries.values.any { it.active || it.nationalized }
+        val groupRows = mutableListOf<FinancialRowItem>()
+        val entityRows = mutableListOf<FinancialRowItem>()
+        if (anySub) {
+            val gi = e.lastConsolidatedIncome; val gb = e.lastConsolidatedBalance; val gc = e.lastConsolidatedCashFlow; val ge = e.lastConsolidatedEquity
+            val gOrigin = origin("Laporan konsolidasi grup", "Bulan $closed", "Akuntansi grup", closed,
+                "Induk ditambah anak usaha aktif (kurs penutupan), dengan eliminasi pendapatan, beban dan dividen antar-entitas. Selisih kurs translasi (CTA) masuk ekuitas, bukan laba rugi.",
+                "Angka dalam jt RS; anak usaha dihitung dari pembukuan mata uang lokalnya.", ConfidenceTier.HIGH)
+            fun g(label: String, v: Double, note: String = "", total: Boolean = false, neg: Boolean = false) =
+                FinancialRowItem(label, money(v, neg && v != 0.0), "", note, total, SemanticTone.NEUTRAL_GRAY, gOrigin)
+            fun head(label: String) = FinancialRowItem(label, "", "", "", true, SemanticTone.NEUTRAL_GRAY, gOrigin)
+            fun m(map: Map<String, Double>, k: String) = map[k] ?: 0.0
+            groupRows += head("LABA RUGI KONSOLIDASI")
+            groupRows += g("Pendapatan grup", m(gi, "revenue"), "Setelah eliminasi pendapatan antar-entitas ${fmt(-m(gi, "elim_intercompany_rev"))} jt RS")
+            groupRows += g("Harga pokok penjualan", m(gi, "cogs"), "", neg = true)
+            groupRows += g("Beban operasional", m(gi, "opex"), "Setelah eliminasi beban antar-entitas", neg = true)
+            groupRows += g("EBIT grup", m(gi, "ebit"), "", total = true)
+            groupRows += g("Beban bunga", m(gi, "interest"), "", neg = true)
+            groupRows += g("Pajak penghasilan", m(gi, "tax"), "Pajak withholding dividen: ${fmt(m(gi, "wht_tax"))} jt RS", neg = true)
+            groupRows += g("Laba bersih grup", m(gi, "ni"), "", total = true)
+            if (m(gi, "ni_nci") != 0.0) {
+                groupRows += g("  diatribusikan ke pemilik induk", m(gi, "ni_parent"))
+                groupRows += g("  diatribusikan ke kepentingan non-pengendali", m(gi, "ni_nci"), "Bagian investor luar di anak usaha")
+            }
+            groupRows += head("NERACA KONSOLIDASI")
+            groupRows += g("Kas grup", m(gb, "cash")); groupRows += g("Piutang", m(gb, "ar")); groupRows += g("Persediaan", m(gb, "inv"))
+            groupRows += g("Aset tetap", m(gb, "fa")); groupRows += g("Goodwill", m(gb, "goodwill"))
+            groupRows += g("Total aset", m(gb, "assets"), "Investasi pada anak usaha dieliminasi: ${fmt(-m(gb, "elim_inv_subs"))} jt RS", total = true)
+            groupRows += g("Total liabilitas", m(gb, "liab"), "", total = true)
+            groupRows += g("Selisih kurs translasi (CTA)", m(gb, "cta_equity"), "Komponen ekuitas dari translasi anak usaha")
+            groupRows += g("Ekuitas grup", m(gb, "equity"), "Aset = liabilitas + ekuitas", total = true)
+            if (m(gb, "nci_equity") != 0.0) groupRows += g("  di antaranya kepentingan non-pengendali", m(gb, "nci_equity"), "Bagian investor luar atas ekuitas anak usaha")
+            groupRows += head("ARUS KAS KONSOLIDASI")
+            groupRows += g("Operasi", m(gc, "cfo")); groupRows += g("Investasi", m(gc, "cfi"), "Termasuk pembangunan anak usaha, dikurangi kas anak usaha yang diperoleh")
+            groupRows += g("Pendanaan", m(gc, "cff"), "Dividen internal dieliminasi")
+            groupRows += g("Pengaruh kurs atas kas anak usaha", m(gc, "fx_cash"))
+            if (m(gc, "seized_cash") != 0.0) groupRows += g("Kas disita (nasionalisasi)", m(gc, "seized_cash"))
+            groupRows += g("Perubahan kas grup", m(gc, "net"), "Cocok dengan selisih kas grup antar bulan", total = true)
+            groupRows += head("PERUBAHAN EKUITAS KONSOLIDASI")
+            groupRows += g("Ekuitas awal", m(ge, "open")); groupRows += g("Laba bersih grup", m(ge, "ni"))
+            groupRows += g("Penambahan modal, dividen, dan komponen langsung lain", m(ge, "direct"))
+            groupRows += g("Perubahan CTA", m(ge, "cta"))
+            if (m(ge, "deconsol") != 0.0) groupRows += g("Pelepasan anak usaha yang disita", m(ge, "deconsol"))
+            groupRows += g("Ekuitas akhir", m(ge, "close"), "", total = true)
+            // Per entitas (mata uang lokal)
+            val eOrigin = origin("Anak usaha per entitas", "Bulan $closed", "Akuntansi anak usaha", closed,
+                "Pembukuan tiap anak usaha dalam mata uang lokal; laba dan ekuitas diterjemahkan ke jt RS pada kurs penutupan.",
+                "Pendapatan anak usaha dihitung dari operasinya sendiri, tidak dari rumus tetap.", ConfidenceTier.HIGH)
+            for ((cid, sb) in e.subsidiaries) {
+                val fx = e.foreignMeta.getValue(cid).fxToRs
+                val cur = sb.spec.currencyCode
+                entityRows += FinancialRowItem(sb.spec.title, "", "", if (sb.nationalized) "Dinasionalisasi" else if (sb.active) "Aktif ${sb.monthsActive} bulan · kurs ${fmt2(fx)} RS/$cur" else "Dalam pembangunan", true, SemanticTone.NEUTRAL_GRAY, eOrigin)
+                if (sb.active && !sb.nationalized) {
+                    val li = sb.lastIncomeLocal
+                    fun lv(k: String) = li[k] ?: 0.0
+                    entityRows += FinancialRowItem("    Pendapatan bulan ini", "${fmt(lv("revenue"))} jt $cur", money(lv("revenue") * fx), "Utilisasi ${fmt1(sb.lastUtilization * 100)}%", false, SemanticTone.NEUTRAL_GRAY, eOrigin)
+                    entityRows += FinancialRowItem("    EBIT", "${fmt(lv("ebit"))} jt $cur", money(lv("ebit") * fx), "", false, SemanticTone.NEUTRAL_GRAY, eOrigin)
+                    entityRows += FinancialRowItem("    Laba bersih", "${fmt(lv("ni"))} jt $cur", money(lv("ni") * fx), "Laba kumulatif ${fmt(sb.cumulativeTranslatedNiRs)} jt RS vs investasi ${fmt(sb.spentRs)} jt RS", false, SemanticTone.NEUTRAL_GRAY, eOrigin)
+                    entityRows += FinancialRowItem("    Ekuitas lokal", "${fmt(sb.localEquity)} jt $cur", money(sb.localEquity * fx), "Utang bank lokal ${fmt(sb.localDebt)} jt $cur", false, SemanticTone.NEUTRAL_GRAY, eOrigin)
+                    entityRows += FinancialRowItem("    Dividen siap ditarik", "${fmt(sb.retainedForeign)} jt $cur", money(sb.retainedForeign * fx), "Pajak withholding berlaku saat repatriasi", false, SemanticTone.NEUTRAL_GRAY, eOrigin)
+                }
+            }
+        }
+
+        // ---- Eksekutif ----
+        val agedAR = e.stuffedBuckets.filter { turn - it.first >= 3 }.sumOf { it.second }
+        val executives = e.execs.map { x ->
+            val noise = ((seed xor x.id.hashCode().toLong()) % 100) / 500.0
+            val perceived = (x.loyalty + noise).coerceIn(0.0, 1.0)
+            val loyal = when { perceived > 0.6 -> "Tinggi?"; perceived > 0.35 -> "Sedang?"; else -> "Rendah?" }
+            val loyalTone = when { perceived > 0.6 -> SemanticTone.GOOD_GREEN; perceived > 0.35 -> SemanticTone.WARNING_YELLOW; else -> SemanticTone.DANGER_RED }
+            val signal = when (x.id) {
+                "exec_sales" -> "Sinyal: omzet bulan lalu ${fmt(iv(inc, "revenue"))} jt RS; piutang berumur >90 hari ${fmt(agedAR)} jt RS."
+                "exec_factory" -> "Sinyal: belanja perawatan bulan lalu ${fmt(iv(inc, "maint"))} jt RS vs kebutuhan teknis ±${fmt(610 * e.costIndex)} jt RS."
+                "exec_coo" -> {
+                    val gap = if (e.kickbackActive) 3.4 else 0.6
+                    "Sinyal: harga beli kapas ${fmt1(gap + noise * 5)}% di atas indeks bursa Tarsis."
+                }
+                else -> "Sinyal: rekonsiliasi kas cocok dengan rekening bank."
+            }
+            val audit = when {
+                !x.present -> "Posisi kosong sampai ${dateText(x.vacantUntil)}"
+                x.auditDueTurn >= 0 -> "Audit berjalan · hasil di laporan akhir bulan"
+                x.evidence == true -> "Audit: indikasi pelanggaran ditemukan (akurasi ±85%)"
+                x.evidence == false -> "Audit: tidak ditemukan bukti"
                 else -> "Belum diaudit"
             }
+            val scheme = when (x.id) {
+                "exec_sales" -> e.salesScheme.label
+                "exec_factory" -> e.factoryScheme.label
+                "exec_coo" -> "Bonus efisiensi dan ketepatan kirim"
+                else -> "Bonus stabilitas likuiditas dan audit bersih"
+            }
             Executive(
-                id = e.id,
-                initials = e.initials,
-                name = if (e.present) e.name else "${e.name} (posisi kosong)",
-                roleTitle = e.role,
-                loyaltyEstimate = loyLabel,
-                ambitionEstimate = if (e.id == "exec_sales") "Tinggi?" else "Sedang?",
-                skillEstimate = "Tinggi?",
-                horizonNote = if (e.id == "exec_cfo") "Jangka panjang" else "Kuartal ini",
+                id = x.id,
+                initials = if (x.present) x.initials else "—",
+                name = if (x.present) x.name else "Posisi kosong",
+                roleTitle = x.role,
+                loyaltyEstimate = if (x.present) loyal else "—",
+                ambitionEstimate = when (x.id) { "exec_sales" -> "Sangat tinggi?"; "exec_factory" -> "Tinggi?"; else -> "Sedang?" },
+                skillEstimate = when (x.id) {
+                    "exec_sales" -> "Agresif membuka pasar ritel"; "exec_factory" -> "Ahli mesin tenun"
+                    "exec_coo" -> "Kuat di logistik dan pengadaan"; else -> "Akuntansi akrual dan negosiasi bank"
+                },
+                horizonNote = if (x.replacement) "Baru bergabung" else "Rekam jejak sejak 2028",
                 incentiveScheme = scheme,
-                suspectedBehaviorNote = if (e.lastOutcome.isNotEmpty()) "${e.lastOutcome} · $suspect" else suspect,
-                loyaltyTone = loyTone,
-                originInfo = DataOriginInfo(
-                    title = "Profil: ${e.name}",
-                    displayedValue = "Loyalitas $loyLabel · $auditTxt",
-                    sourceName = "Pengamatan HRD & Audit Internal",
-                    dataDate = date,
-                    calculationMethod = "Loyalitas sejati tersembunyi. Audit forensik (2 AP, 150 jt RS) mendeteksi pelanggaran dengan akurasi ±85% (positif palsu ±10%).",
-                    uncertaintyAndBiasNote = "Mengganti orang tanpa mengubah skema insentif akan menghasilkan perilaku yang sama pada penggantinya.",
-                    confidence = ConfidenceTier.LOW
-                ),
-                present = e.present,
-                vacantNote = if (!e.present) "Pengganti masuk pada ${dateText(e.vacantUntil)} (selama kosong AP maksimum −1)." else "",
-                canAudit = e.present && e.auditDueTurn < 0 && e.evidence == null && eng.ap >= 2,
-                auditStatus = auditTxt,
-                canConfront = e.present && e.evidence == true && eng.ap >= 1,
-                canFire = e.present && eng.ap >= 1,
-                lastOutcome = e.lastOutcome
+                suspectedBehaviorNote = signal,
+                loyaltyTone = if (x.present) loyalTone else SemanticTone.NEUTRAL_GRAY,
+                originInfo = origin("Profil ${x.role}", "Loyalitas: $loyal", "Observasi HRD dan rapat", closed,
+                    "Tidak ada angka pasti. Perkiraan berasal dari perilaku yang terlihat.",
+                    "Perilaku sebenarnya hanya bisa dipastikan lewat audit, dan audit pun bisa keliru.", ConfidenceTier.LOW),
+                present = x.present, signalNote = signal, auditStatus = audit,
+                canAudit = x.present && x.evidence == null && x.auditDueTurn < 0 && e.ap >= 2,
+                canConfront = x.present && x.evidence == true && e.ap >= 1,
+                canFire = x.present && e.ap >= 1,
+                lastOutcome = x.lastOutcome
             )
         }
 
-    private fun buildGantt(): List<GanttTask> {
-        val elapsed = if (eng.spinningDecision == "approved" && eng.turn >= eng.spinningStartTurn) eng.turn - eng.spinningStartTurn else 0
-        val spinTasks = eng.spinningPhases.mapIndexed { idx, ph ->
-            val prog = (elapsed - ph.startMonth).coerceIn(0, ph.months)
-            val real = (ph.budget * prog / ph.months).roundToInt()
-            val status = when {
-                eng.spinningDecision == null -> "Menunggu persetujuan di Markas (3 AP)"
-                eng.spinningDecision == "rejected" -> "Ditolak"
-                prog >= ph.months -> "Selesai"
-                prog > 0 -> if (idx == 2 && eng.spinningDelayed) "Molor 3 bln (+18% biaya)" else "Berjalan ($prog/${ph.months} bln)"
-                else -> "Dijadwalkan"
-            }
-            val tone = when {
-                idx == 2 && eng.spinningDelayed && prog > 0 -> SemanticTone.DANGER_RED
-                prog >= ph.months -> SemanticTone.GOOD_GREEN
-                prog > 0 -> SemanticTone.PRIMARY_BLUE
-                else -> SemanticTone.NEUTRAL_GRAY
-            }
-            GanttTask(
-                id = "gantt_${idx + 1}",
-                projectName = "Pabrik pemintalan",
-                phaseName = ph.name,
-                startMonth = ph.startMonth + 1,
-                durationMonths = ph.months,
-                progressMonth = prog,
-                budgetRsMillion = ph.budget.roundToInt(),
-                realizedRsMillion = real,
-                statusLabel = status,
-                tone = tone,
-                noteFromStaff = if (idx == 2 && eng.spinningDelayed) "Tertahan pembatasan ekspor Kestrel; waktu +3 bulan dan biaya +18%."
-                else "Setelah seluruh fase selesai, rasio HPP turun bertahap hingga 5 poin dalam 6 bulan."
-            )
+        // ---- Kontrak ----
+        val contracts = mutableListOf<ContractItem>()
+        fun reviewAction(id: String) = if (id in e.reviewedContracts) emptyList()
+            else listOf(ContractActionItem("review", "Tinjau dengan penasihat hukum (1 AP, 50 jt RS)", e.ap >= 1))
+        val notReviewed = "Belum ditinjau penasihat hukum. Klausul berisiko tidak terlihat."
+        val bankB = e.loans.firstOrNull { it.id == "bank_b" && it.balance > 0.5 }
+        if (bankB != null) contracts += ContractItem("cnt_bank_b", "Kredit bank aktif", bankB.lender, "Sundara",
+            "${fmt(bankB.balance)} jt RS (mengambang ${fmt2(bankB.annualRatePct)}%)",
+            "Jatuh tempo ${dateText(bankB.maturityTurn)}", "ICR ≥ ${fmt1(bankB.covenantIcr)}x dan utang bersih/EBITDA ≤ 3,5x, diuji kuartalan.",
+            if ("cnt_bank_b" in e.reviewedContracts) "Cross-default: gagal covenant 3 kuartal berturut-turut memberi bank hak menyita Pabrik Kalimas. Perpanjangan saat jatuh tempo hanya jika kuartal terakhir lulus." else notReviewed,
+            SemanticTone.WARNING_YELLOW, originInfo = covOrigin, actions = reviewAction("cnt_bank_b"))
+        if (e.termSheetChosen == null && bankB != null) {
+            contracts += ContractItem("cnt_ts_1", "Term sheet #1", "Bank Pembangunan Sundara", "Sundara",
+                "${fmt(e.termSheetAmount())} jt RS (bunga tetap ${fmt2(e.termSheetFixedRate())}%)", "Tenor 48 bulan · cicilan merata ±${fmt(e.termSheetAmount() / 48.0)} jt RS/bulan",
+                "ICR ≥ 1,5x · agunan pabrik dengan haircut 25%.",
+                if ("cnt_ts_1" in e.reviewedContracts) "Aman dari kurs dan kenaikan bunga, tetapi cicilan pokok menyedot sekitar ${fmt(e.termSheetAmount() / 4.0)} jt RS kas per tahun." else notReviewed,
+                SemanticTone.PRIMARY_BLUE, originInfo = covOrigin,
+                actions = reviewAction("cnt_ts_1") + ContractActionItem("choose", "Pilih lewat jurnal keputusan (2 AP)", e.ap >= 2))
+            contracts += ContractItem("cnt_ts_2", "Term sheet #2", "Aurelia Global CitiTrust", "Aurelia",
+                "≈${fmt2(e.termSheetAudAmountRs() / e.kurs)} juta A$ (≈${fmt(e.termSheetAudAmountRs())} jt RS, bunga 5,2%)", "Tenor 36 bulan · bullet (pokok di akhir)",
+                "ICR ≥ 1,75x · klausul Material Adverse Change (MAC).",
+                if ("cnt_ts_2" in e.reviewedContracts) "JEBAKAN: utang dalam A$. Jika Rial anjlok, klausul MAC mengizinkan bank menaikkan bunga ke 9,2% dan menagih 30% pokok dalam 3 bulan." else notReviewed,
+                SemanticTone.PRIMARY_BLUE, originInfo = covOrigin,
+                actions = reviewAction("cnt_ts_2") + ContractActionItem("choose", "Pilih lewat jurnal keputusan (2 AP)", e.ap >= 2))
         }
-        val subTasks = eng.projectsInv.filter { it.type.startsWith("sub_") }.mapIndexed { i, p ->
-            val cid = p.type.removePrefix("sub_")
-            val spec = eng.subsidiarySpec(cid)
-            val prog = (eng.turn - p.startTurn).coerceIn(0, p.months)
-            GanttTask(
-                id = "gantt_sub_$i",
-                projectName = spec?.title ?: "Anak Usaha Luar Negeri",
-                phaseName = "Konstruksi & Izin Lintas Negara (${spec?.countryName ?: cid})",
-                startMonth = 1,
-                durationMonths = p.months,
-                progressMonth = if (p.done) p.months else prog,
-                budgetRsMillion = p.totalCost.roundToInt(),
-                realizedRsMillion = p.spent.roundToInt(),
-                statusLabel = if (p.done) "Beroperasi" else "Berjalan ($prog/${p.months} bln)",
-                tone = if (p.done) SemanticTone.GOOD_GREEN else SemanticTone.PRIMARY_BLUE,
-                noteFromStaff = spec?.benefitText ?: ""
-            )
+        for (l in e.loans.filter { it.id != "bank_b" && it.balance > 0.5 }) {
+            contracts += ContractItem("loan_${l.id}", "Pinjaman aktif", l.lender, if (l.currencyAud) "Aurelia" else "Sundara",
+                if (l.currencyAud) "${fmt2(l.balance)} juta A$ (≈${fmt(l.balance * e.kurs)} jt RS) · ${fmt1(l.annualRatePct)}%"
+                else "${fmt(l.balance)} jt RS · ${fmt1(l.annualRatePct)}%",
+                if (l.maturityTurn < 900) "Jatuh tempo ${dateText(l.maturityTurn)}" else "Cicilan berjalan",
+                if (l.covenantIcr > 0) "ICR ≥ ${fmt1(l.covenantIcr)}x" else "Tanpa covenant rasio",
+                if (l.currencyAud) "Nilai dalam Rial berubah mengikuti kurs." else "Cicilan pokok ${fmt(l.amortPerMonth)} jt RS/bulan.",
+                SemanticTone.NEUTRAL_GRAY, originInfo = covOrigin)
         }
-        return spinTasks + subTasks
-    }
+        contracts += ContractItem("cnt_sup_kestrel", "Pemasok Tier-2", "Kestrel Precision Loom Parts", "Kestrel",
+            "Suku cadang dan sensor tenun (±${fmt(1800.0 * e.sc.size)} jt RS/tahun)",
+            if (e.dualSourcing) "Dual sourcing aktif (HPP +1,2%)" else "Just-in-time · tanpa denda keterlambatan",
+            "Memasok 80% kebutuhan sensor dan jarum mesin tenun Kalimas.",
+            if ("cnt_sup_kestrel" in e.reviewedContracts) "Pemasok diam-diam memakai magnet dari Velmora (terkena sanksi Aurelia) dan bisa menahan kiriman saat kelangkaan untuk dijual ke pasar spot." else notReviewed,
+            if (e.dualSourcing) SemanticTone.GOOD_GREEN else SemanticTone.WARNING_YELLOW, originInfo = covOrigin,
+            actions = reviewAction("cnt_sup_kestrel") +
+                if (e.dualSourcing) emptyList() else listOf(ContractActionItem("dual", "Aktifkan dual sourcing (1 AP, HPP +1,2%)", e.ap >= 1)))
 
-    private fun buildContracts(date: String): List<ContractItem> {
-        val list = mutableListOf<ContractItem>()
-        for (l in eng.loans) {
-            if (l.balance <= 0.5 && l.id != "rcf") continue
-            val rev = l.id in eng.reviewedContracts
-            val valTxt = if (l.currencyAud) "${fmt2(l.balance)} jt A$ (≈ ${fmt(eng.loanBalanceRs(l))} jt RS)"
-            else "${fmt(l.balance)} jt RS"
-            val matTxt = if (l.maturityTurn < 900) "Jatuh tempo ${dateText(l.maturityTurn)} (${max(0, l.maturityTurn - eng.turn)} bln lagi)" else "Revolving s.d. ${fmt(eng.sc.rcfLimit)} jt RS"
-            val hidden = when (l.id) {
-                "bank_b" -> "Klausul tersembunyi: waiver pertama biaya 0,5% pokok + spread +1,5%; gagal kedua pelunasan paksa 15% pokok; gagal ketiga penyitaan pabrik."
-                "aurelia" -> "Klausul MAC: jika Rial melemah ≥10% dalam 1 bulan, bank berhak menuntut pelunasan paksa 30% pokok dalam 3 giliran dan menaikkan bunga ke 9,2%."
-                else -> "Klausul cross-default standar."
-            }
-            list += ContractItem(
-                id = l.id,
-                category = "Pinjaman Aktif",
-                counterparty = l.lender,
-                countryName = if (l.currencyAud) "Aurelia (A$)" else "Sundara (RS)",
-                valueText = "$valTxt · bunga ${fmt2(l.annualRatePct)}%",
-                maturityOrTenor = matTxt,
-                covenantOrClause = if (l.covenantIcr > 0) "ICR ≥ ${fmt2(l.covenantIcr)}x; Utang bersih/EBITDA ≤ 3,5x" else "Tanpa uji ICR terpisah",
-                hiddenRiskNote = if (rev) hidden else "Belum ditinjau konsultan hukum. Ketuk tombol untuk membuka klausul tersembunyi (1 AP, 50 jt RS).",
-                tone = if (l.id == "bank_b" && l.maturityTurn - eng.turn <= 4) SemanticTone.DANGER_RED else SemanticTone.WARNING_YELLOW,
-                apCostToAct = 1,
-                actionLabel = if (rev) "Klausul sudah ditinjau" else "Tinjau klausul hukum (1 AP)",
-                originInfo = DataOriginInfo(l.lender, valTxt, "Perjanjian Kredit", date, "Kewajiban kontraktual.", hidden, ConfidenceTier.HIGH),
-                reviewed = rev,
-                revealedClause = hidden,
-                canAct = !rev && eng.ap >= 1
-            )
-        }
-        list += ContractItem(
-            id = "act_dual",
-            category = "Rantai Pasok Komponen",
-            counterparty = if (eng.dualSourcing) "Kestrel Loom Parts + Halvenia Precision (Dual Sourcing)" else "Kestrel Precision Loom Parts (Pemasok Tunggal)",
-            countryName = "Kestrel",
-            valueText = if (eng.dualSourcing) "HPP +1,2% (aman dari hold-up, sanksi, & borongan pesaing)" else "650 jt RS/bln (rawan hold-up, sanksi Tier-2, & serangan pasokan pesaing)",
-            maturityOrTenor = "Kontrak berjalan",
-            covenantOrClause = "Sensor tenun Kestrel mengandung mineral Velmora (Tier-2)",
-            hiddenRiskNote = if (eng.dualSourcing) "Pemasok kedua sudah aktif: bebas dari penahanan kiriman dan denda sanksi."
-            else "Tanpa pemasok kedua, Kestrel bisa menahan kiriman (produksi −30%), Aurelia bisa menjatuhkan denda sanksi 600 jt RS, dan Mitra Tekstil bisa memborong pasokan.",
-            tone = if (eng.dualSourcing) SemanticTone.GOOD_GREEN else SemanticTone.WARNING_YELLOW,
-            apCostToAct = 1,
-            actionLabel = if (eng.dualSourcing) "Dual sourcing sudah aktif" else "Aktifkan pemasok kedua (1 AP)",
-            originInfo = DataOriginInfo("Kontrak Komponen Kestrel", "Tier-1 → Tier-2 Velmora", "Bagian Pengadaan", date,
-                "Biaya komponen masuk ke rasio HPP.", "Dual sourcing menambah HPP 1,2% tetapi menghilangkan risiko hold-up dan sanksi.", ConfidenceTier.MEDIUM),
-            reviewed = eng.dualSourcing,
-            canAct = !eng.dualSourcing && eng.ap >= 1
-        )
-        list += ContractItem(
-            id = "act_hedge",
-            category = "Lindung Nilai Bahan Baku",
-            counterparty = "Kontrak Berjangka Kapas Bursa Tarsis",
-            countryName = "Tarsis",
-            valueText = if (eng.hedgeActive) "Aktif s.d. ${dateText(eng.hedgeUntilTurn)}" else "Harga pasar (${fmt(eng.commodities.cotton.price)} A$/ton)",
-            maturityOrTenor = "6 bulan per kontrak",
-            covenantOrClause = "Mengunci indeks kapas pada harga saat ini + 2% (premi 60 jt RS)",
-            hiddenRiskNote = "Melindungi HPP dari lonjakan harga kapas karena El Niño atau borongan pesaing selama 6 giliran.",
-            tone = if (eng.hedgeActive) SemanticTone.GOOD_GREEN else SemanticTone.PRIMARY_BLUE,
-            apCostToAct = 1,
-            actionLabel = if (eng.hedgeActive) "Lindung nilai kapas aktif" else "Kunci harga kapas 6 bln (1 AP)",
-            originInfo = DataOriginInfo("Lindung Nilai Kapas", "Kontrak 6 bulan", "Meja Komoditas", date, "Mengunci porsi kapas dalam perhitungan HPP.", "", ConfidenceTier.HIGH),
-            reviewed = eng.hedgeActive,
-            canAct = !eng.hedgeActive && eng.ap >= 1
-        )
-        list += ContractItem(
-            id = "act_hedge_fx",
-            category = "Lindung Nilai Valas (Era 2)",
-            counterparty = "Kontrak Forward Valas RS/A$ (Meja Tresuri Meridia)",
-            countryName = "Aurelia / Meridia",
-            valueText = if (eng.fxHedgeActive) "Terkunci ${fmt(eng.hedgedKurs)} RS/A$ s.d. ${dateText(eng.fxHedgeUntilTurn)}" else "Kurs spot ${fmt(eng.kurs)} RS/A$",
-            maturityOrTenor = "6 bulan per kontrak",
-            covenantOrClause = "Mengunci nilai tukar RS/A$ untuk porsi HPP impor dan menutup 90% rugi selisih kurs utang A$",
-            hiddenRiskNote = "Melindungi neraca dan margin saat Rial jatuh akibat pemilu atau pengetatan suku bunga The Fed Aurelia.",
-            tone = if (eng.fxHedgeActive) SemanticTone.GOOD_GREEN else SemanticTone.PRIMARY_BLUE,
-            apCostToAct = 1,
-            actionLabel = if (eng.fxHedgeActive) "Forward valas aktif" else "Kunci Forward Valas RS/A$ 6 bln (1 AP)",
-            originInfo = DataOriginInfo("Kontrak Forward Valas RS/A$", "${fmt(eng.kurs)} RS/A$", "Meja Tresuri Valas", date,
-                "Menutup 90% kerugian translasi utang A$ dan membatasi dampak pelemahan kurs pada HPP.", "Premi forward 75 jt RS untuk 6 bulan.", ConfidenceTier.HIGH),
-            reviewed = eng.fxHedgeActive,
-            canAct = !eng.fxHedgeActive && eng.ap >= 1
-        )
-        return list
-    }
+        if (e.covenantBreaches >= 1 && !e.cureUsed) contracts += ContractItem("cnt_cure", "Hak equity cure", "Pemegang saham", "Sundara",
+            "Suntikan ekuitas ${fmt(e.sc.equityCure)} jt RS (sekali seumur permainan)",
+            "Berlaku selama ada pelanggaran covenant aktif",
+            "Menambah kas dan menurunkan hitungan pelanggaran satu tingkat. Tidak memperbaiki ICR.",
+            "Menunda masalah, bukan menyelesaikannya: jika laba operasi tidak pulih, pelanggaran terulang.",
+            SemanticTone.WARNING_YELLOW, originInfo = covOrigin,
+            actions = listOf(ContractActionItem("cure", "Suntik ekuitas (2 AP, sekali)", e.ap >= 2)))
+        contracts += ContractItem("cnt_hedge_kapas", "Kontrak berjangka kapas", "Bursa Komoditas Tarsis–Sundara", "Tarsis",
+            "Kunci harga kapas ${fmt1(e.commodities.cotton.price)} A$/ton (+2% premi) selama 6 bulan",
+            if (e.hedgeActive) "Aktif sampai ${dateText(e.hedgeUntilTurn)}" else "Belum ada lindung nilai · HPP mengikuti harga pasar",
+            "Biaya 60 jt RS. Melindungi dari kenaikan harga, tetapi Anda tidak menikmati penurunan harga selama kontrak.",
+            "Kapas ±45% dari biaya produksi. Harga kapas bisa bergerak ±25% per tahun dan melonjak saat El Niño.",
+            if (e.hedgeActive) SemanticTone.GOOD_GREEN else SemanticTone.WARNING_YELLOW, originInfo = covOrigin,
+            actions = if (e.hedgeActive) emptyList() else listOf(ContractActionItem("hedge", "Lindung nilai kapas 6 bulan (1 AP, 60 jt RS)", e.ap >= 1)))
 
-    private fun buildMarkets(date: String): List<MarketInstrument> {
-        val c = eng.commodities
-        fun seriesInst(id: String, name: String, ticker: String, unit: String, s: Commodities.Series, note: String, actionLabel: String? = null, actionOk: Boolean = false): MarketInstrument {
-            val h = s.history.map { it.toFloat() }
-            val chg = if (h.size >= 2) (h.last() / h[h.size - 2] - 1f) * 100f else 0f
-            val p = s.price.toFloat()
-            return MarketInstrument(
-                id = id, category = "Komoditas", name = name, ticker = ticker,
-                priceText = "${fmt1(s.price)} $unit",
-                changeText = "${if (chg >= 0) "+" else ""}${fmt1(chg.toDouble())}% bln ini · indeks ${fmt2(s.index)}x",
-                tone = if (s.index > 1.08) SemanticTone.DANGER_RED else if (s.index < 0.95) SemanticTone.GOOD_GREEN else SemanticTone.NEUTRAL_GRAY,
-                sparklineHistory = h,
-                fanProjectionMedian = List(6) { i -> p * (1f - 0.04f * (i + 1) * (s.index.toFloat() - 1f)) },
-                fanProjectionSpread = List(6) { i -> p * 0.05f * (i + 1) },
-                forensicMScoreNote = note,
-                originInfo = DataOriginInfo(name, "${fmt1(s.price)} $unit", "Bursa Komoditas", date,
-                    "Proses AR(1) pada log-harga + permintaan dunia + guncangan pasokan.", note, ConfidenceTier.HIGH),
-                actionLabel = actionLabel,
-                actionEnabled = actionOk
-            )
-        }
-        val kh = eng.kursHist.takeLast(6).map { it.toFloat() }
-        val kChg = if (kh.size >= 2) (kh.last() / kh[kh.size - 2] - 1f) * 100f else 0f
-        val kNow = eng.kurs.toFloat()
-        return listOf(
-            seriesInst("mkt_kapas", "Kapas Mentah (Tarsis Grade-A)", "CTN", "A$/ton", c.cotton,
-                if (eng.hedgeActive) "Lindung nilai kapas aktif s.d. ${dateText(eng.hedgeUntilTurn)}."
-                else "78% dari indeks bahan baku Anda. Ketuk di tab Kontrak atau di bawah untuk mengunci harga 6 bulan (1 AP).",
-                if (eng.hedgeActive) "Lindung nilai kapas aktif" else "Kunci harga kapas 6 bulan (1 AP, 60 jt RS)",
-                !eng.hedgeActive && eng.ap >= 1),
-            seriesInst("mkt_minyak", "Minyak Mentah Brent-Norvaldia", "OIL", "A$/barel", c.oil,
-                "22% dari indeks biaya bahan & energi pabrik Anda. Dipengaruhi ketegangan Selat Norvaldia."),
-            seriesInst("mkt_baja", "Baja Konstruksi (Kestrel)", "STL", "A$/ton", c.steel,
-                "Mempengaruhi harga suku cadang mesin Kestrel dan biaya konstruksi."),
-            MarketInstrument(
-                id = "mkt_kurs", category = "Kurs Valas", name = "Kurs Rial Sundara per Aurelia Dollar", ticker = "RS/A$",
-                priceText = "${fmt(eng.kurs)} RS",
-                changeText = "${if (kChg >= 0) "+" else ""}${fmt1(kChg.toDouble())}% bln ini (riil ${fmt2(eng.fxReal())}x)",
-                tone = if (kChg > 1.5f) SemanticTone.DANGER_RED else SemanticTone.WARNING_YELLOW,
-                sparklineHistory = kh,
-                fanProjectionMedian = List(6) { i -> kNow * (1f + 0.004f * (i + 1)) },
-                fanProjectionSpread = List(6) { i -> kNow * 0.025f * (i + 1) },
-                forensicMScoreNote = if (eng.fxHedgeActive)
-                    "Forward Valas aktif pada ${fmt(eng.hedgedKurs)} RS/A$ s.d. ${dateText(eng.fxHedgeUntilTurn)}."
-                else "Mengikuti paritas daya beli (selisih inflasi Sundara vs Aurelia) + kejutan pemilu. Mempengaruhi HPP impor dan nilai utang A$.",
-                originInfo = DataOriginInfo("Kurs Spot RS/A$", "${fmt(eng.kurs)} RS", "Pasar Valas Antarbank", date,
-                    "Mengikuti selisih inflasi (PPP) + guncangan pemilu.", "Utang dalam A$ dihitung ulang ke RS setiap akhir bulan.", ConfidenceTier.HIGH),
-                actionLabel = if (eng.fxHedgeActive) "Forward valas aktif" else "Kunci Forward Valas RS/A$ 6 bln (1 AP, 75 jt RS)",
-                actionEnabled = !eng.fxHedgeActive && eng.ap >= 1
-            )
-        )
-    }
-
-    private fun buildHoldings(): List<HoldingRow> =
-        eng.holdings.entries.mapNotNull { (id, lots) ->
-            val c = eng.bourse.company(id) ?: return@mapNotNull null
-            val basis = eng.costBasis[id] ?: 0.0
-            val avg = if (lots > 0) basis / (lots * KapitalEngine.LOT) else 0.0
-            val value = lots * KapitalEngine.LOT * c.price
-            val pnl = value - basis
-            val pct = if (basis > 0) pnl / basis * 100.0 else 0.0
-            HoldingRow(
-                id = id, ticker = c.spec.ticker, name = c.spec.name, lots = lots,
-                avgPriceText = "${fmt(avg)} RS", lastPriceText = "${fmt(c.price)} RS",
-                valueText = "${fmt(value)} jt RS",
-                pnlText = "${signed(pnl)} jt RS (${if (pct >= 0) "+" else ""}${fmt1(pct)}%)",
-                pnlTone = if (pnl >= 0) SemanticTone.GOOD_GREEN else SemanticTone.DANGER_RED
-            )
-        }
-
-    private fun buildStocks(): List<StockCard> =
-        eng.bourse.companies.map { c ->
-            val h = c.priceHist.map { it.toFloat() }
-            val chg = if (h.size >= 2 && h[h.size - 2] > 0f) (h.last() / h[h.size - 2] - 1f) * 100f else 0f
-            val eps = c.eps()
-            val per = if (eps > 1.0) "${fmt1(c.price / eps)}x" else "Rugi"
-            val pbv = if (c.bvps > 1.0) "${fmt2(c.price / c.bvps)}x" else "—"
-            val dy = if (c.price > 0) "${fmt1(c.lastDps / c.price * 100.0)}%" else "0%"
-            val roe = if (c.equity > 0) "${fmt1(c.ttmNi() / c.equity * 100.0)}%" else "—"
-            val ebitda12 = c.monthly.takeLast(12).sumOf { it.ebit + it.dep }
-            val de = if (ebitda12 > 1.0) "${fmt1((c.debt - c.cash) / ebitda12)}x" else "—"
-            val lots = eng.holdings[c.spec.id] ?: 0
-            val basis = eng.costBasis[c.spec.id] ?: 0.0
-            val valNow = lots * KapitalEngine.LOT * c.price
-            val unr = valNow - basis
-            val lotCost = KapitalEngine.LOT * c.price * (1.0 + KapitalEngine.BROKER_FEE)
-            val qs = c.quarters.asReversed().take(4).map { q ->
-                val l = q.last
-                StockQuarter(
-                    label = q.label,
-                    revenue = fmt(q.revenue), cogs = "(${fmt(q.cogs)})", opex = "(${fmt(q.opex)})", dep = "(${fmt(q.dep)})",
-                    ebit = fmt(q.ebit), interest = "(${fmt(q.interest)})", tax = "(${fmt(q.tax)})", ni = fmt(q.ni),
-                    ar = fmt(l.ar), inv = fmt(l.inv), fa = fmt(l.fa), ap = fmt(l.ap), debt = fmt(l.debt), equity = fmt(l.equity),
-                    cfo = signed(q.cfo), capex = "(${fmt(q.capex)})", dDebt = signed(q.dDebt),
-                    dividend = if (q.dividend > 0) "(${fmt(q.dividend)})" else "0",
-                    cashStart = fmt(q.cashStart), cashEnd = fmt(q.cashEnd),
-                    surprise = c.surpriseNote
+        // ---- Proyek ----
+        val gantt = mutableListOf<GanttTask>()
+        var ganttTitle = "Belum ada proyek aktif"
+        var totalMonths = 12
+        if (e.spinningDecision == "approved") {
+            val m = turn - e.spinningStartTurn
+            val phases = e.spinningPhases
+            val showPhases = if (m < 8 && e.spinningDelayed) listOf(
+                phases[0], phases[1], phases[2].copy(months = 4, budget = 5600.0), phases[3].copy(startMonth = 12)
+            ) else phases
+            totalMonths = showPhases.last().startMonth + showPhases.last().months
+            ganttTitle = "Pabrik pemintalan · mulai ${dateText(e.spinningStartTurn)}"
+            showPhases.forEachIndexed { i, ph ->
+                val prog = (m - ph.startMonth).coerceIn(0, ph.months)
+                val done = prog >= ph.months || e.spinningCompletedTurn > 0
+                gantt += GanttTask(
+                    "gantt_$i", "Pabrik pemintalan", ph.name, ph.startMonth + 1, ph.months,
+                    if (e.spinningCompletedTurn > 0) ph.months else prog,
+                    ph.budget.toInt(), (ph.budget * (if (done) 1.0 else prog.toDouble() / ph.months)).toInt(),
+                    when {
+                        done -> "Selesai"
+                        prog > 0 -> "Berjalan (bulan $prog/${ph.months})"
+                        else -> "Menunggu"
+                    },
+                    when {
+                        done -> SemanticTone.GOOD_GREEN
+                        prog > 0 -> SemanticTone.PRIMARY_BLUE
+                        else -> SemanticTone.NEUTRAL_GRAY
+                    },
+                    when (i) {
+                        2 -> "Mesin dari Kestrel; rawan tertunda bila kuota ekspor diperketat."
+                        3 -> "Biaya benang turun bertahap selama 6 bulan setelah selesai."
+                        else -> "Dibiayai 70% kredit investasi, 30% kas."
+                    }
                 )
             }
-            StockCard(
-                id = c.spec.id, ticker = c.spec.ticker, name = c.spec.name, sector = c.spec.sector,
-                blurb = c.spec.blurb, riskNote = c.spec.riskNote, listed = c.listed,
-                priceText = if (c.listed) "${fmt(c.price)} RS" else "SUSPEN (${fmt(c.price)} RS)",
-                changePctText = "${if (chg >= 0) "+" else ""}${fmt1(chg.toDouble())}%",
+        }
+
+        // ---- Jurnal, bias, kronik ----
+        val journals = e.journals.reversed().map {
+            CompletedJournalEntry(it.id, it.decisionTitle, it.turnSubmitted, it.evaluateAtTurn, it.reason, it.prediction,
+                it.confidencePct, it.failure, it.outcome != null,
+                it.outcome?.let { o -> val p = it.confidencePct / 100.0; val v = if (o) 1.0 else 0.0; (p - v) * (p - v) })
+        }
+        val evaluated = e.journals.filter { it.outcome != null }
+        val biases = BiasDetector.texts(e.biasFindings())
+
+        val chronicles = e.chronicle.reversed().map {
+            ChronicleEntry(it.turn, dateText(it.turn), "Era ${KapitalEngine.era(it.turn)}", it.title, it.description, it.causalChain,
+                canReplayCounterfactual = !engine.difficulty.ironman && it.actionIndex != null && turn - it.turn >= 12, actionIndex = it.actionIndex)
+        }
+
+        // ---- Pesaing dan pasar produk (estimasi intel ±1,5%, bukan angka pasti) ----
+        val intel = kotlin.random.Random(seed * 31L + turn * 17L)
+        val myRel = (1.0 + e.priceAdjPct / 100.0) * e.fxPassLevel()
+        val rivalItems = e.world.rivals.mapIndexed { idx, rv ->
+            val observed = rv.price * (1.0 + (intel.nextDouble() - 0.5) * 0.03)
+            val diff = (observed / myRel - 1.0) * 100.0
+            RivalItem(
+                id = rv.id, name = rv.name,
+                priceText = "${fmt2(observed * 100.0)} (indeks)",
+                vsYouText = when {
+                    !rv.active -> "—"
+                    diff < -1.0 -> "${fmt1(-diff)}% lebih murah dari Anda"
+                    diff > 1.0 -> "${fmt1(diff)}% lebih mahal dari Anda"
+                    else -> "sepadan dengan harga Anda"
+                },
+                statusText = when {
+                    !rv.active -> "Keluar pasar"
+                    rv.id == "riv_importir" && e.world.dumpingMonthsLeft > 0 -> "Membanting harga (dumping)"
+                    rv.weakMonths >= 4 -> "Tertekan: jual di bawah biaya ${rv.weakMonths} bulan"
+                    else -> "Bersaing normal"
+                },
                 tone = when {
-                    !c.listed -> SemanticTone.DANGER_RED
-                    chg >= 0.5f -> SemanticTone.GOOD_GREEN
-                    chg <= -0.5f -> SemanticTone.DANGER_RED
-                    else -> SemanticTone.NEUTRAL_GRAY
-                },
-                sparkline = h,
-                perText = per, pbvText = pbv, divYieldText = dy, roeText = roe, debtEbitdaText = de,
-                marketCapText = "${fmt(c.marketCap())} jt RS",
-                lastQuarterLabel = c.quarters.lastOrNull()?.label ?: "Menunggu rilis triwulan",
-                surpriseNote = c.surpriseNote.ifEmpty { "Laporan keuangan terbit tiap akhir triwulan (Maret, Juni, September, Desember)." },
-                quarters = qs,
-                heldLots = lots,
-                heldValueText = "${fmt(valNow)} jt RS",
-                avgCostText = if (lots > 0) "${fmt(basis / (lots * KapitalEngine.LOT))} RS" else "—",
-                unrealizedText = if (lots > 0) "${signed(unr)} jt RS" else "0 jt RS",
-                unrealizedTone = if (unr >= 0) SemanticTone.GOOD_GREEN else SemanticTone.DANGER_RED,
-                lotCostText = "${fmt(KapitalEngine.LOT * c.price)} jt RS / lot",
-                canBuy1 = c.listed && eng.ap >= 1 && eng.cash - lotCost >= 1500.0,
-                canBuy10 = c.listed && eng.ap >= 1 && eng.cash - 10 * lotCost >= 1500.0 && 10 * lotCost <= 0.5 * eng.totalAssets(),
-                canSell1 = c.listed && eng.ap >= 1 && lots >= 1,
-                canSellAll = c.listed && eng.ap >= 1 && lots >= 1
+                    !rv.active -> SemanticTone.NEUTRAL_GRAY
+                    rv.id == "riv_importir" && e.world.dumpingMonthsLeft > 0 -> SemanticTone.DANGER_RED
+                    rv.weakMonths >= 4 -> SemanticTone.WARNING_YELLOW
+                    else -> SemanticTone.PRIMARY_BLUE
+                }
             )
         }
+        val shareText = "${fmt1(e.playerShare() * 100.0)}% (awal 20%)"
+        val unempText = "${fmt1(e.world.unemployment)}%"
+        val marketNote = "Ketika Anda memotong harga, pesaing menyamai dalam beberapa bulan dan perang harga menggerus margin semua pihak. " +
+            "Menaikkan harga membuat Anda kehilangan pangsa karena pesaing tidak ikut naik."
 
-    private fun buildBanks(): List<BankCard> {
-        val m = eng.creditMetrics(5000.0)
-        val activeIds = eng.credit.active().map { it.bankId }.toSet()
-        return eng.credit.banks.map { b ->
-            val base = eng.credit.baseRate(b, eng.policyRate)
-            val sr = eng.credit.score(b, m, 5000.0, base + 1.0, eng.turn, 0.0)
-            val hardNo = b.kind == BankKind.STATE && m.covenantBreaches >= 2
-            val margin = sr.total - b.minScore
-            val chance = when {
-                hardNo -> "Sangat rendah (ada pelanggaran covenant)"
-                margin >= 12 -> "Tinggi"
-                margin >= 2 -> "Sedang (mungkin dipotong atau bersyarat)"
-                margin >= -6 -> "Tipis"
-                else -> "Rendah"
-            }
-            val weakLabel = when (sr.weakest) {
-                "cov" -> "Rasio penutupan bunga (ICR)"
-                "dscr" -> "Kemampuan bayar cicilan (DSCR)"
-                "lev" -> "Utang bersih / EBITDA"
-                "liq" -> "Likuiditas kas & current ratio"
-                "col" -> "Agunan bebas"
-                else -> "Rekam jejak covenant / DSO"
-            }
-            val block = when {
-                b.id in activeIds -> "Pengajuan di bank ini sedang diproses."
-                eng.credit.active().size >= 3 -> "Maksimal 3 pengajuan aktif sekaligus."
-                eng.ap < 2 -> "Butuh 2 AP untuk menyusun proposal kredit."
-                else -> null
-            }
-            BankCard(
-                id = b.id, name = b.name, banker = b.banker, bankerRole = b.bankerRole,
-                kindLabel = when (b.kind) {
-                    BankKind.COMMERCIAL -> "Bank Komersial"
-                    BankKind.STATE -> "Bank BUMN"
-                    BankKind.FOREIGN -> "Bank Asing (A$)"
-                    BankKind.SHADOW -> "Pinjaman Kilat (Non-Bank)"
-                },
-                foreign = b.foreign,
-                indicativeRateText = if (b.foreign) "±${fmt2(base)}% tetap dalam A$"
-                else "±${fmt2(base)}% – ${fmt2(base + 2.5)}% (mengambang: bunga acuan + spread)",
-                feeText = "Provisi ${fmt2(b.feePct)}%",
-                maxTenor = b.maxTenor,
-                maxAmountText = b.maxAmount?.let { "Maks ${fmt(it)} jt RS" } ?: "Sesuai kapasitas agunan & EBITDA",
-                reviewTurns = b.reviewTurns,
-                covenantText = if (b.covenantIcr > 0) "ICR ≥ ${fmt2(b.covenantIcr)}x" else "Tanpa uji ICR, tetapi pinjaman bisa ditarik sewaktu-waktu",
-                relationshipScore = (eng.credit.relationship[b.id] ?: 0.0).roundToInt(),
-                style = b.style,
-                incentive = b.incentive,
-                tell = b.tell,
-                estimatedChance = chance,
-                weakestFactor = weakLabel,
-                canApply = block == null,
-                blockReason = block
-            )
-        }
-    }
-
-    private fun buildCreditApps(): List<CreditAppUi> =
-        eng.credit.applications.asReversed().map { a ->
-            val b = eng.credit.bank(a.bankId)!!
-            val o = a.offer
-            val tone = when (a.status) {
-                AppStatus.OFFER, AppStatus.DISBURSED, AppStatus.ACCEPTED -> SemanticTone.GOOD_GREEN
-                AppStatus.REJECTED, AppStatus.EXPIRED -> SemanticTone.DANGER_RED
-                AppStatus.PROCESSING -> SemanticTone.PRIMARY_BLUE
-                AppStatus.DECLINED -> SemanticTone.NEUTRAL_GRAY
-            }
-            val label = when (a.status) {
-                AppStatus.PROCESSING -> "Sedang ditelaah"
-                AppStatus.OFFER -> "Penawaran siap"
-                AppStatus.REJECTED -> "Ditolak"
-                AppStatus.ACCEPTED -> "Menunggu pencairan"
-                AppStatus.DISBURSED -> "Sudah cair"
-                AppStatus.DECLINED -> "Ditolak oleh Anda"
-                AppStatus.EXPIRED -> "Kedaluwarsa"
-            }
-            val summary = if (o != null) {
-                val cur = if (b.foreign) "jt RS (dicairkan dalam A$)" else "jt RS"
-                val rTxt = if (o.spreadPct != null) "mengambang ${fmt2(o.ratePct)}% (acuan + ${fmt2(o.spreadPct)}%)" else "tetap ${fmt2(o.ratePct)}%"
-                val grace = if (o.graceMonths > 0) ", grace ${o.graceMonths} bln" else ""
-                val bul = if (o.bullet) ", pokok bullet saat jatuh tempo" else ""
-                "Disetujui ${fmt(o.amount)} $cur · bunga $rTxt · tenor ${o.tenor} bln$grace$bul · provisi ${fmt2(o.feePct)}% · covenant ICR ≥ ${fmt2(o.covenantIcr)}x"
-            } else ""
-            CreditAppUi(
-                id = a.id,
-                bankName = b.name,
-                banker = "${b.banker} (${b.bankerRole})",
-                amountText = "${fmt(a.amount)} jt RS",
-                tenorText = "${a.tenor} bulan",
-                purposeText = a.purpose.label,
-                structureText = "${if (a.floating) "Bunga mengambang" else "Bunga tetap"} · ${if (a.bullet) "Pokok jatuh tempo (bullet)" else "Amortisasi bulanan"}",
-                statusLabel = label,
-                statusTone = tone,
-                stageText = a.stageText,
-                officialReason = a.officialReason,
-                informalNote = a.informalNote,
-                offerSummary = summary,
-                offerTerms = o?.extraTerms ?: emptyList(),
-                hiddenTerms = if (a.reviewed) (o?.hiddenTerms ?: emptyList()) else emptyList(),
-                reviewed = a.reviewed,
-                canReview = a.status == AppStatus.OFFER && !a.reviewed && eng.ap >= 1,
-                canAccept = a.status == AppStatus.OFFER && eng.ap >= 1,
-                canDecline = a.status == AppStatus.OFFER,
-                expiresText = if (a.status == AppStatus.OFFER) "Berlaku s.d. ${dateText(a.offerExpiresTurn)}" else ""
-            )
-        }
-
-    private fun buildBiases(): List<String> {
-        val list = mutableListOf<String>()
-        if (eng.stuffingActive) list += "Ilusi Laba Akrual: Anda masih memakai bonus berbasis omzet; laba terlihat tinggi sementara piutang rapuh menumpuk."
-        if (eng.deferralActive) list += "Diskon Hiperbolik: Perawatan mesin masih ditunda (${eng.deferredMonths} bulan) demi menghemat kas jangka pendek."
-        if (eng.loans.any { it.id == "aurelia" && it.balance > 0 } && !eng.fxHedgeActive) {
-            list += "Risiko Mata Uang Terbuka: Anda meminjam dalam A$ tanpa kontrak Forward Valas; jika Rial melemah, saldo utang RS membengkak."
-        }
-        if (eng.ethicsLoad >= 2.0) {
-            list += "Bom Waktu Etika: Jejak jalan pintas (${eng.ethicsEvidences.size} bukti) meningkatkan risiko skandal saat saksi keluar atau pemilu."
-        }
-        if (eng.world.rivals.any { it.warningSignal.isNotBlank() }) {
-            list += "Intelijen Pesaing AI: ${eng.world.rivals.first { it.warningSignal.isNotBlank() }.warningSignal}"
-        }
-        if (list.isEmpty()) list += "Disiplin Kas & Operasional: Insentif selaras dengan kas tertagih dan keandalan mesin."
-        return list
-    }
-
-    private fun buildEventDialog(): EventDialogModel {
-        val ev = eng.openEvents.firstOrNull { it.id == activeEventId } ?: eng.openEvents.firstOrNull()
-        if (ev == null) {
-            return EventDialogModel("none", "Tidak ada kejadian mendesak", "", "", emptyList())
-        }
-        val left = ev.deadlineTurn - eng.turn
-        val dl = if (left <= 0) "Tenggat berakhir akhir giliran ini" else "Tenggat ${left + 1} giliran"
-        return EventDialogModel(
-            id = ev.id,
-            title = "${ev.category}: ${ev.title}",
-            contextDescription = "${ev.body} ($dl.)",
-            earlyWarningNote = "Peringatan dini: ${ev.warning}",
-            options = ev.options.filter { it.id != "z" }.map { o ->
-                EventOptionItem(o.id, o.title, o.apCost, o.impact, o.advisor, toneOf(o.tone))
+        return GameState(
+            hasSavedGame = log.isNotEmpty() || e.turn > e.sc.turn0,
+            companyEquityText = "${fmt(e.equity)} jt RS",
+            rivals = rivalItems,
+            actionPoints = e.ap,
+            credit = CreditView.credit(e),
+            actors = CreditView.actors(e, executives, closed),
+            bourse = BourseView.build(e, origin("Bursa Efek Sundara", "Harga penutupan", "Bursa Efek Sundara (BES)", "Bulan $closed", "Harga bergerak dari nilai wajar (laba 12 bulan x P/E yang bergantung suku bunga) ditambah sentimen pasar. Laporan dirilis resmi tiap akhir triwulan.", "Harga bisa menyimpang jauh dari nilai wajar dalam jangka pendek.", ConfidenceTier.HIGH)),
+            playerShareText = shareText,
+            unemploymentText = unempText,
+            marketNote = marketNote,
+            dateText = dateText(turn),
+            turn = turn,
+            eraNumber = KapitalEngine.era(turn),
+            eraName = "Era ${KapitalEngine.era(turn)}: ${KapitalEngine.ERA_NAMES[KapitalEngine.era(turn) - 1]}",
+            apCurrent = e.ap,
+            apMax = e.apMax,
+            runwayMonths = e.runwayMonths(),
+            isDarkTheme = ui.isDarkTheme,
+            seed = seed,
+            covenantTone = covTone,
+            memos = e.memos.map { MemoItem(it.from, it.role, it.text) },
+            monthlyReportTitle = e.lastReportTitle,
+            monthlyReportLines = e.lastReport.map { ReportLineItem(it.text, tone(it.tone)) },
+            showMonthlyReport = ui.showMonthlyReport,
+            gameOverReason = e.gameOverReason,
+            evaluationTitle = if (e.gameOverReason != null) e.evaluateCampaign().let { "Kelas ${it.grade} · ${it.archetypeTitle} · skor ${it.totalScore}/100" } else "",
+            difficultyLabel = e.difficulty.label,
+            cashRs = e.cash,
+            equityRs = e.equity,
+            autosaves = autosaveViews(),
+            postMortemLines = if (e.gameOverReason != null) e.postMortem().lines() else emptyList(),
+            prediction = predictionView(e),
+            evaluationRows = if (e.gameOverReason != null) e.evaluateCampaign().let {
+                listOf(
+                    "Nilai perusahaan riil (30%)" to "${it.nilaiPerusahaanScore}/100",
+                    "Ketahanan (20%)" to "${it.ketahananScore}/100",
+                    "Kualitas keputusan dan kalibrasi (20%)" to "${it.kualitasKeputusanScore}/100",
+                    "Etika dan reputasi (15%)" to "${it.etikaReputasiScore}/100",
+                    "Dampak sosial (15%)" to "${it.dampakSosialScore}/100"
+                )
+            } else emptyList(),
+            salesSchemeLabel = e.salesScheme.name,
+            factorySchemeLabel = e.factoryScheme.name,
+            salesSchemeOptions = SalesScheme.entries.map { it.name to it.label },
+            factorySchemeOptions = FactoryScheme.entries.map { it.name to it.label },
+            priceAdjPct = e.priceAdjPct,
+            counterfactualText = ui.counterfactualText,
+            ganttTitle = ganttTitle,
+            ganttTotalMonths = totalMonths,
+            periodLabel = closed,
+            prevPeriodLabel = prevClosed,
+            accrualWarning = accrual,
+            covenantWarningTitle = covTitle,
+            covenantWarningSubtitle = covSub,
+            covenantOrigin = covOrigin,
+            featuredNewsSource = featured?.mediaSlant?.outletName ?: "",
+            featuredNewsConfidence = featured?.confidence ?: ConfidenceTier.MEDIUM,
+            featuredNewsHeadline = featured?.headline ?: "",
+            featuredNewsFooter = "+${max(0, newsItems.size - 1)} sudut pandang lain · ${newsItems.count { it.isRumor }} rumor",
+            markasIndicators = indicators,
+            cashHistoryPoints = hist,
+            cashFanMedianPoints = median,
+            cashFanBand50Points = s50,
+            cashFanBand90Points = s90,
+            pendingDecisions = decisions,
+            completedJournals = journals,
+            morningPaperEdition = newsItems,
+            countries = countries,
+            mapPieces = StaticWorldData.mapPieces(),
+            activeMapLayer = ui.activeMapLayer,
+            pairwiseTensions = liveTensions(e),
+            worldLayer = worldLayerView(e),
+            intel = intelView(e),
+            productMarket = productMarketView(e),
+            operations = operationsView(e),
+            incomeStatementRows = incomeRows,
+            balanceSheetRows = balanceRows,
+            cashFlowRows = cashFlowRows,
+            equityRows = eqRows,
+            notesRows = notesRows,
+            groupRows = groupRows,
+            entityRows = entityRows,
+            investments = investItems,
+            investSummary = investSummary,
+            executives = executives,
+            ganttTasks = gantt,
+            contracts = contracts,
+            marketInstruments = markets,
+            brierScore = e.brierScore(),
+            evaluatedJournals = evaluated.size,
+            detectedBiases = biases,
+            worldChronicles = chronicles,
+            activeEventDialog = run {
+                val ev = e.openEvents.firstOrNull { it.id == ui.activeEventId } ?: e.openEvents.firstOrNull()
+                if (ev == null) EventDialogModel("none", "Tidak ada kartu aktif", "Tidak ada kejadian yang menunggu keputusan.", "", emptyList())
+                else EventDialogModel(ev.id, ev.title, ev.body, ev.warning,
+                    ev.options.filter { it.id != "z" }.map { EventOptionItem(it.id, it.title, it.apCost, it.impact, it.advisor, tone(it.tone)) })
             },
-            isCascadingChain = ev.category.contains("Rantai")
+            eventOutcomeText = ui.eventOutcome,
+            showEventDialog = ui.showEventDialog,
+            inspectedDataOrigin = ui.inspectedOrigin,
+            selectedCountryForSheet = ui.selectedCountry
         )
-    }
-
-    private fun buildMapPieces(): List<MapPiece> {
-        val base = mutableListOf(
-            MapPiece("pc_pabrik_1", MapTokenType.PABRIK, "Pabrik Tenun Kalimas (4 lini + ${eng.extraLines} ekspansi)", "sundara", 0.56f, 0.52f,
-                "Utilisasi ${(eng.utilization() * 100 * eng.lastProdFactor).roundToInt().coerceIn(20, 100)}%"),
-            MapPiece("pc_gudang_1", MapTokenType.GUDANG, "Gudang Bahan & Benang Kalimas", "sundara", 0.62f, 0.58f,
-                "DIO ${eng.dio().roundToInt()} hari"),
-            MapPiece("pc_toko_1", MapTokenType.TOKO, "Jaringan Peritel Sundara", "sundara", 0.50f, 0.60f,
-                "DSO ${eng.dso().roundToInt()} hari"),
-            MapPiece("pc_kapal_1", MapTokenType.KAPAL, "Jalur Komponen Kestrel → Sundara", "kestrel", 0.72f, 0.34f,
-                if (eng.dualSourcing) "Dual sourcing aktif" else "Pemasok tunggal"),
-            MapPiece("pc_kapal_2", MapTokenType.KAPAL, "Kapal Kapas Tarsis → Sundara", "tarsis", 0.30f, 0.72f,
-                "Indeks kapas ${fmt2(eng.commodities.cotton.index)}x")
-        )
-        eng.subsidiaries.values.filter { it.active && !it.nationalized }.forEach { sub ->
-            val (nx, ny) = when (sub.spec.countryId) {
-                "tarsis" -> 0.25f to 0.72f
-                "kestrel" -> 0.78f to 0.24f
-                "halvenia" -> 0.45f to 0.22f
-                else -> 0.46f to 0.43f
-            }
-            base += MapPiece(
-                id = "pc_sub_${sub.spec.countryId}",
-                type = if (sub.spec.countryId in listOf("tarsis", "kestrel")) MapTokenType.PABRIK else MapTokenType.TOKO,
-                label = sub.spec.title,
-                countryId = sub.spec.countryId,
-                normX = nx,
-                normY = ny,
-                statusNote = "Anak usaha aktif (${fmt1(sub.retainedForeign)} jt ${sub.spec.currencyCode})"
-            )
-        }
-        return base
-    }
-
-    private fun buildTensions(): List<PairwiseTension> {
-        val kstMeta = eng.foreignMeta.getValue("kestrel")
-        val nrvMeta = eng.foreignMeta.getValue("norvaldia")
-        val vlmMeta = eng.foreignMeta.getValue("velmora")
-        return listOf(
-            PairwiseTension(
-                "Aurelia ↔ Kestrel", "Selat Kestrel & Kuota Komponen", kstMeta.tensionScore,
-                "Tahap: Tarif Bea Masuk (${fmt1(kstMeta.tariffPct)}%) & Kuota Ekspor",
-                if (eng.dualSourcing || eng.subsidiaries["kestrel"]?.active == true) "Anda terlindungi oleh dual sourcing / pabrik lokal Kestrel."
-                else "Tanpa dual sourcing, kiriman suku cadang berisiko tertahan dan terkena tarif.",
-                if (kstMeta.tensionScore >= 65) SemanticTone.DANGER_RED else SemanticTone.WARNING_YELLOW
-            ),
-            PairwiseTension(
-                "Aurelia ↔ Velmora", "Sanksi Ekstrateritorial", vlmMeta.tensionScore,
-                "Tahap: Sanksi Keuangan & Pelacakan Tier-2",
-                if (eng.sanctionHit) "Anda telah terkena denda sanksi 600 jt RS." else "Sensor Kestrel memakai mineral Velmora; risiko denda sanksi sekunder.",
-                SemanticTone.DANGER_RED
-            ),
-            PairwiseTension(
-                "Halvenia ↔ Norvaldia", "Koridor Energi & Selat Norvaldia", nrvMeta.tensionScore,
-                "Tahap: Gesekan Pelayaran & Bea Karbon CBAM",
-                "Premi asuransi kargo dan harga minyak (${fmt1(eng.commodities.oil.price)} A$/barel) sensitif terhadap selat ini.",
-                SemanticTone.WARNING_YELLOW
-            )
-        )
-    }
-
-    private fun buildCountries(date: String): List<Country> {
-        val mToElection = eng.electionTurn - eng.turn
-        val elTxt = when {
-            mToElection > 0 -> "Pemilu dalam $mToElection giliran (${dateText(eng.electionTurn)})"
-            mToElection == 0 -> "Pemilu berlangsung giliran ini"
-            else -> "Pemilu selesai ${-mToElection} bln lalu"
-        }
-        fun fw(id: String) = eng.foreign.getValue(id)
-        fun fm(id: String) = eng.foreignMeta.getValue(id)
-        fun fInf(id: String): String { val x = fw(id).inflation; return "${fmt1(x - 0.5)}–${fmt1(x + 0.5)}%" }
-        fun fPol(id: String): String = "${fmt2(fw(id).policyRate)}%"
-        fun fGdp(id: String, base: Double): String = "${ signed(base + fw(id).gap * 25.0).replace("−", "-") }%"
-        val pieces = buildMapPieces()
-        return listOf(
-            Country(
-                id = "sundara", name = "Sundara", currencyCode = "RS",
-                archetype = "Negara Berkembang Manufaktur (Negara Asal)",
-                opportunity = "Basis Pabrik Kalimas; pasar domestik 50.000 rumah tangga; PPh Badan 22%",
-                mainRisk = "Pemadaman listrik kawasan, siklus subsidi pemilu, dan fluktuasi Rial",
-                centralBankStyle = "Aturan Taylor (target inflasi 3%, merespons kesenjangan output & kurs)",
-                inflationRange = "${(eng.inflationAnnual - 1).roundToInt().coerceAtLeast(0)}–${(eng.inflationAnnual + 1).roundToInt()}%",
-                policyRate = "${fmt2(eng.policyRate)}%",
-                gdpGrowth = "${fmt1((eng.econ - 1.0) * 100.0 + 4.8)}%",
-                tensionScore = if (mToElection in 0..3) 58 else 42,
-                electionCountdown = elTxt,
-                electricityReliability = "Sedang (risiko pemadaman bergilir)",
-                climateRiskLabel = "Banjir musiman & El Niño",
-                supplyChainRole = "Pabrik tenun utama, pasar ritel domestik",
-                polygonPoints = listOf(0.48f to 0.44f, 0.66f to 0.42f, 0.70f to 0.62f, 0.52f to 0.66f, 0.44f to 0.56f),
-                pieces = pieces.filter { it.countryId == "sundara" },
-                originInfo = DataOriginInfo("Profil Makro Sundara", "Bunga ${fmt2(eng.policyRate)}% · Kurs ${fmt(eng.kurs)} RS/A$",
-                    "Bank Sentral & BPS Sundara", date, "Simulasi 50.000 agen rumah tangga + 4 pesaing + aturan Taylor.", "", ConfidenceTier.MEDIUM),
-                fxToRsText = "1,00 RS (Mata uang induk)",
-                corpTaxText = "PPh 22% (Efektif grup ${fmt1(eng.effectiveTaxRate() * 100)}%)",
-                tariffText = "Bea masuk domestik 0%",
-                hasSubsidiary = true
-            ),
-            Country(
-                id = "aurelia", name = "Aurelia", currencyCode = "A$",
-                archetype = "Negara Maju Konsumen & Penerbit Mata Uang Cadangan",
-                opportunity = "Pinjaman A$ berbunga rendah & pasar ekspor garmen",
-                mainRisk = "Sanksi ekstrateritorial & klausul MAC saat Rial melemah",
-                centralBankStyle = "Independen, mandat ganda",
-                inflationRange = fInf("aurelia"), policyRate = fPol("aurelia"), gdpGrowth = fGdp("aurelia", 2.1),
-                tensionScore = fm("aurelia").tensionScore, electionCountdown = "22 giliran lagi",
-                electricityReliability = "99,8%", climateRiskLabel = "Rendah",
-                supplyChainRole = "Kreditur A$ (Aurelia CitiTrust) & pengawas sanksi",
-                polygonPoints = listOf(0.06f to 0.12f, 0.28f to 0.10f, 0.30f to 0.34f, 0.10f to 0.38f, 0.04f to 0.25f),
-                pieces = emptyList(),
-                originInfo = DataOriginInfo("Profil Makro Aurelia", "Kurs ${fmt(eng.kurs)} RS/A$", "Federal Reserve Aurelia", date, "Penerbit A$.", "", ConfidenceTier.HIGH),
-                fxToRsText = "${fmt(fm("aurelia").fxToRs)} RS / A$",
-                corpTaxText = "PPh ${fmt1(fm("aurelia").profile.corpTaxPct)}%",
-                tariffText = "Tarif impor ${fmt1(fm("aurelia").tariffPct)}%"
-            ),
-            Country(
-                id = "kestrel", name = "Kestrel", currencyCode = "KST",
-                archetype = "Raksasa Manufaktur & Pemasok Mesin Tenun",
-                opportunity = "Suku cadang mesin presisi & Pabrik Patungan Era 2",
-                mainRisk = "Kuota ekspor komponen, hold-up pemasok tunggal, & perang tarif",
-                centralBankStyle = "Menjaga kurs kompetitif untuk ekspor",
-                inflationRange = fInf("kestrel"), policyRate = fPol("kestrel"), gdpGrowth = fGdp("kestrel", 4.6),
-                tensionScore = fm("kestrel").tensionScore, electionCountdown = "Kongres 30 giliran",
-                electricityReliability = "96%", climateRiskLabel = "Topan pesisir",
-                supplyChainRole = "Pemasok Tier-1 sensor tenun & mesin pintal",
-                polygonPoints = listOf(0.68f to 0.10f, 0.92f to 0.12f, 0.94f to 0.36f, 0.72f to 0.38f, 0.66f to 0.24f),
-                pieces = pieces.filter { it.countryId == "kestrel" },
-                originInfo = DataOriginInfo("Profil Makro Kestrel", "Pemasok komponen & anak usaha", "Bea Cukai Kestrel", date, "Pemasok mesin.", "", ConfidenceTier.MEDIUM),
-                fxToRsText = "${fmt1(fm("kestrel").fxToRs)} RS / KST",
-                corpTaxText = "PPh ${fmt1(fm("kestrel").profile.corpTaxPct)}% · WHT ${fmt1(fm("kestrel").profile.withholdingTaxPct)}%",
-                tariffText = "Tarif ${fmt1(fm("kestrel").tariffPct)}%",
-                hasSubsidiary = eng.subsidiaries["kestrel"]?.active == true
-            ),
-            Country(
-                id = "tarsis", name = "Tarsis", currencyCode = "TRS",
-                archetype = "Negara Agraris Pemasok Kapas & Buruh Murah",
-                opportunity = "Kapas mentah & Pabrik Hulu Kapas Tarsis (Era 2)",
-                mainRisk = "Kekeringan El Niño yang memicu gagal panen & tuntutan serikat berantai",
-                centralBankStyle = "Reaktif terhadap inflasi pangan",
-                inflationRange = fInf("tarsis"), policyRate = fPol("tarsis"), gdpGrowth = fGdp("tarsis", 5.5),
-                tensionScore = fm("tarsis").tensionScore, electionCountdown = "16 giliran lagi",
-                electricityReliability = "78%", climateRiskLabel = "Tinggi (El Niño)",
-                supplyChainRole = "Pemasok utama kapas mentah",
-                polygonPoints = listOf(0.14f to 0.60f, 0.38f to 0.58f, 0.40f to 0.86f, 0.16f to 0.88f, 0.10f to 0.74f),
-                pieces = pieces.filter { it.countryId == "tarsis" },
-                originInfo = DataOriginInfo("Profil Makro Tarsis", "Indeks kapas ${fmt2(eng.commodities.cotton.index)}x", "Bursa Pertanian Tarsis", date, "Sumber kapas.", "", ConfidenceTier.MEDIUM),
-                fxToRsText = "${fmt1(fm("tarsis").fxToRs)} RS / TRS",
-                corpTaxText = "PPh ${fmt1(fm("tarsis").profile.corpTaxPct)}% · WHT ${fmt1(fm("tarsis").profile.withholdingTaxPct)}%",
-                tariffText = "Tarif ${fmt1(fm("tarsis").tariffPct)}%",
-                hasSubsidiary = eng.subsidiaries["tarsis"]?.active == true
-            ),
-            Country(
-                id = "halvenia", name = "Halvenia", currencyCode = "HLV",
-                archetype = "Negara Maju Berstandar Lingkungan Tinggi (ESG & CBAM)",
-                opportunity = "Pemasok kedua komponen (dual sourcing) & Cabang Garmen ESG Era 2",
-                mainRisk = "Biaya tinggi & denda pajak karbon CBAM jika pabrik induk belum punya IPAL",
-                centralBankStyle = "Konservatif anti-inflasi",
-                inflationRange = fInf("halvenia"), policyRate = fPol("halvenia"), gdpGrowth = fGdp("halvenia", 1.5),
-                tensionScore = fm("halvenia").tensionScore, electionCountdown = "28 giliran lagi",
-                electricityReliability = "99,9%", climateRiskLabel = "Rendah",
-                supplyChainRole = "Pemasok alternatif komponen mesin & pasar premium ESG",
-                polygonPoints = listOf(0.34f to 0.08f, 0.54f to 0.08f, 0.56f to 0.28f, 0.36f to 0.30f),
-                pieces = pieces.filter { it.countryId == "halvenia" },
-                originInfo = DataOriginInfo("Profil Makro Halvenia", "Standar ESG & CBAM", "Institut Statistik Halvenia", date, "Pemasok alternatif & pasar premium.", "", ConfidenceTier.HIGH),
-                fxToRsText = "${fmt(fm("halvenia").fxToRs)} RS / HLV",
-                corpTaxText = "PPh ${fmt1(fm("halvenia").profile.corpTaxPct)}% · WHT ${fmt1(fm("halvenia").profile.withholdingTaxPct)}%",
-                tariffText = "Tarif ${fmt1(fm("halvenia").tariffPct)}%",
-                hasSubsidiary = eng.subsidiaries["halvenia"]?.active == true
-            ),
-            Country(
-                id = "norvaldia", name = "Norvaldia", currencyCode = "NRV",
-                archetype = "Eksportir Minyak dan Gas",
-                opportunity = "Kontrak energi jangka panjang",
-                mainRisk = "Ketegangan Selat Norvaldia mendongkrak harga minyak",
-                centralBankStyle = "Mengikuti harga minyak",
-                inflationRange = fInf("norvaldia"), policyRate = fPol("norvaldia"), gdpGrowth = fGdp("norvaldia", 3.2),
-                tensionScore = fm("norvaldia").tensionScore, electionCountdown = "19 giliran lagi",
-                electricityReliability = "91%", climateRiskLabel = "Sedang",
-                supplyChainRole = "Pemasok energi kawasan",
-                polygonPoints = listOf(0.56f to 0.10f, 0.66f to 0.10f, 0.65f to 0.32f, 0.55f to 0.32f),
-                pieces = emptyList(),
-                originInfo = DataOriginInfo("Profil Makro Norvaldia", "Minyak ${fmt1(eng.commodities.oil.price)} A$/barel", "Kementerian Energi", date, "Eksportir minyak.", "", ConfidenceTier.LOW),
-                fxToRsText = "${fmt1(fm("norvaldia").fxToRs)} RS / NRV",
-                corpTaxText = "PPh ${fmt1(fm("norvaldia").profile.corpTaxPct)}%",
-                tariffText = "Tarif ${fmt1(fm("norvaldia").tariffPct)}%"
-            ),
-            Country(
-                id = "meridia", name = "Meridia", currencyCode = "MRD",
-                archetype = "Pusat Keuangan, Holding SPV, & Pelabuhan Bebas",
-                opportunity = "Holding SPV PPh 8,5%, efisiensi Transfer Pricing, & pemotongan pajak dividen 50%",
-                mainRisk = "Pemeriksaan pajak lintas batas jika memakai Transfer Pricing Agresif",
-                centralBankStyle = "Dewan mata uang terikat A$",
-                inflationRange = fInf("meridia"), policyRate = fPol("meridia"), gdpGrowth = fGdp("meridia", 3.6),
-                tensionScore = fm("meridia").tensionScore, electionCountdown = "38 giliran lagi",
-                electricityReliability = "99,9%", climateRiskLabel = "Kenaikan muka laut",
-                supplyChainRole = "Pelabuhan transshipment & pusat tresuri multinasional",
-                polygonPoints = listOf(0.41f to 0.36f, 0.51f to 0.36f, 0.51f to 0.43f, 0.41f to 0.43f),
-                pieces = pieces.filter { it.countryId == "meridia" },
-                originInfo = DataOriginInfo("Profil Makro Meridia", "PPh Badan 8,5% · WHT 0%", "Otoritas Moneter Meridia", date, "Hub keuangan & SPV.", "", ConfidenceTier.HIGH),
-                fxToRsText = "${fmt(fm("meridia").fxToRs)} RS / MRD",
-                corpTaxText = "PPh 8,5% · WHT 0%",
-                tariffText = "Pelabuhan bebas (0%)",
-                hasSubsidiary = eng.subsidiaries["meridia"]?.active == true
-            ),
-            Country(
-                id = "velmora", name = "Velmora", currencyCode = "VLM",
-                archetype = "Negara Kaya Mineral dalam Sanksi Aurelia",
-                opportunity = "Mineral industri & kain murah",
-                mainRisk = "Sumber mineral Tier-2 pada sensor Kestrel & sumber kain dumping",
-                centralBankStyle = "Kontrol modal ketat",
-                inflationRange = fInf("velmora"), policyRate = fPol("velmora"), gdpGrowth = fGdp("velmora", 1.2),
-                tensionScore = fm("velmora").tensionScore, electionCountdown = "Tidak terjadwal",
-                electricityReliability = "82%", climateRiskLabel = "Kekeringan",
-                supplyChainRole = "Pemasok Tier-2 mineral & pesaing impor murah",
-                polygonPoints = listOf(0.74f to 0.54f, 0.95f to 0.52f, 0.96f to 0.84f, 0.72f to 0.86f, 0.68f to 0.68f),
-                pieces = emptyList(),
-                originInfo = DataOriginInfo("Profil Makro Velmora", "Dalam sanksi Aurelia", "Estimasi Intelijen", date, "Risiko sanksi sekunder.", "", ConfidenceTier.LOW),
-                fxToRsText = "${fmt1(fm("velmora").fxToRs)} RS / VLM",
-                corpTaxText = "PPh ${fmt1(fm("velmora").profile.corpTaxPct)}%",
-                tariffText = "Tarif ${fmt1(fm("velmora").tariffPct)}%"
-            )
-        )
-    }
-
-    companion object {
-        const val DEFAULT_SEED = 203303L
     }
 }

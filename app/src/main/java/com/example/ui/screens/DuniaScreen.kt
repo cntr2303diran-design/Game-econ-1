@@ -1,40 +1,38 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.HistoryEdu
-import androidx.compose.material.icons.outlined.Psychology
-import androidx.compose.material.icons.outlined.Public
-import androidx.compose.material.icons.outlined.VerifiedUser
+import androidx.compose.material.icons.outlined.HowToVote
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.model.*
+import com.example.ui.components.ConfidenceBadge
 import com.example.ui.components.semanticToneColor
 import com.example.ui.components.semanticToneContainerColor
 import com.example.ui.theme.KapitalSemanticColors
 import com.example.ui.theme.MonoFontFamily
-import com.example.ui.theme.NotoSerifFontFamily
-import java.util.Locale
 
 @Composable
 fun DuniaScreen(
     gameState: GameState,
     onOpenKronikDunia: () -> Unit,
-    onSelectCountry: (Country) -> Unit,
-    onSetDifficulty: (String) -> Unit = {},
+    onInspectOrigin: (DataOriginInfo) -> Unit,
     modifier: Modifier = Modifier
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
@@ -50,38 +48,45 @@ fun DuniaScreen(
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.weight(1.1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    KronikDuniaBannerCard(
-                        chronicleCount = gameState.worldChronicles.size,
-                        onOpenKronikDunia = onOpenKronikDunia
-                    )
-                    if (gameState.campaignEvaluation != null) {
-                        CampaignEvaluationDetailCard(eval = gameState.campaignEvaluation)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Indikator Makro 8 Negara",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Ketuk untuk Asal data",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-                    DifficultySelectorCard(
-                        currentDifficulty = gameState.difficultyName,
-                        difficultyLabel = gameState.difficultyLabel,
-                        difficultyDesc = gameState.difficultyDesc,
-                        onSetDifficulty = onSetDifficulty
-                    )
-                    BrierCalibrationCard(
-                        brierScore = gameState.brierScore,
-                        detectedBiases = gameState.detectedBiases,
-                        completedJournals = gameState.completedJournals
-                    )
+
+                    gameState.countries.forEach { country ->
+                        WorldCountryMacroCard(
+                            country = country,
+                            onInspectOrigin = onInspectOrigin
+                        )
+                    }
                 }
 
                 Column(
-                    modifier = Modifier.weight(1.1f),
+                    modifier = Modifier.weight(0.9f),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    GeopoliticalTensionTable(tensions = gameState.pairwiseTensions)
-                    WorldDirectoryMacroTable(
-                        countries = gameState.countries,
-                        onSelectCountry = onSelectCountry
-                    )
+                    KronikDuniaActionBanner(onOpenKronikDunia = onOpenKronikDunia)
+
+                    PairwiseTensionSection(tensions = gameState.pairwiseTensions)
+
+                    ElectionCalendarSection(countries = gameState.countries)
+
+                    WorldLayerSection(layer = gameState.worldLayer)
                 }
             }
         } else {
@@ -92,37 +97,33 @@ fun DuniaScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                KronikDuniaBannerCard(
-                    chronicleCount = gameState.worldChronicles.size,
-                    onOpenKronikDunia = onOpenKronikDunia
+                KronikDuniaActionBanner(onOpenKronikDunia = onOpenKronikDunia)
+
+                PairwiseTensionSection(tensions = gameState.pairwiseTensions)
+
+                ElectionCalendarSection(countries = gameState.countries)
+
+                WorldLayerSection(layer = gameState.worldLayer)
+
+                Text(
+                    text = "Daftar Negara & Indikator Makro (Inflasi, Bunga, Pertumbuhan)",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                if (gameState.campaignEvaluation != null) {
-                    CampaignEvaluationDetailCard(eval = gameState.campaignEvaluation)
+
+                gameState.countries.forEach { country ->
+                    WorldCountryMacroCard(
+                        country = country,
+                        onInspectOrigin = onInspectOrigin
+                    )
                 }
-                DifficultySelectorCard(
-                    currentDifficulty = gameState.difficultyName,
-                    difficultyLabel = gameState.difficultyLabel,
-                    difficultyDesc = gameState.difficultyDesc,
-                    onSetDifficulty = onSetDifficulty
-                )
-                BrierCalibrationCard(
-                    brierScore = gameState.brierScore,
-                    detectedBiases = gameState.detectedBiases,
-                    completedJournals = gameState.completedJournals
-                )
-                GeopoliticalTensionTable(tensions = gameState.pairwiseTensions)
-                WorldDirectoryMacroTable(
-                    countries = gameState.countries,
-                    onSelectCountry = onSelectCountry
-                )
             }
         }
     }
 }
 
 @Composable
-private fun KronikDuniaBannerCard(
-    chronicleCount: Int,
+private fun KronikDuniaActionBanner(
     onOpenKronikDunia: () -> Unit
 ) {
     Surface(
@@ -130,237 +131,50 @@ private fun KronikDuniaBannerCard(
         shape = RoundedCornerShape(6.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
-            .border(1.dp, KapitalSemanticColors.blue.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-            .clickable { onOpenKronikDunia() }
-            .defaultMinSize(minHeight = 64.dp)
-            .testTag("open_kronik_dunia_card")
+            .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.HistoryEdu,
-                    contentDescription = "Kronik Dunia",
-                    tint = KapitalSemanticColors.blue,
-                    modifier = Modifier.size(26.dp)
-                )
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        text = "Kronik Dunia & Cabang 'Bagaimana Jika'",
-                        style = MaterialTheme.typography.titleLarge.copy(fontFamily = NotoSerifFontFamily),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "$chronicleCount babak sejarah tercatat · Putar ulang keputusan masa lalu dari seed deterministik",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
-                contentDescription = "Buka Kronik Dunia",
-                tint = KapitalSemanticColors.blue
-            )
-        }
-    }
-}
-
-@Composable
-private fun CampaignEvaluationDetailCard(eval: CampaignEvaluationUi) {
-    val gradeColor = when (eval.grade) {
-        "S", "A" -> KapitalSemanticColors.green
-        "B", "C" -> KapitalSemanticColors.blue
-        "D" -> KapitalSemanticColors.yellow
-        else -> KapitalSemanticColors.red
-    }
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(6.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
-            .testTag("dunia_campaign_evaluation_card")
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.VerifiedUser,
-                        contentDescription = null,
-                        tint = gradeColor,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Column {
-                        Text(
-                            text = "Evaluasi Kampanye 5 Komponen & Skor Etika",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = eval.archetypeTitle,
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                            color = gradeColor
-                        )
-                    }
-                }
-                Surface(
-                    color = gradeColor.copy(alpha = 0.14f),
-                    shape = RoundedCornerShape(4.dp),
-                    modifier = Modifier.border(1.dp, gradeColor.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                ) {
-                    Text(
-                        text = "Nilai ${eval.grade} (${eval.totalScore}/100)",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontFamily = MonoFontFamily,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = gradeColor,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                }
-            }
-
-            Text(
-                text = eval.summaryText,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            val pillars: List<Triple<String, Int, String>> = listOf(
-                Triple("1. Nilai Perusahaan & Solvabilitas", eval.nilaiPerusahaanScore, "Pertumbuhan ekuitas, kas, dan kepatuhan covenant bank"),
-                Triple("2. Ketahanan Operasional & Rantai Pasok", eval.ketahananScore, "Utilisasi kapasitas, cadangan kas, dan diversifikasi anak usaha"),
-                Triple("3. Kualitas Keputusan & Kalibrasi Brier", eval.kualitasKeputusanScore, "Kepercayaan dewan (${eval.boardTrust}/100) & akurasi prediksi jurnal"),
-                Triple("4. Etika Korporasi & Reputasi Publik", eval.etikaReputasiScore, "${eval.ethicsRiskLabel} · Bukti: ${eval.ethicsEvidencesCount} · Skandal: ${eval.scandalsCount}"),
-                Triple("5. Dampak Sosial, Pekerja & Lingkungan", eval.dampakSosialScore, "Kesejahteraan 50.000 rumah tangga Sundara, K3, dan dekarbonisasi")
-            )
-
-            pillars.forEach { (title, score, subtitle) ->
-                val tone = when {
-                    score >= 75 -> SemanticTone.GOOD_GREEN
-                    score >= 50 -> SemanticTone.WARNING_YELLOW
-                    else -> SemanticTone.DANGER_RED
-                }
-                val barCol = semanticToneColor(tone)
-                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
-                        Text(
-                            "$score/100",
-                            style = MaterialTheme.typography.labelMedium.copy(fontFamily = MonoFontFamily, fontWeight = FontWeight.Bold),
-                            color = barCol
-                        )
-                    }
-                    LinearProgressIndicator(
-                        progress = { (score / 100f).coerceIn(0f, 1f) },
-                        modifier = Modifier.fillMaxWidth().height(5.dp),
-                        color = barCol,
-                        trackColor = KapitalSemanticColors.border
-                    )
-                    Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DifficultySelectorCard(
-    currentDifficulty: String,
-    difficultyLabel: String,
-    difficultyDesc: String,
-    onSetDifficulty: (String) -> Unit
-) {
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(6.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
-            .testTag("difficulty_selector_card")
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Tingkat Kesulitan Simulasi",
-                    style = MaterialTheme.typography.titleLarge,
+                    text = "Arsip Sejarah & Pohon Sebab-Akibat",
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = difficultyLabel,
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontFamily = MonoFontFamily,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = KapitalSemanticColors.blue
+                    text = "Telusuri rantai transmisi makro-mikro sejak Januari 2030",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Text(
-                text = difficultyDesc,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            Spacer(modifier = Modifier.width(10.dp))
+            Button(
+                onClick = onOpenKronikDunia,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ),
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .testTag("kronik_dunia_button")
             ) {
-                val options = listOf(
-                    "MAGANG" to "Magang",
-                    "MANAJER" to "Manajer",
-                    "DIREKTUR" to "Direktur",
-                    "KRISIS_ABADI" to "Krisis Abadi"
-                )
-                options.forEach { (code, label) ->
-                    val selected = currentDifficulty == code
-                    FilterChip(
-                        selected = selected,
-                        onClick = { onSetDifficulty(code) },
-                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .defaultMinSize(minHeight = 48.dp)
-                            .testTag("difficulty_chip_${code.lowercase()}")
-                    )
-                }
+                Icon(Icons.Outlined.HistoryEdu, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Kronik Dunia")
             }
         }
     }
 }
 
 @Composable
-private fun BrierCalibrationCard(
-    brierScore: Double,
-    detectedBiases: List<String>,
-    completedJournals: List<CompletedJournalEntry>
+private fun PairwiseTensionSection(
+    tensions: List<PairwiseTension>
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
@@ -373,172 +187,64 @@ private fun BrierCalibrationCard(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Psychology,
-                        contentDescription = null,
-                        tint = KapitalSemanticColors.blue,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Text(
-                        text = "Kalibrasi Prediksi (Skor Brier) & Bias Kognitif",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-
-                Surface(
-                    color = KapitalSemanticColors.yellowContainer,
-                    shape = RoundedCornerShape(4.dp)
-                ) {
-                    Text(
-                        text = String.format(Locale.US, "Brier %.2f", brierScore),
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontFamily = MonoFontFamily,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = KapitalSemanticColors.yellow,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-            }
-
             Text(
-                text = "Skor Brier 0.00 = kalibrasi sempurna; >0.20 = terlalu percaya diri (overconfidence). Diukur dari Jurnal Keputusan yang telah jatuh tempo.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            HorizontalDivider(color = KapitalSemanticColors.border)
-
-            Text(
-                text = "Bias Pengambilan Keputusan yang Terdeteksi:",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            detectedBiases.forEach { bias ->
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(4.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = "• $bias",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(10.dp)
-                    )
-                }
-            }
-
-            if (completedJournals.isNotEmpty()) {
-                HorizontalDivider(color = KapitalSemanticColors.border)
-                Text(
-                    text = "Evaluasi Jurnal Keputusan Terdahulu:",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                completedJournals.forEach { entry ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(4.dp))
-                            .padding(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(entry.decisionTitle, style = MaterialTheme.typography.labelLarge)
-                            Text(
-                                "Giliran ${entry.turnSubmitted} · Keyakinan ${entry.confidencePct}%",
-                                style = MaterialTheme.typography.labelSmall.copy(fontFamily = MonoFontFamily),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Text("Prediksi Anda: ${entry.numericPrediction}", style = MaterialTheme.typography.bodySmall)
-                        Text(
-                            "Kenyataan: ${entry.outcomeText ?: "Menunggu jatuh tempo evaluasi (Giliran ${entry.evaluateAtTurn})"}",
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
-                            color = KapitalSemanticColors.yellow
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun GeopoliticalTensionTable(tensions: List<PairwiseTension>) {
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(6.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Text(
-                text = "Skor Ketegangan Antarnegara (0–100) & Sanksi",
-                style = MaterialTheme.typography.titleLarge,
+                text = "Skor Ketegangan Antarnegara (0–100) & Selat Strategis",
+                style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
 
             tensions.forEach { item ->
-                val toneColor = semanticToneColor(item.tone)
-                val toneBg = semanticToneContainerColor(item.tone)
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(4.dp))
-                        .padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
+                val col = semanticToneColor(item.tone)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "${item.pairLabel} (${item.straitOrBorder})",
+                            text = item.pairLabel,
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        Surface(
-                            color = toneBg,
-                            shape = RoundedCornerShape(4.dp)
-                        ) {
-                            Text(
-                                text = "Skor ${item.score}/100 · ${item.escalationStage}",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontFamily = MonoFontFamily,
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = toneColor,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
-                        }
+                        Text(
+                            text = "${item.score} / 100",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontFamily = MonoFontFamily,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = col
+                        )
                     }
 
+                    // Bar 0..100
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(fraction = (item.score / 100f).coerceIn(0f, 1f))
+                                .fillMaxHeight()
+                                .background(col)
+                        )
+                    }
+
+                    Text(
+                        text = "${item.straitOrBorder} · ${item.escalationStage}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = col
+                    )
                     Text(
                         text = item.businessEffect,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    HorizontalDivider(
+                        color = KapitalSemanticColors.border.copy(alpha = 0.5f),
+                        modifier = Modifier.padding(top = 4.dp)
                     )
                 }
             }
@@ -547,9 +253,50 @@ private fun GeopoliticalTensionTable(tensions: List<PairwiseTension>) {
 }
 
 @Composable
-private fun WorldDirectoryMacroTable(
-    countries: List<Country>,
-    onSelectCountry: (Country) -> Unit
+private fun WorldLayerSection(layer: WorldLayerView) {
+    if (layer.rows.isEmpty() && layer.lines.isEmpty()) return
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(6.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
+            .testTag("dunia_lanjutan")
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "Dunia Lanjutan: Utang, Peringkat, Bank, Data Resmi",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            layer.rows.forEach { row ->
+                val col = semanticToneColor(row.tone)
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(row.countryName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Peringkat ${row.rating}", style = MaterialTheme.typography.labelMedium, color = col)
+                    }
+                    Text(
+                        "${row.debtText} · ${row.yieldText} · ${row.curveText}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            HorizontalDivider(color = KapitalSemanticColors.border.copy(alpha = 0.5f))
+            layer.lines.forEach { (k, v) ->
+                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    Text(k, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+                    Text(v, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ElectionCalendarSection(
+    countries: List<Country>
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
@@ -567,67 +314,165 @@ private fun WorldDirectoryMacroTable(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.Public,
+                    imageVector = Icons.Outlined.HowToVote,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(20.dp)
+                    tint = KapitalSemanticColors.yellow,
+                    modifier = Modifier.size(18.dp)
                 )
                 Text(
-                    text = "Kalender Pemilu, Tarif & Suku Bunga 8 Negara",
-                    style = MaterialTheme.typography.titleLarge,
+                    text = "Kalender Pemilu & Siklus Politik",
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
 
             countries.forEach { country ->
-                val tone = when {
-                    country.tensionScore >= 70 -> SemanticTone.DANGER_RED
-                    country.tensionScore >= 45 -> SemanticTone.WARNING_YELLOW
-                    else -> SemanticTone.GOOD_GREEN
-                }
-                val toneColor = semanticToneColor(tone)
+                val isUrgent = country.id == "sundara"
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .defaultMinSize(minHeight = 52.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable { onSelectCountry(country) }
-                        .padding(vertical = 6.dp, horizontal = 4.dp)
-                        .testTag("dunia_country_row_${country.id}"),
+                        .padding(vertical = 3.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.weight(1.2f)) {
-                        Text(
-                            text = "${country.name} (${country.currencyCode})",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = country.electionCountdown,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    Column(
-                        horizontalAlignment = Alignment.End,
+                    Text(
+                        text = "${country.name} (${country.centralBankStyle})",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f)
+                    )
+                    Surface(
+                        color = if (isUrgent) KapitalSemanticColors.yellowContainer else MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(4.dp)
                     ) {
                         Text(
-                            text = "Bunga ${country.policyRate} · Tarif ${country.tariffText}",
-                            style = MaterialTheme.typography.labelMedium.copy(fontFamily = MonoFontFamily),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Kurs ${country.fxToRsText}",
-                            style = MaterialTheme.typography.labelSmall.copy(fontFamily = MonoFontFamily),
-                            color = toneColor
+                            text = country.electionCountdown,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontFamily = MonoFontFamily,
+                                fontWeight = if (isUrgent) FontWeight.Bold else FontWeight.Normal
+                            ),
+                            color = if (isUrgent) KapitalSemanticColors.yellow else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                         )
                     }
                 }
-                HorizontalDivider(color = KapitalSemanticColors.border)
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun WorldCountryMacroCard(
+    country: Country,
+    onInspectOrigin: (DataOriginInfo) -> Unit
+) {
+    val tensionTone = when {
+        country.tensionScore >= 60 -> SemanticTone.DANGER_RED
+        country.tensionScore >= 40 -> SemanticTone.WARNING_YELLOW
+        else -> SemanticTone.GOOD_GREEN
+    }
+
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(6.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
+            .combinedClickable(
+                onClick = { onInspectOrigin(country.originInfo) },
+                onLongClick = { onInspectOrigin(country.originInfo) }
+            )
+            .testTag("world_country_card_${country.id}")
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "${country.name} (${country.currencyCode})",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = country.archetype,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                ConfidenceBadge(confidence = country.originInfo.confidence)
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                MacroStatCell("Inflasi", country.inflationRange, Modifier.weight(1f))
+                MacroStatCell("Bunga Acuan", country.policyRate, Modifier.weight(1f))
+                MacroStatCell("Pertumbuhan", country.gdpGrowth, Modifier.weight(1f))
+                MacroStatCell(
+                    label = "Ketegangan",
+                    value = "${country.tensionScore}/100",
+                    modifier = Modifier.weight(1f),
+                    valueColor = semanticToneColor(tensionTone)
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Pemilu: ${country.electionCountdown} · Listrik: ${country.electricityReliability}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    imageVector = Icons.Outlined.Info,
+                    contentDescription = "Asal data",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MacroStatCell(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(4.dp),
+        modifier = modifier
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontFamily = MonoFontFamily,
+                    fontWeight = FontWeight.Bold
+                ),
+                color = valueColor
+            )
         }
     }
 }

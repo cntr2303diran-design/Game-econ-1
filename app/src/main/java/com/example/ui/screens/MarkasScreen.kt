@@ -17,6 +17,10 @@ import androidx.compose.material.icons.outlined.Newspaper
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,18 +40,22 @@ fun MarkasScreen(
     onOpenKoranPagi: () -> Unit,
     onOpenJurnalKeputusan: (Decision) -> Unit,
     onOpenEventDialog: (String) -> Unit,
-    onRejectProposal: (String) -> Unit,
-    onEquityCure: () -> Unit,
-    onNewGame: () -> Unit,
     onInspectOrigin: (DataOriginInfo) -> Unit,
     onAdvanceTurn: () -> Unit,
-    modifier: Modifier = Modifier
+    onAdjustPrice: (Int) -> Unit,
+    onShowLastReport: () -> Unit,
+    onNewGame: () -> Unit,
+    onOpenChronicle: () -> Unit,
+    modifier: Modifier = Modifier,
+    onOpenMenu: () -> Unit = {}
 ) {
+    val gameOver = gameState.gameOverReason
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isLandscapeWide = maxWidth >= 700.dp
         val scrollState = rememberScrollState()
 
         if (isLandscapeWide) {
+            // Mode Landscape / Tablet: 2 Kolom Terminal Eksekutif (Kiri: Peringatan, Koran Pagi, Indikator; Kanan: FanChart, Menunggu Keputusan, Kalibrasi, Akhiri Giliran)
             Row(
                 modifier = Modifier
                     .fillMaxSize()
@@ -59,24 +67,23 @@ fun MarkasScreen(
                     modifier = Modifier.weight(1.05f),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    if (gameState.gameOverReason != null) {
-                        GameOverBanner(
-                            reason = gameState.gameOverReason,
-                            isVictory = gameState.isVictory,
-                            evaluation = gameState.campaignEvaluation,
-                            onNewGame = onNewGame
+                    if (gameOver != null) {
+                        GameOverPanel(
+                            reason = gameOver,
+                            turn = gameState.turn,
+                            dateText = gameState.dateText,
+                            onNewGame = onNewGame,
+                            onOpenChronicle = onOpenChronicle,
+                            evaluationTitle = gameState.evaluationTitle,
+                            evaluationRows = gameState.evaluationRows,
+                            postMortem = gameState.postMortemLines
                         )
                     }
 
-                    ScenarioDifficultyBanner(gameState = gameState)
-
                     CovenantWarningBanner(
+                        tone = gameState.covenantTone,
                         title = gameState.covenantWarningTitle,
                         subtitle = gameState.covenantWarningSubtitle,
-                        tone = gameState.covenantTone,
-                        canEquityCure = gameState.canEquityCure,
-                        equityCureAmountText = gameState.equityCureAmountText,
-                        onEquityCure = onEquityCure,
                         originInfo = gameState.covenantOrigin,
                         onInspectOrigin = onInspectOrigin
                     )
@@ -94,9 +101,14 @@ fun MarkasScreen(
                         onInspectOrigin = onInspectOrigin
                     )
 
-                    if (gameState.memos.isNotEmpty()) {
-                        MemosSection(memos = gameState.memos)
-                    }
+                    ExecutiveMemosCard(memos = gameState.memos)
+
+                    PriceLeverCard(
+                        priceAdjPct = gameState.priceAdjPct,
+                        apCurrent = gameState.apCurrent,
+                        enabled = gameOver == null,
+                        onAdjustPrice = onAdjustPrice
+                    )
                 }
 
                 Column(
@@ -105,45 +117,43 @@ fun MarkasScreen(
                 ) {
                     PendingDecisionsSection(
                         decisions = gameState.pendingDecisions,
-                        scheduledChainCount = gameState.scheduledChainCount,
                         onDecisionClick = { decision ->
                             if (decision.opensEventDialog) {
                                 onOpenEventDialog(decision.id)
                             } else {
                                 onOpenJurnalKeputusan(decision)
                             }
-                        },
-                        onReject = onRejectProposal
+                        }
                     )
 
                     FanChart(
-                        title = "Proyeksi Kas & Ketidakpastian (FanChart)",
-                        subtitle = "Pita keyakinan 50% & 90% dalam 6 giliran ke depan (Kesulitan: ${gameState.difficultyLabel})",
+                        title = "Proyeksi kas dan ketidakpastian",
+                        subtitle = "Pita 50% dan 90% untuk 6 giliran ke depan · garis merah = kas nol",
                         historyPoints = gameState.cashHistoryPoints,
                         medianFuturePoints = gameState.cashFanMedianPoints,
                         spread50Points = gameState.cashFanBand50Points,
                         spread90Points = gameState.cashFanBand90Points,
-                        unitLabel = "juta RS"
+                        unitLabel = "juta RS",
+                        dangerLevel = 0f
                     )
 
-                    if (gameState.campaignEvaluation != null) {
-                        CampaignScoreCard(evaluation = gameState.campaignEvaluation)
-                    }
-
                     CognitiveCalibrationCard(
+                        evaluatedCount = gameState.evaluatedJournals,
                         brierScore = gameState.brierScore,
                         biases = gameState.detectedBiases,
                         completedJournals = gameState.completedJournals
                     )
 
                     EndTurnPrimaryButton(
-                        turn = gameState.turn,
-                        gameOver = gameState.gameOverReason != null,
-                        onAdvanceTurn = if (gameState.gameOverReason != null) onNewGame else onAdvanceTurn
+                        enabled = gameOver == null,
+                        gameState = gameState,
+                        onAdvanceTurn = onAdvanceTurn,
+                        onShowLastReport = onShowLastReport
                     )
                 }
             }
         } else {
+            // Mode Portrait Satu Tangan
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -151,24 +161,23 @@ fun MarkasScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (gameState.gameOverReason != null) {
-                    GameOverBanner(
-                        reason = gameState.gameOverReason,
-                        isVictory = gameState.isVictory,
-                        evaluation = gameState.campaignEvaluation,
-                        onNewGame = onNewGame
+                if (gameOver != null) {
+                    GameOverPanel(
+                        reason = gameOver,
+                        turn = gameState.turn,
+                        dateText = gameState.dateText,
+                        onNewGame = onNewGame,
+                        onOpenChronicle = onOpenChronicle,
+                        evaluationTitle = gameState.evaluationTitle,
+                        evaluationRows = gameState.evaluationRows,
+                        postMortem = gameState.postMortemLines
                     )
                 }
 
-                ScenarioDifficultyBanner(gameState = gameState)
-
                 CovenantWarningBanner(
+                    tone = gameState.covenantTone,
                     title = gameState.covenantWarningTitle,
                     subtitle = gameState.covenantWarningSubtitle,
-                    tone = gameState.covenantTone,
-                    canEquityCure = gameState.canEquityCure,
-                    equityCureAmountText = gameState.equityCureAmountText,
-                    onEquityCure = onEquityCure,
                     originInfo = gameState.covenantOrigin,
                     onInspectOrigin = onInspectOrigin
                 )
@@ -186,93 +195,49 @@ fun MarkasScreen(
                     onInspectOrigin = onInspectOrigin
                 )
 
-                if (gameState.memos.isNotEmpty()) {
-                    MemosSection(memos = gameState.memos)
-                }
+                ExecutiveMemosCard(memos = gameState.memos)
 
                 PendingDecisionsSection(
                     decisions = gameState.pendingDecisions,
-                    scheduledChainCount = gameState.scheduledChainCount,
                     onDecisionClick = { decision ->
                         if (decision.opensEventDialog) {
                             onOpenEventDialog(decision.id)
                         } else {
                             onOpenJurnalKeputusan(decision)
                         }
-                    },
-                    onReject = onRejectProposal
+                    }
+                )
+
+                PriceLeverCard(
+                    priceAdjPct = gameState.priceAdjPct,
+                    apCurrent = gameState.apCurrent,
+                    enabled = gameOver == null,
+                    onAdjustPrice = onAdjustPrice
                 )
 
                 FanChart(
-                    title = "Proyeksi Kas & Ketidakpastian (FanChart)",
-                    subtitle = "Pita keyakinan 50% & 90% dalam 6 giliran ke depan (Kesulitan: ${gameState.difficultyLabel})",
+                    title = "Proyeksi kas dan ketidakpastian",
+                    subtitle = "Pita 50% dan 90% untuk 6 giliran ke depan · garis merah = kas nol",
                     historyPoints = gameState.cashHistoryPoints,
                     medianFuturePoints = gameState.cashFanMedianPoints,
                     spread50Points = gameState.cashFanBand50Points,
                     spread90Points = gameState.cashFanBand90Points,
-                    unitLabel = "juta RS"
+                    unitLabel = "juta RS",
+                    dangerLevel = 0f
                 )
 
-                if (gameState.campaignEvaluation != null) {
-                    CampaignScoreCard(evaluation = gameState.campaignEvaluation)
-                }
-
                 CognitiveCalibrationCard(
+                    evaluatedCount = gameState.evaluatedJournals,
                     brierScore = gameState.brierScore,
                     biases = gameState.detectedBiases,
                     completedJournals = gameState.completedJournals
                 )
 
                 EndTurnPrimaryButton(
-                    turn = gameState.turn,
-                    gameOver = gameState.gameOverReason != null,
-                    onAdvanceTurn = if (gameState.gameOverReason != null) onNewGame else onAdvanceTurn
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ScenarioDifficultyBanner(gameState: GameState) {
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(6.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Skenario: ${gameState.scenarioTitle.ifEmpty { "Warisan Bangkrut" }} · Seed #${gameState.seed}",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "${gameState.eraName} · PPh Efektif ${gameState.effectiveTaxRateText}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Surface(
-                color = if (gameState.isIronman) KapitalSemanticColors.redContainer else KapitalSemanticColors.blueContainer,
-                shape = RoundedCornerShape(4.dp)
-            ) {
-                Text(
-                    text = "Mode: ${gameState.difficultyLabel}${if (gameState.isIronman) " (Ironman)" else ""}",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontFamily = MonoFontFamily,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = if (gameState.isIronman) KapitalSemanticColors.red else KapitalSemanticColors.blue,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    enabled = gameOver == null,
+                    gameState = gameState,
+                    onAdvanceTurn = onAdvanceTurn,
+                    onShowLastReport = onShowLastReport
                 )
             }
         }
@@ -282,19 +247,15 @@ private fun ScenarioDifficultyBanner(gameState: GameState) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun CovenantWarningBanner(
+    tone: SemanticTone,
     title: String,
     subtitle: String,
-    tone: SemanticTone,
-    canEquityCure: Boolean,
-    equityCureAmountText: String,
-    onEquityCure: () -> Unit,
     originInfo: DataOriginInfo,
     onInspectOrigin: (DataOriginInfo) -> Unit
 ) {
     val fg = semanticToneColor(tone)
-    val bg = semanticToneContainerColor(tone)
     Surface(
-        color = bg,
+        color = semanticToneContainerColor(tone),
         shape = RoundedCornerShape(6.dp),
         modifier = Modifier
             .fillMaxWidth()
@@ -304,220 +265,40 @@ private fun CovenantWarningBanner(
                 onClick = { onInspectOrigin(originInfo) },
                 onLongClick = { onInspectOrigin(originInfo) }
             )
+            .defaultMinSize(minHeight = 56.dp)
             .testTag("covenant_warning_card")
     ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.WarningAmber,
-                        contentDescription = "Peringatan Covenant",
-                        tint = fg,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Column {
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = fg
-                        )
-                        Text(
-                            text = subtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-                Icon(
-                    imageVector = Icons.Outlined.Info,
-                    contentDescription = "Lihat Asal Data Covenant",
-                    tint = fg,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-            if (canEquityCure) {
-                OutlinedButton(
-                    onClick = onEquityCure,
-                    shape = RoundedCornerShape(6.dp),
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                ) {
-                    Text("Suntikan Ekuitas Pemegang Saham / Equity Cure (+$equityCureAmountText · 2 AP)")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun GameOverBanner(
-    reason: String,
-    isVictory: Boolean,
-    evaluation: CampaignEvaluationUi?,
-    onNewGame: () -> Unit
-) {
-    val fg = if (isVictory) KapitalSemanticColors.green else KapitalSemanticColors.red
-    val bg = if (isVictory) KapitalSemanticColors.greenContainer else KapitalSemanticColors.redContainer
-    Surface(
-        color = bg,
-        shape = RoundedCornerShape(6.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.5.dp, fg, RoundedCornerShape(6.dp))
-    ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = if (isVictory) "KAMPANYE 40 TAHUN BERHASIL DISELESAIKAN" else "PERMAINAN BERAKHIR",
-                style = MaterialTheme.typography.labelMedium.copy(fontFamily = MonoFontFamily, fontWeight = FontWeight.Bold),
-                color = fg
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.WarningAmber,
+                contentDescription = "Peringatan Covenant",
+                tint = fg,
+                modifier = Modifier.size(22.dp)
             )
-            Text(reason, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-            if (evaluation != null) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Evaluasi Akhir: Kelas ${evaluation.grade} (${evaluation.totalScore}/100) · ${evaluation.archetypeTitle}",
+                    text = title,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = fg
                 )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
             }
-            Button(
-                onClick = onNewGame,
-                colors = ButtonDefaults.buttonColors(containerColor = fg, contentColor = Color.White),
-                shape = RoundedCornerShape(6.dp),
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-            ) {
-                Text("Mulai Permainan Baru")
-            }
-        }
-    }
-}
-
-@Composable
-private fun CampaignScoreCard(evaluation: CampaignEvaluationUi) {
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(6.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Evaluasi Kepemimpinan 5 Komponen",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = evaluation.archetypeTitle,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = KapitalSemanticColors.blue
-                    )
-                }
-                Surface(
-                    color = KapitalSemanticColors.blueContainer,
-                    shape = RoundedCornerShape(4.dp)
-                ) {
-                    Text(
-                        text = "Kelas ${evaluation.grade} · ${evaluation.totalScore}/100",
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontFamily = MonoFontFamily,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = KapitalSemanticColors.blue,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                ScoreMetricPill("Nilai Riil (30%)", "${evaluation.nilaiPerusahaanScore}")
-                ScoreMetricPill("Ketahanan (20%)", "${evaluation.ketahananScore}")
-                ScoreMetricPill("Kalibrasi (20%)", "${evaluation.kualitasKeputusanScore}")
-                ScoreMetricPill("Etika (15%)", "${evaluation.etikaReputasiScore}")
-                ScoreMetricPill("Sosial (15%)", "${evaluation.dampakSosialScore}")
-            }
-
-            Text(
-                text = "Kepercayaan Dewan: ${evaluation.boardTrust}/100 · Jejak Etika: ${evaluation.ethicsRiskLabel}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            Icon(
+                imageVector = Icons.Outlined.Info,
+                contentDescription = "Asal data covenant",
+                tint = fg,
+                modifier = Modifier.size(18.dp)
             )
-        }
-    }
-}
-
-@Composable
-private fun ScoreMetricPill(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontFamily = MonoFontFamily,
-                fontWeight = FontWeight.Bold
-            ),
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
-private fun MemosSection(memos: List<MemoItem>) {
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(6.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
-    ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = "Memo Meja Direksi Bulan Ini (masing-masing punya kepentingan)",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            memos.forEach { m ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f), RoundedCornerShape(4.dp))
-                        .padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    Text(
-                        text = "${m.from} · ${m.role}",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = KapitalSemanticColors.blue
-                    )
-                    Text(
-                        text = "“${m.text}”",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
         }
     }
 }
@@ -538,6 +319,7 @@ private fun MorningPaperPreviewCard(
             .clip(RoundedCornerShape(6.dp))
             .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
             .clickable(onClick = onClick)
+            .defaultMinSize(minHeight = 48.dp)
             .testTag("morning_paper_card")
     ) {
         Column(
@@ -550,6 +332,7 @@ private fun MorningPaperPreviewCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
+                    modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
@@ -560,11 +343,8 @@ private fun MorningPaperPreviewCard(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = source.uppercase(),
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontFamily = MonoFontFamily,
-                            fontWeight = FontWeight.Bold
-                        ),
+                        text = source,
+                        style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -573,7 +353,7 @@ private fun MorningPaperPreviewCard(
 
             Text(
                 text = headline,
-                style = MaterialTheme.typography.headlineMedium.copy(
+                style = MaterialTheme.typography.displayMedium.copy(
                     fontFamily = NotoSerifFontFamily,
                     fontWeight = FontWeight.Bold
                 ),
@@ -588,7 +368,8 @@ private fun MorningPaperPreviewCard(
                 Text(
                     text = footer,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
                 )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -616,14 +397,32 @@ private fun MarkasIndicatorsGrid(
     indicators: List<Indicator>,
     onInspectOrigin: (DataOriginInfo) -> Unit
 ) {
-    val rows = indicators.chunked(2)
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        rows.forEach { pair ->
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Indikator utama",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = "Ketuk / tahan angka untuk Asal data",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        val chunked = indicators.chunked(2)
+        chunked.forEach { rowItems ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                pair.forEach { ind ->
+                rowItems.forEach { ind ->
                     UncertainValue(
                         label = ind.label,
                         valueText = ind.valueText,
@@ -637,7 +436,7 @@ private fun MarkasIndicatorsGrid(
                         modifier = Modifier.weight(1f)
                     )
                 }
-                if (pair.size == 1) {
+                if (rowItems.size == 1) {
                     Spacer(modifier = Modifier.weight(1f))
                 }
             }
@@ -648,137 +447,106 @@ private fun MarkasIndicatorsGrid(
 @Composable
 private fun PendingDecisionsSection(
     decisions: List<Decision>,
-    scheduledChainCount: Int,
-    onDecisionClick: (Decision) -> Unit,
-    onReject: (String) -> Unit
+    onDecisionClick: (Decision) -> Unit
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(6.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Text(
+                text = "Menunggu keputusan",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = "Keputusan besar wajib jurnal",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        if (decisions.isEmpty()) {
+            Text(
+                text = "Tidak ada keputusan mendesak. Gunakan AP untuk audit, tinjauan kontrak, atau periksa silang berita.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        decisions.forEach { dec ->
+            val badgeFg = semanticToneColor(dec.tone)
+            val badgeBg = semanticToneContainerColor(dec.tone)
+
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(6.dp))
+                    .border(
+                        width = 1.dp,
+                        color = if (dec.tone == SemanticTone.DANGER_RED) badgeFg.copy(alpha = 0.55f) else KapitalSemanticColors.border,
+                        shape = RoundedCornerShape(6.dp)
+                    )
+                    .clickable { onDecisionClick(dec) }
+                    .defaultMinSize(minHeight = 56.dp)
+                    .testTag("decision_item_${dec.id}")
             ) {
-                Text(
-                    text = "Menunggu keputusan",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = if (scheduledChainCount > 0) "${decisions.size} aktif · $scheduledChainCount rantai mengintai"
-                    else "${decisions.count { !it.isCompleted }} aktif",
-                    style = MaterialTheme.typography.labelMedium.copy(fontFamily = MonoFontFamily),
-                    color = if (scheduledChainCount > 0) KapitalSemanticColors.yellow else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            if (decisions.isEmpty()) {
-                Text(
-                    text = "Semua agenda keputusan bulan ini sudah diselesaikan. Anda dapat meninjau laporan atau mengakhiri giliran.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            decisions.forEach { decision ->
-                val toneColor = semanticToneColor(decision.tone)
-                val containerBg = if (decision.isCompleted) {
-                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                } else {
-                    MaterialTheme.colorScheme.surface
-                }
-
-                Surface(
-                    color = containerBg,
-                    shape = RoundedCornerShape(6.dp),
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(6.dp))
-                        .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
-                        .clickable { onDecisionClick(decision) }
-                        .defaultMinSize(minHeight = 56.dp)
-                        .testTag("decision_card_${decision.id}")
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    if (decision.isCompleted) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.CheckCircle,
-                                            contentDescription = "Selesai",
-                                            tint = KapitalSemanticColors.green,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                    Text(
-                                        text = decision.title,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = decision.subtitle,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                            if (dec.isCompleted) {
+                                Icon(
+                                    imageVector = Icons.Outlined.CheckCircle,
+                                    contentDescription = "Selesai",
+                                    tint = KapitalSemanticColors.green,
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            Surface(
-                                color = semanticToneContainerColor(decision.tone),
-                                shape = RoundedCornerShape(4.dp),
-                                modifier = Modifier.border(
-                                    width = 1.dp,
-                                    color = toneColor.copy(alpha = 0.45f),
-                                    shape = RoundedCornerShape(4.dp)
-                                )
-                            ) {
-                                Text(
-                                    text = decision.badgeText,
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontFamily = MonoFontFamily,
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    color = toneColor,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
+                            Text(
+                                text = dec.title,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
                         }
+                        Text(
+                            text = dec.subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
 
-                        if (decision.canReject) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End
-                            ) {
-                                TextButton(onClick = { onReject(decision.id) }) {
-                                    Text("Tolak proposal (0 AP)", style = MaterialTheme.typography.labelMedium)
-                                }
-                            }
-                        }
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Surface(
+                        color = badgeBg,
+                        shape = RoundedCornerShape(4.dp),
+                        modifier = Modifier.border(1.dp, badgeFg.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                    ) {
+                        Text(
+                            text = dec.badgeText,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontFamily = MonoFontFamily,
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = badgeFg,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
                     }
                 }
             }
@@ -788,6 +556,7 @@ private fun PendingDecisionsSection(
 
 @Composable
 private fun CognitiveCalibrationCard(
+    evaluatedCount: Int,
     brierScore: Double,
     biases: List<String>,
     completedJournals: List<CompletedJournalEntry>
@@ -800,8 +569,8 @@ private fun CognitiveCalibrationCard(
             .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -809,34 +578,46 @@ private fun CognitiveCalibrationCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Kalibrasi Kognitif & Jurnal Keputusan",
+                    text = "Kalibrasi dan jurnal",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
                 )
-                Text(
-                    text = "Skor Brier: ${String.format("%.2f", brierScore)}",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontFamily = MonoFontFamily,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = KapitalSemanticColors.green
-                )
+                val brierTone = when {
+                    brierScore <= 0.15 -> SemanticTone.GOOD_GREEN
+                    brierScore <= 0.25 -> SemanticTone.WARNING_YELLOW
+                    else -> SemanticTone.DANGER_RED
+                }
+                Surface(
+                    color = semanticToneContainerColor(brierTone),
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text(
+                        text = "Brier ${String.format(java.util.Locale.forLanguageTag("id-ID"), "%.2f", brierScore)} · $evaluatedCount dinilai",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = MonoFontFamily,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = semanticToneColor(brierTone),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
             }
 
-            biases.forEach { bias ->
+            biases.forEach { note ->
                 Text(
-                    text = "• $bias",
+                    text = "• $note",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
             if (completedJournals.isNotEmpty()) {
-                HorizontalDivider(color = KapitalSemanticColors.border)
-                val latest = completedJournals.last()
+                HorizontalDivider(color = KapitalSemanticColors.border, modifier = Modifier.padding(vertical = 2.dp))
+                val latest = completedJournals.first()
                 Text(
-                    text = "Jurnal Terakhir (Giliran ${latest.turnSubmitted}): ${latest.decisionTitle} — Keyakinan ${latest.confidencePct}% (Evaluasi pada Giliran ${latest.evaluateAtTurn})",
-                    style = MaterialTheme.typography.labelSmall,
+                    text = "Jurnal Terakhir: ${latest.decisionTitle} (Keyakinan ${latest.confidencePct}% · Evaluasi Giliran ${latest.evaluateAtTurn})",
+                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = MonoFontFamily),
                     color = KapitalSemanticColors.blue
                 )
             }
@@ -846,25 +627,173 @@ private fun CognitiveCalibrationCard(
 
 @Composable
 private fun EndTurnPrimaryButton(
-    turn: Int,
-    gameOver: Boolean,
-    onAdvanceTurn: () -> Unit
+    enabled: Boolean,
+    gameState: GameState,
+    onAdvanceTurn: () -> Unit,
+    onShowLastReport: () -> Unit
 ) {
-    Button(
-        onClick = onAdvanceTurn,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = KapitalSemanticColors.blue,
-            contentColor = Color.White
-        ),
+    var confirming by rememberSaveable { mutableStateOf(false) }
+    if (confirming) {
+        EndTurnConfirmDialog(
+            gameState = gameState,
+            onConfirm = { confirming = false; onAdvanceTurn() },
+            onCancel = { confirming = false }
+        )
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Button(
+            onClick = { confirming = true },
+            enabled = enabled,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ),
+            shape = RoundedCornerShape(6.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 52.dp)
+                .testTag("end_turn_button")
+        ) {
+            Text(
+                text = "Akhiri giliran",
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+            )
+        }
+        TextButton(
+            onClick = onShowLastReport,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+        ) {
+            Text("Lihat laporan bulan lalu")
+        }
+    }
+}
+
+@Composable
+private fun EndTurnConfirmDialog(
+    gameState: GameState,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit
+) {
+    val pending = gameState.pendingDecisions.filter { !it.isCompleted }
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text("Akhiri giliran ${gameState.dateText}?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Setelah giliran diakhiri, bulan berjalan: pendapatan, biaya, bunga, dan kejadian acak diproses. Keputusan tidak bisa ditarik kembali.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                HorizontalDivider()
+                Text("AP tersisa: ${gameState.apCurrent} dari ${gameState.apMax}" +
+                    if (gameState.apCurrent > 0) " (AP tidak dibawa ke bulan depan)" else "",
+                    style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                Text("Kas: ${gameState.markasIndicators.firstOrNull()?.valueText ?: "-"} · ${gameState.covenantWarningTitle}",
+                    style = MaterialTheme.typography.bodySmall)
+                if (pending.isNotEmpty()) {
+                    Text("Keputusan belum diambil (${pending.size}):", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                    pending.take(5).forEach { Text("• ${it.title}", style = MaterialTheme.typography.bodySmall) }
+                    Text("Keputusan yang dibiarkan bisa menimbulkan akibat (mis. tenggat serikat).", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onConfirm, modifier = Modifier.testTag("confirm_end_turn")) { Text("Ya, akhiri giliran") }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onCancel, modifier = Modifier.testTag("cancel_end_turn")) { Text("Tidak, kembali") }
+        }
+    )
+}
+
+@Composable
+private fun ExecutiveMemosCard(memos: List<MemoItem>) {
+    if (memos.isEmpty()) return
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(6.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 52.dp)
-            .testTag("end_turn_button")
+            .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
     ) {
-        Text(
-            text = if (gameOver) "Mulai Permainan Baru" else "Akhiri giliran (Lanjut ke Giliran ${turn + 1})",
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-        )
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "Memo eksekutif",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            memos.forEach { memo ->
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = "${memo.from} · ${memo.role}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "\u201C${memo.text}\u201D",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = NotoSerifFontFamily),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+            Text(
+                text = "Memo mencerminkan kepentingan penulisnya. Cocokkan dengan data sebelum percaya.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun PriceLeverCard(
+    priceAdjPct: Int,
+    apCurrent: Int,
+    enabled: Boolean,
+    onAdjustPrice: (Int) -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(6.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(6.dp))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Harga jual: ${if (priceAdjPct >= 0) "+" else ""}$priceAdjPct% dari harga pasar",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Harga naik = margin naik, pangsa turun. Pesaing menyamai potongan harga, tapi tidak ikut kenaikan. 1 AP per perubahan.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            OutlinedButton(
+                onClick = { onAdjustPrice(-3) },
+                enabled = enabled && apCurrent >= 1 && priceAdjPct > -15,
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier.heightIn(min = 48.dp)
+            ) { Text("−3%") }
+            OutlinedButton(
+                onClick = { onAdjustPrice(3) },
+                enabled = enabled && apCurrent >= 1 && priceAdjPct < 15,
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier.heightIn(min = 48.dp)
+            ) { Text("+3%") }
+        }
     }
 }
