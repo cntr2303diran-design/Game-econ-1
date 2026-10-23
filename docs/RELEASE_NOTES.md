@@ -13,6 +13,7 @@ Simulasi ekonomi dunia dan strategi korporasi berbahasa Indonesia untuk Android.
 ## Yang terbukti
 - 227+ tes mesin lulus tanpa kegagalan pada JVM, dan CI "Build APK" menjalankan tes yang sama lewat Gradle. Tes mencakup invarian akuntansi (aset = liabilitas + ekuitas, arus kas = perubahan kas, roll-forward ekuitas, konsolidasi) pada puluhan ribu giliran acak, serta determinisme (seed + aksi = keadaan identik).
 - Audit rilis: 8.280 aksi berparameter ekstrem tanpa pengecualian; 12 kampanye penuh tanpa NaN atau nilai negatif yang mustahil; hasil identik pada tiga mode hash JVM; fungsi transendental lewat `StrictMath` agar putar ulang identik antar CPU.
+- Akibat pilihan diuji dengan menjalankan mesin (`EventConsequenceTest`): semua hasil kartu yang punya efek mengubah simulasi; mogok terukur 0,58× pendapatan selama 2 bulan, lalu 0,97× empat bulan, lalu pulih, dan tampil di laporan bulanan.
 - Keseimbangan (250 seed baru, hanya bot): bot disiplin menang 39% (mati di Era 1: 20%), bot cakap 65% (18%), bot sembrono 0%. Tak ada strategi yang menang >85%.
 
 ## Yang BELUM terbukti atau terbatas
@@ -22,10 +23,11 @@ Simulasi ekonomi dunia dan strategi korporasi berbahasa Indonesia untuk Android.
 4. **Putar ulang lintas perangkat belum diuji di ART/ARM.** Hanya HotSpot x86 dengan `StrictMath` dan mode hash berbeda. Bila berbeda, hasil tantangan yang dibagikan bisa ditolak.
 5. **Tantangan tidak anti-curang.** Verifikasi membuktikan skor cocok dengan log, bukan bahwa log dimainkan sendiri; log bisa disalin dan seed bisa dicoba berulang. Tidak ada server: berbagi lewat salin-tempel; papan peringkat hanya selama sesi layar.
 6. **Peran Gubernur, Menteri, dan Manajer Dana memakai dunia makro yang disederhanakan** (tanpa geopolitik penuh dan tanpa perusahaan pemain); perusahaan CEO tidak merasakan kebijakan fiskal atau moneter pemain di mode itu.
-7. **Kartu bervariasi lebih sempit daripada jumlahnya**: 579 kartu berasal dari delapan arketipe dengan profil untung-rugi sama. Beberapa kondisi (sanksi, mogok) jarang terjadi pada bot cakap.
-8. **Realisme**: ROE 21% hampir tanpa utang agak tinggi untuk manufaktur tekstil; bulan dengan margin EBIT sangat tinggi berasal dari pembayaran derivatif/asuransi yang dibukukan sebagai pengurang beban operasi; ekor krisis (kesenjangan output −20%, kurs sampai 100.000) mungkin terlalu dalam. Era 2 lebih keras sejak kovenan dilonggarkan (kematian Era 2 pasif ±25–27%).
-9. **Aksesibilitas**: grafik dan peta kini punya deskripsi teks, tetapi belum diuji dengan TalkBack; peta hanya bisa dipilih lewat sentuhan (daftar negara sebagai alternatif). Tata letak lanskap/tablet hanya dikodekan, tidak diuji.
-10. **Bahasa**: pemindaian otomatis tidak menemukan salah eja umum atau teks Inggris tersisa, tetapi tidak ada penyuntingan oleh penutur asli.
+7. **10,4% opsi kartu (191 dari 1.841) tidak berefek**: semuanya "lewati/tolak" pada tawaran sukarela, dan teks dampaknya menyatakan itu. Keputusan terhadap politikus/aktivis baru terasa lewat kejadian berikutnya. Akibat kartu generator kecil dibanding laba rugi bulanan; mogok yang terbesar.
+8. **Kartu bervariasi lebih sempit daripada jumlahnya**: 579 kartu berasal dari delapan arketipe dengan profil untung-rugi sama. Beberapa kondisi (sanksi, mogok) jarang terjadi pada bot cakap.
+9. **Realisme**: ROE 21% hampir tanpa utang agak tinggi untuk manufaktur tekstil; bulan dengan margin EBIT sangat tinggi berasal dari pembayaran derivatif/asuransi yang dibukukan sebagai pengurang beban operasi; ekor krisis (kesenjangan output −20%, kurs sampai 100.000) mungkin terlalu dalam. Era 2 lebih keras sejak kovenan dilonggarkan (kematian Era 2 pasif ±25–27%).
+10. **Aksesibilitas**: grafik dan peta kini punya deskripsi teks, tetapi belum diuji dengan TalkBack; peta hanya bisa dipilih lewat sentuhan (daftar negara sebagai alternatif). Tata letak lanskap/tablet hanya dikodekan, tidak diuji.
+11. **Bahasa**: pemindaian otomatis tidak menemukan salah eja umum atau teks Inggris tersisa, tetapi tidak ada penyuntingan oleh penutur asli.
 
 ## Ukuran APK
 CI mencatat ukuran APK debug dan release (R8) di ringkasan tiap run ("Ukuran APK"); APK debug sebelumnya ±18 MB.

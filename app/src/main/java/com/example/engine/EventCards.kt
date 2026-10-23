@@ -192,6 +192,9 @@ object EventCards {
 
     val cards: List<Card> by lazy { CardData.all().flatMap { parse(it) } }
 
+    /** Kartu tuntutan (bukan tawaran sukarela): menolak = pengali (kunci, nilai) selama [Card.months] bulan. */
+    private val DECLINE_BACKLASH: Map<String, Pair<String, Double>> = mapOf("hr_remote_request" to ("prod" to 0.99))
+
     fun build(card: Card, c: EventCtx, id: String, turn: Int): GameEvent {
         val sev = card.sev * CardTuning.severityScale
         val l = c.m(150.0 * sev)
@@ -200,7 +203,10 @@ object EventCards {
         val options = ids.indices.map { i ->
             val pr = profs[i]
             val up = pr.up * l
-            val outs = pr.outs.map { (p, net) ->
+            // Menolak tuntutan pihak yang punya pengaruh (bukan sekadar melewatkan tawaran) memicu reaksi, bukan status quo gratis.
+            val backlash = if (i == 2) DECLINE_BACKLASH[card.id] else null
+            val outs = if (backlash != null) listOf(Outcome(1.0, "Penolakan Anda mengecewakan pihak itu; dampaknya terasa ${card.months} bulan.",
+                listOf(Effect("mod", backlash.second, card.months, backlash.first)))) else pr.outs.map { (p, net) ->
                 val eff = mutableListOf<Effect>()
                 if (up > 0.0) eff += Effect("cost", up)
                 eff += netEffects(net, card.loss, c, l, card.months)
@@ -209,7 +215,9 @@ object EventCards {
                 if (pr.trust != 0) eff += Effect("board_trust", pr.trust.toDouble())
                 Outcome(p, outcomeText(card.arch, i, net, p, pr.outs.size), eff)
             }
-            EventOption(ids[i], card.opts[i], pr.ap, impact(pr, l), adv[i], tn[i], outs)
+            val impactText = if (backlash != null) "penolakan berisiko: ${if (backlash.first == "prod") "produksi" else "pendapatan"} turun ±${fmt((1.0 - backlash.second) * 100.0)}% selama ${card.months} bulan"
+                else impact(pr, l)
+            EventOption(ids[i], card.opts[i], pr.ap, impactText, adv[i], tn[i], outs)
         }
         val default = if (card.arch == Arch.DEAL || card.arch == Arch.INVEST) "c" else "a"
         val body = card.body.replace("{L}", fmt(l))

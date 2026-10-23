@@ -569,6 +569,21 @@ class KapitalEngine(val seed: Long) {
     private var pendingDividend = 0.0
     private var pendingInvLoss = 0.0
     private val scheduledWage = mutableListOf<Pair<Int, Double>>()
+    /** Ringkasan efek kejadian bertenggat yang sedang aktif (pendapatan, HPP, produksi, umur piutang), atau null bila tak ada. */
+    fun activeModsLine(): String? {
+        val act = mods.filter { turn <= it.until }
+        if (act.isEmpty()) return null
+        val label = mapOf("rev" to "pendapatan", "cogs" to "HPP", "prod" to "produksi")
+        val parts = act.groupBy { it.key }.entries.sortedBy { it.key }.mapNotNull { (k, ms) ->
+            val pct = (ms.fold(1.0) { x, m -> x * m.value } - 1.0) * 100.0
+            val until = ms.maxOf { it.until } - turn + 1
+            if (k == "dso") "umur piutang +${fmt1(ms.sumOf { it.value })} hari (hingga $until bulan lagi)"
+            else if (kotlin.math.abs(pct) < 0.05) null
+            else "${label[k] ?: k} ${if (pct >= 0) "+" else "−"}${fmt1(kotlin.math.abs(pct))}% (hingga $until bulan lagi)"
+        }
+        return if (parts.isEmpty()) null else "Efek kejadian yang masih berjalan: ${parts.joinToString("; ")}."
+    }
+
     fun modProduct(key: String): Double = mods.filter { it.key == key && turn <= it.until }.fold(1.0) { a, m -> a * m.value }
     fun modSum(key: String): Double = mods.filter { it.key == key && turn <= it.until }.sumOf { it.value }
     var strikeMonthsLeft = 0; private set
@@ -2605,7 +2620,12 @@ class KapitalEngine(val seed: Long) {
     private fun applyEffect(f: Effect) {
         when (f.kind) {
             "wage" -> if (f.s == "delay6") scheduledWage += (turn + 6) to f.a else wageAddOn += f.a
-            "strike" -> strikeMonthsLeft = max(strikeMonthsLeft, f.b)
+            "strike" -> {
+                // Mogok baru: produksi 60% selama f.b bulan. Pesanan yang tertunda dan pelanggan yang ragu menahan pendapatan
+                // empat bulan lagi (pengali pendapatan STRIKE_AFTERMATH), sehingga mogok tidak hilang tanpa bekas begitu usai.
+                if (strikeMonthsLeft == 0) mods += Mod("rev", STRIKE_AFTERMATH, turn + f.b + 3)
+                strikeMonthsLeft = max(strikeMonthsLeft, f.b)
+            }
             "unskilled" -> unskilledUntil = turn + f.b
             "cost", "fine" -> oneOffOpex += f.a
             "capex" -> pendingCapex += f.a
@@ -3242,6 +3262,10 @@ class KapitalEngine(val seed: Long) {
                 "Pemasok Kestrel ternyata memakai mineral Velmora.", "Sanksi Aurelia → pemasok Tier-2 → denda ke pemain.")
         }
 
+        // Akibat kejadian yang masih berjalan harus terlihat di laporan bulan ini, bukan hanya diam-diam menekan angka.
+        if (strikeMonthsLeft > 0) lines += ReportLine("Mogok pekerja berlangsung: produksi tinggal 60% (sisa $strikeMonthsLeft bulan). Setelah usai, pesanan tertunda masih menahan pendapatan beberapa bulan.", Tone.BAD)
+        if (turn <= unskilledUntil) lines += ReportLine("Tenaga kontrak kurang terampil sampai bulan ke-${unskilledUntil - turn + 1} lagi: risiko kerusakan mesin naik 40%.", Tone.WARN)
+        activeModsLine()?.let { lines += ReportLine(it, Tone.INFO) }
         var prodFactor = modProduct("prod")
         if (strikeMonthsLeft > 0) prodFactor *= 0.6
         if (breakdownMonthsLeft > 0) prodFactor *= 0.6
@@ -3957,6 +3981,8 @@ class KapitalEngine(val seed: Long) {
     }
 
     companion object {
+        /** Pengali pendapatan selama mogok dan empat bulan sesudahnya (pesanan tertunda, pelanggan ragu). */
+        const val STRIKE_AFTERMATH = 0.97
         /** Biaya L/C bulanan (jt RS pada skala 1), tarif sewa kembali per bulan, dan batas aset yang boleh disewa kembali. */
         const val LC_FEE = 31.0
         /** B5c: ambang antimonopoli: telaah bersyarat, blokir, dan pengawasan dominasi (pangsa gabungan atau organik). */

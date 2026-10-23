@@ -389,7 +389,9 @@ object EventDeck {
                     o("b", "Bayar separuh dan jelaskan rencana investasi", 1, "±${fmt(c.m(750.0))} jt RS", "menurut Anda", Tone.INFO,
                         Outcome(0.7, "Keluarga menerima.", listOf(Effect("dividend", c.m(750.0)))),
                         Outcome(0.3, "Keluarga kecewa dan menekan dewan komisaris.", listOf(Effect("dividend", c.m(750.0)), Effect("cost", c.m(200.0))))),
-                    o("c", "Tolak", 0, "Tanpa biaya", "menurut Anda", Tone.NEUTRAL, sure("Permintaan ditolak; suasana tegang."))
+                    o("c", "Tolak", 0, "Tanpa biaya langsung, tetapi kepercayaan dewan turun dan keluarga bisa menekan (±${fmt(c.m(300.0))} jt RS)", "menurut Anda", Tone.WARN,
+                        Outcome(0.6, "Keluarga menahan diri, tetapi hubungan dengan dewan memburuk.", listOf(Effect("board_trust", -3.0))),
+                        Outcome(0.4, "Keluarga menekan lewat dewan komisaris dan menyewa penasihat hukum.", listOf(Effect("board_trust", -5.0), Effect("cost", c.m(300.0)))))
                 ), t, 2, "c")
         },
         Template("used_machines", "Peluang", 24, { c -> 0.35 + c.deferredMonths * 0.05 }) { c, r, id, t ->
