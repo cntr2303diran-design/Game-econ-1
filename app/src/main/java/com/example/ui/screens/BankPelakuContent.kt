@@ -224,8 +224,9 @@ fun InvestTabContent(
     summary: List<Pair<String, String>>,
     ap: Int,
     onInvest: (String) -> Unit,
-    onCorporateAction: (String) -> Unit = {}
+    onCorporateAction: (String) -> String = { "" }
 ) {
+    var feedback by remember { mutableStateOf<String?>(null) }
     Text("Ekspansi dan investasi", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
     Text(
         "Anda bebas memilih. Kapasitas pabrik dan permintaan pasar harus tumbuh bersama: lini baru tanpa tambahan permintaan hanya menambah biaya, " +
@@ -279,9 +280,14 @@ fun InvestTabContent(
             "Tunjuk anggota keluarga sebagai penerus" to "SUC|family",
             "Dirikan bank dan asuransi grup" to "CBK"
         )
+        feedback?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold,
+                color = if (it.startsWith("Dilaksanakan")) KapitalSemanticColors.green else KapitalSemanticColors.red,
+                modifier = Modifier.fillMaxWidth().testTag("corp_feedback"))
+        }
         actions.forEach { (label, code) ->
             OutlinedButton(
-                onClick = { onCorporateAction(code) },
+                onClick = { feedback = "$label: ${onCorporateAction(code)}" },
                 modifier = Modifier.fillMaxWidth().testTag("corp_$code")
             ) { Text(label) }
         }

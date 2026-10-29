@@ -8,7 +8,8 @@ Simulasi ekonomi dunia dan strategi korporasi berbahasa Indonesia untuk Android.
 - **Peran lain**: Gubernur Bank Sentral, Menteri Keuangan, Manajer Dana, masing-masing dengan skor sendiri.
 - **Tantangan asinkron**: kode tantangan (seed + kesulitan) dan hasil berisi log aksi; penerima memutar ulang log untuk memverifikasi skor. Termasuk tantangan CEO satu kampanye penuh.
 - **Fitur era dibuka lebih awal oleh kinerja** (pendapatan, ekuitas, laba, covenant, anak usaha); kalender tetap menjamin fitur terbuka pada tanggal era.
-- Simpan/muat berbasis putar ulang (seed + daftar aksi), 5 slot autosave, 4 tingkat kesulitan, "Bagaimana Jika".
+- Simpan/muat berbasis putar ulang (seed + daftar aksi), 5 slot autosave, 4 tingkat kesulitan, "Bagaimana Jika". Simpanan memuat cap versi mesin; bila versi berbeda atau ada tindakan yang tak bisa diputar ulang, pemain diberi tahu lewat spanduk, tidak diam-diam.
+- Tombol tindakan korporasi Era 2–4 selalu memberi umpan balik (dilaksanakan / terkunci era / AP habis / syarat belum terpenuhi).
 
 ## Yang terbukti
 - 227+ tes mesin lulus tanpa kegagalan pada JVM, dan CI "Build APK" menjalankan tes yang sama lewat Gradle. Tes mencakup invarian akuntansi (aset = liabilitas + ekuitas, arus kas = perubahan kas, roll-forward ekuitas, konsolidasi) pada puluhan ribu giliran acak, serta determinisme (seed + aksi = keadaan identik).
@@ -28,6 +29,8 @@ Simulasi ekonomi dunia dan strategi korporasi berbahasa Indonesia untuk Android.
 9. **Realisme**: ROE 21% hampir tanpa utang agak tinggi untuk manufaktur tekstil; bulan dengan margin EBIT sangat tinggi berasal dari pembayaran derivatif/asuransi yang dibukukan sebagai pengurang beban operasi; ekor krisis (kesenjangan output −20%, kurs sampai 100.000) mungkin terlalu dalam. Era 2 lebih keras sejak kovenan dilonggarkan (kematian Era 2 pasif ±25–27%).
 10. **Aksesibilitas**: grafik dan peta kini punya deskripsi teks, tetapi belum diuji dengan TalkBack; peta hanya bisa dipilih lewat sentuhan (daftar negara sebagai alternatif). Tata letak lanskap/tablet hanya dikodekan, tidak diuji.
 11. **Bahasa**: pemindaian otomatis tidak menemukan salah eja umum atau teks Inggris tersisa, tetapi tidak ada penyuntingan oleh penutur asli.
+12. **Simpanan lama dari versi mesin berbeda bisa berjalan berbeda**: pemain kini diberi peringatan, tetapi permainan tetap dimuat dari log yang sama dan keadaannya mungkin tidak sama dengan yang pernah dilihat. Tantangan yang dibagikan belum memuat versi mesin: log yang dibuat di versi lain bisa ditolak verifikasi seolah curang.
+13. **Waktu muat simpanan 480 giliran di perangkat belum diukur**: muat berarti memutar ulang seluruh log. Terukur di JVM x86 (kontainer awan 2 inti): kampanye 481 giliran, 755 baris log, 0,4–0,6 detik per putar ulang (pertama/dingin 0,4 detik; median lima kali 0,5 detik). Di ponsel (ART, CPU lebih lambat) tidak diketahui; bila lebih dari ±5 detik, pemuatan perlu dipindah dari utas UI.
 
 ## Ukuran APK
 CI mencatat ukuran APK debug dan release (R8) di ringkasan tiap run ("Ukuran APK"); APK debug sebelumnya ±18 MB.

@@ -229,6 +229,7 @@ fun KapitalAppScaffold(
             composable(ROUTE_MARKAS) {
                 MarkasScreen(
                     gameState = gameState,
+                    onDismissSaveNotice = { viewModel.dismissSaveNotice() },
                     onOpenKoranPagi = { navController.navigate(ROUTE_KORAN_PAGI) },
                     onOpenJurnalKeputusan = { decision ->
                         navController.navigate("jurnal_keputusan/${decision.id}")
@@ -270,7 +271,7 @@ fun KapitalAppScaffold(
                     onAcceptOffer = { viewModel.acceptOffer(it) },
                     onDeclineOffer = { viewModel.declineOffer(it) },
                     onInvest = { viewModel.invest(it) },
-                    onCorporateAction = { viewModel.corporateAction(it) },
+                    onCorporateAction = { viewModel.corporateActionFeedback(it) },
                     onBuyIntel = { k, s, t -> viewModel.buyIntel(k, s, t) },
                     onAnswerBoard = { viewModel.answerBoard(it) },
                     onSetSegmentFocus = { s, l -> viewModel.setSegmentFocus(s, l) },

@@ -468,6 +468,8 @@ data class GameState(
     val factorySchemeOptions: List<Pair<String, String>> = emptyList(),
     val priceAdjPct: Int = 0,
     val counterfactualText: String? = null,
+    /** Peringatan saat simpanan dimuat dari versi mesin lain atau sebagian tindakannya tak bisa diputar ulang. */
+    val saveNotice: String? = null,
     val ganttTitle: String = "",
     val ganttTotalMonths: Int = 12,
     val periodLabel: String = "",

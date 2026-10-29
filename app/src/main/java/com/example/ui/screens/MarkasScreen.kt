@@ -47,7 +47,8 @@ fun MarkasScreen(
     onNewGame: () -> Unit,
     onOpenChronicle: () -> Unit,
     modifier: Modifier = Modifier,
-    onOpenMenu: () -> Unit = {}
+    onOpenMenu: () -> Unit = {},
+    onDismissSaveNotice: () -> Unit = {}
 ) {
     val gameOver = gameState.gameOverReason
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
@@ -67,6 +68,7 @@ fun MarkasScreen(
                     modifier = Modifier.weight(1.05f),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    gameState.saveNotice?.let { SaveNoticeBanner(it, onDismissSaveNotice) }
                     if (gameOver != null) {
                         GameOverPanel(
                             reason = gameOver,
@@ -161,6 +163,7 @@ fun MarkasScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                gameState.saveNotice?.let { SaveNoticeBanner(it, onDismissSaveNotice) }
                 if (gameOver != null) {
                     GameOverPanel(
                         reason = gameOver,
@@ -794,6 +797,22 @@ private fun PriceLeverCard(
                 shape = RoundedCornerShape(6.dp),
                 modifier = Modifier.heightIn(min = 48.dp)
             ) { Text("+3%") }
+        }
+    }
+}
+
+
+/** Peringatan saat simpanan dimuat dari versi mesin lain atau sebagian tindakannya tak bisa diputar ulang. */
+@Composable
+private fun SaveNoticeBanner(text: String, onDismiss: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(6.dp),
+        modifier = Modifier.fillMaxWidth().testTag("save_notice")
+    ) {
+        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(text, style = MaterialTheme.typography.bodySmall, color = KapitalSemanticColors.yellow)
+            TextButton(onClick = onDismiss) { Text("Mengerti") }
         }
     }
 }

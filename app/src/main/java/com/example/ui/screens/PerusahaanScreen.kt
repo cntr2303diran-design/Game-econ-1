@@ -46,7 +46,7 @@ fun PerusahaanScreen(
     onAcceptOffer: (String) -> Unit = {},
     onDeclineOffer: (String) -> Unit = {},
     onInvest: (String) -> Unit = {},
-    onCorporateAction: (String) -> Unit = {},
+    onCorporateAction: (String) -> String = { "" },
     onBuyIntel: (kind: String, subject: String, tier: Int) -> Unit = { _, _, _ -> },
     onAnswerBoard: (String) -> Unit = {},
     onSetSegmentFocus: (segment: String, level: Int) -> Unit = { _, _ -> },

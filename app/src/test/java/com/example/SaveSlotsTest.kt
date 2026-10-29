@@ -158,4 +158,49 @@ class SaveSlotsTest {
         assertTrue(r.gameState.value.gameOverReason == null)
         assertEquals(Difficulty.DIREKTUR.label, r.gameState.value.difficultyLabel)
     }
+
+    // ---- Cap versi mesin pada simpanan dan umpan balik tombol korporasi ----
+
+    @Test
+    fun saves_carryEngineVersion_andMismatchIsReportedToThePlayer() {
+        val (seed, lines) = run
+        val store = Main()
+        val r = GameRepository(store, seed)
+        r.newGameFromChallenge(com.example.engine.Challenge(com.example.engine.Role.CEO, seed, 480, Difficulty.MANAJER))
+        feed(r, lines.take(30))
+        val text = store.text!!
+        assertTrue("simpanan memuat cap versi", text.lines().any { it == "VER:${com.example.data.ENGINE_VERSION}" })
+        assertTrue("SEED tetap baris pertama (kompatibel dengan pembaca lama)", text.lines().first().startsWith("SEED:"))
+        // muat ulang dengan versi sama: tanpa peringatan
+        val same = Main().also { it.text = text }
+        assertTrue("versi sama = tanpa peringatan", GameRepository(same).gameState.value.saveNotice == null)
+        // simpanan lama tanpa cap versi: ada peringatan, permainan tetap termuat
+        val legacy = Main().also { it.text = text.lines().filter { l -> !l.startsWith("VER:") }.joinToString("\n") }
+        val rl = GameRepository(legacy)
+        val note = rl.gameState.value.saveNotice
+        assertTrue("simpanan tanpa cap versi diberi peringatan: $note", note != null && note.contains("versi mesin 1"))
+        assertEquals("permainan tetap sama", r.gameState.value.turn, rl.gameState.value.turn)
+        rl.dismissSaveNotice()
+        assertTrue("peringatan bisa ditutup", rl.gameState.value.saveNotice == null)
+        // tindakan yang tak bisa diputar ulang dilaporkan, bukan hilang diam-diam
+        val broken = Main().also { it.text = text + "\nIPO|20|false" }
+        val nb = GameRepository(broken).gameState.value.saveNotice
+        assertTrue("tindakan tak bisa diputar ulang dilaporkan: $nb", nb != null && nb.contains("1 tindakan"))
+    }
+
+    @Test
+    fun corporateButtons_alwaysTellThePlayerWhatHappened() {
+        val r = GameRepository(Main(), 7919L)
+        val unknown = r.corporateActionFeedback("XYZ|nope")
+        assertTrue("kode tak dikenal: $unknown", unknown.contains("tidak dikenal"))
+        val locked = r.corporateActionFeedback("IPO|20|false")
+        assertTrue("terkunci era dijelaskan: $locked", locked.startsWith("Belum bisa"))
+        val carbon = r.corporateActionFeedback("CRB|buy|5")
+        assertTrue("karbon di Era 1 terkunci: $carbon", carbon.startsWith("Belum bisa"))
+        val buyback = r.corporateActionFeedback("BYB|1500")
+        assertTrue("buyback butuh emiten: $buyback", buyback.startsWith("Belum bisa"))
+        // setiap jawaban berisi alasan, tidak pernah kosong
+        for (code in listOf("SUB|tarsis", "TPR|OPTIMAL", "HFX", "BND|3000|36", "SPO|3000", "NCI|tarsis|15", "ACQ|riv_cahaya", "LOB|media", "CBK", "SUC|exec_cfo", "BSB|tarsis|500", "CHA"))
+            assertTrue("umpan balik $code tak kosong", r.corporateActionFeedback(code).length > 10)
+    }
 }

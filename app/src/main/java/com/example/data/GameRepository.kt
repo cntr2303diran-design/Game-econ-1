@@ -71,6 +71,13 @@ private data class UiFlags(
     val counterfactualText: String? = null
 )
 
+/**
+ * Versi mesin pada berkas simpanan (baris "VER:n"). Simpanan adalah seed + daftar tindakan yang diputar ulang, sehingga setiap
+ * perubahan perilaku mesin mengubah hasil simpanan lama. Naikkan angka ini tiap perubahan yang memengaruhi hasil putar ulang.
+ * 1 = simpanan tanpa cap (sampai build-77); 2 = mogok meninggalkan efek pasca-mogok dan efek aktif di laporan.
+ */
+const val ENGINE_VERSION = 2
+
 /** Tantangan CEO selalu satu kampanye penuh (480 bulan) atau sampai perusahaan berakhir. */
 const val CEO_CHALLENGE_HORIZON = 480
 
@@ -82,6 +89,15 @@ class GameRepository(
 ) {
     private var seed: Long
     private val log = mutableListOf<String>()
+    private var loadNotice: String? = null
+
+    private fun noticeFor(lines: List<String>, dropped: Int): String? {
+        val ver = lines.firstOrNull { it.startsWith("VER:") }?.removePrefix("VER:")?.toIntOrNull() ?: 1
+        val parts = ArrayList<String>()
+        if (ver != ENGINE_VERSION) parts += "Simpanan ini dibuat dengan versi mesin $ver (sekarang $ENGINE_VERSION), jadi hasil kejadian bisa berbeda dari saat Anda memainkannya."
+        if (dropped > 0) parts += "$dropped tindakan tersimpan tidak dapat diputar ulang dan dilewati."
+        return if (parts.isEmpty()) null else parts.joinToString(" ")
+    }
     private var engine: KapitalEngine
     private var ui = UiFlags()
 
@@ -92,11 +108,13 @@ class GameRepository(
         if (seedOverride == null && savedSeed != null) {
             seed = savedSeed
             engine = KapitalEngine(seed)
+            var dropped = 0
             for (l in lines.drop(1)) {
-                if (l.startsWith(Autosave.META)) continue
+                if (l.startsWith(Autosave.META) || l.startsWith("VER:")) continue
                 val a = Action.decode(l) ?: continue
-                if (engine.apply(a)) log += l
+                if (engine.apply(a)) log += l else dropped++
             }
+            loadNotice = noticeFor(lines, dropped)
         } else {
             seed = seedOverride ?: System.currentTimeMillis()
             engine = KapitalEngine(seed)
@@ -126,7 +144,7 @@ class GameRepository(
         val st = slots ?: return
         if (engine.difficulty.ironman || engine.gameOverReason != null || engine.turn % Autosave.EVERY != 0) return
         val meta = listOf(engine.turn, dateText(engine.turn), engine.difficulty.name, engine.equity.roundToInt()).joinToString("|")
-        st.writeSlot(Autosave.slotFor(engine.turn), (listOf("SEED:$seed", Autosave.META + meta) + log).joinToString("\n"))
+        st.writeSlot(Autosave.slotFor(engine.turn), (listOf("SEED:$seed", "VER:$ENGINE_VERSION", Autosave.META + meta) + log).joinToString("\n"))
     }
 
     /** Ringkasan kelima slot (kosong bila belum ada), diurutkan dari yang terbaru. */
@@ -147,11 +165,13 @@ class GameRepository(
         val s = lines.firstOrNull()?.removePrefix("SEED:")?.toLongOrNull() ?: return false
         val e = KapitalEngine(s)
         val newLog = mutableListOf<String>()
+        var dropped = 0
         for (l in lines.drop(1)) {
-            if (l.startsWith(Autosave.META)) continue
+            if (l.startsWith(Autosave.META) || l.startsWith("VER:")) continue
             val a = Action.decode(l) ?: continue
-            if (e.apply(a)) newLog += l
+            if (e.apply(a)) newLog += l else dropped++
         }
+        loadNotice = noticeFor(lines, dropped)
         seed = s; engine = e; log.clear(); log.addAll(newLog)
         ui = UiFlags(isDarkTheme = ui.isDarkTheme)
         persist(); publish()
@@ -159,7 +179,7 @@ class GameRepository(
     }
 
     private fun persist() {
-        store?.write((listOf("SEED:$seed") + log).joinToString("\n"))
+        store?.write((listOf("SEED:$seed", "VER:$ENGINE_VERSION") + log).joinToString("\n"))
     }
 
     private fun publish() {
@@ -179,6 +199,7 @@ class GameRepository(
     fun clearEventOutcome() = setUi { it.copy(eventOutcome = null) }
     fun dismissMonthlyReport() = setUi { it.copy(showMonthlyReport = false) }
     fun showMonthlyReport() = setUi { it.copy(showMonthlyReport = true) }
+    fun dismissSaveNotice() { loadNotice = null; publish() }
     fun clearCounterfactual() = setUi { it.copy(counterfactualText = null) }
 
     fun setSalesScheme(id: String) {
@@ -248,6 +269,26 @@ class GameRepository(
         return perform(a)
     }
 
+    /**
+     * Aksi korporasi dari tombol layar, dengan umpan balik untuk pemain: berhasil, terkunci era, atau ditolak beserta alasannya.
+     * (Sebelumnya tombol diam saja saat ditolak sehingga pemain tak tahu apa yang kurang.)
+     */
+    fun corporateActionFeedback(code: String): String {
+        val a = try { Action.decode(code) } catch (ex: Exception) { null } ?: return "Kode aksi tidak dikenal."
+        val needEra = when (a) {
+            is Action.OpenSubsidiary, is Action.SetTransferPricing, is Action.Repatriate, is Action.AcquireRival,
+            is Action.BorrowForeignSub, is Action.SellSubStake, Action.ChainAudit -> 2
+            is Action.IssueCorporateBond, is Action.IssueShares, is Action.ExecuteIpo, Action.OpenCaptiveBank, is Action.MediaLobby -> 3
+            is Action.CarbonAction, is Action.AppointSuccessor -> 4
+            else -> 0
+        }
+        if (needEra > 0) engine.eraBlock(needEra)?.let { return "Belum bisa: $it" }
+        if (a is Action.Buyback && !engine.isPublicCompany) return "Belum bisa: pembelian kembali saham hanya untuk perusahaan terbuka (lakukan IPO dulu)."
+        if (perform(a)) return "Dilaksanakan. Hasilnya tampil di Koran Pagi, Kronik, dan laporan keuangan."
+        return if (engine.ap < 1) "Ditolak: AP bulan ini habis."
+        else "Ditolak: syarat belum terpenuhi (kas di bawah batas aman, sudah dilakukan atau dibuka sebelumnya, atau jumlah di luar batas). Tidak ada biaya yang keluar."
+    }
+
     fun rejectDecision(decisionId: String) = perform(Action.RejectProposal(decisionId))
 
     fun resolveEventOption(option: EventOptionItem) {
@@ -268,6 +309,7 @@ class GameRepository(
     /** Permainan baru; tanpa argumen, kesulitan diwarisi dari permainan yang sedang/baru berakhir (B8). */
     fun newGame(difficulty: Difficulty? = null) {
         val d = difficulty ?: engine.difficulty
+        loadNotice = null
         seed = newSeed()
         log.clear()
         engine = KapitalEngine(seed)
@@ -280,6 +322,7 @@ class GameRepository(
 
     /** Tantangan CEO: dunia dengan seed dan kesulitan yang sama dengan pemain lain (permainan sebelumnya diganti). */
     fun newGameFromChallenge(c: Challenge) {
+        loadNotice = null
         seed = c.seed
         log.clear()
         engine = KapitalEngine(seed)
@@ -1225,6 +1268,7 @@ class GameRepository(
             factorySchemeOptions = FactoryScheme.entries.map { it.name to it.label },
             priceAdjPct = e.priceAdjPct,
             counterfactualText = ui.counterfactualText,
+            saveNotice = loadNotice,
             ganttTitle = ganttTitle,
             ganttTotalMonths = totalMonths,
             periodLabel = closed,
