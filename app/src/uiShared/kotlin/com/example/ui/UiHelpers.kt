@@ -2,8 +2,9 @@ package com.example.ui
 
 import android.graphics.Bitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.semantics.SemanticsConfiguration
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasClickAction
@@ -61,6 +62,9 @@ class Soft {
     }
 }
 
+/** Nilai properti semantik, atau null bila belum diset. Memakai anggota contains/get (bukan ekstensi getOrNull) supaya tidak bergantung pada impor tambahan. */
+fun <T> SemanticsConfiguration.valueOrNull(key: SemanticsPropertyKey<T>): T? = if (contains(key)) get(key) else null
+
 /** Gulir bila node berada di dalam kontainer yang bisa digulir, lalu ketuk. */
 fun ComposeTestRule.tap(tag: String) {
     val node = onNodeWithTag(tag)
@@ -69,24 +73,24 @@ fun ComposeTestRule.tap(tag: String) {
 }
 
 fun hasTagPrefix(prefix: String): SemanticsMatcher =
-    SemanticsMatcher("testTag diawali $prefix") { it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith(prefix) == true }
+    SemanticsMatcher("testTag diawali $prefix") { it.config.valueOrNull(SemanticsProperties.TestTag)?.startsWith(prefix) == true }
 
 fun ComposeTestRule.tagExists(tag: String): Boolean =
     onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty()
 
 fun ComposeTestRule.textOfTag(tag: String): String =
-    onNodeWithTag(tag).fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)?.joinToString(" ") { it.text } ?: ""
+    onNodeWithTag(tag).fetchSemanticsNode().config.valueOrNull(SemanticsProperties.Text)?.joinToString(" ") { it.text } ?: ""
 
 fun ComposeTestRule.tagsWithPrefix(prefix: String): List<String> =
-    onAllNodes(hasTagPrefix(prefix)).fetchSemanticsNodes().mapNotNull { it.config.getOrNull(SemanticsProperties.TestTag) }
+    onAllNodes(hasTagPrefix(prefix)).fetchSemanticsNodes().mapNotNull { it.config.valueOrNull(SemanticsProperties.TestTag) }
 
 private val TURN_RE = Regex("^Giliran (\\d+) · Era (\\d+)$")
 
 /** (giliran, era) dari bilah atas, atau null bila bilah atas tidak tampil. */
 fun ComposeTestRule.turnAndEra(): Pair<Int, Int>? {
-    val m = SemanticsMatcher("teks giliran") { n -> n.config.getOrNull(SemanticsProperties.Text)?.any { TURN_RE.matches(it.text) } == true }
+    val m = SemanticsMatcher("teks giliran") { n -> n.config.valueOrNull(SemanticsProperties.Text)?.any { TURN_RE.matches(it.text) } == true }
     val node = onAllNodes(m).fetchSemanticsNodes().firstOrNull() ?: return null
-    val text = node.config.getOrNull(SemanticsProperties.Text)?.firstOrNull { TURN_RE.matches(it.text) }?.text ?: return null
+    val text = node.config.valueOrNull(SemanticsProperties.Text)?.firstOrNull { TURN_RE.matches(it.text) }?.text ?: return null
     val g = TURN_RE.matchEntire(text)!!.groupValues
     return g[1].toInt() to g[2].toInt()
 }

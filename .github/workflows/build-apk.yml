@@ -63,7 +63,7 @@ jobs:
                   print(f"::error title=Test gagal::{tc.get('classname')}.{tc.get('name')}: {msg}")
           PY
           done
-          if [ $code -ne 0 ]; then grep -E "What went wrong|error:|e: " -A3 test-output.txt | head -20 | sed 's/^/::warning::/'; fi
+          if [ $code -ne 0 ]; then python3 tools/ci_gradle_errors.py test-output.txt 5; fi
           exit $code
 
       - name: Unggah log uji unit
@@ -83,7 +83,7 @@ jobs:
           gradle :app:testDebugUnitTest -PuiOnly --stacktrace > ui-test-output.txt 2>&1
           code=$?
           python3 tools/ci_test_report.py "app/build/test-results/testDebugUnitTest/*.xml" "Uji UI (Robolectric + Compose)"
-          if [ $code -ne 0 ]; then grep -E "What went wrong|error:|e: " -A3 ui-test-output.txt | head -30 | sed 's/^/::warning::/'; fi
+          if [ $code -ne 0 ]; then python3 tools/ci_gradle_errors.py ui-test-output.txt 5; fi
           exit $code
 
       - name: Kumpulkan hasil uji UI
@@ -195,7 +195,14 @@ jobs:
             -keypass "$KEY_PASSWORD" -keyalg RSA -keysize 2048 -validity 30 -dname "CN=CI Throwaway"
 
       - name: Bangun APK debug, APK uji, dan APK release (R8)
-        run: gradle :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease --stacktrace
+        run: |
+          mkdir -p emulator-out
+          set +e
+          gradle :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease --stacktrace > emulator-out/gradle-build.log 2>&1
+          code=$?
+          tail -n 40 emulator-out/gradle-build.log
+          if [ $code -ne 0 ]; then python3 tools/ci_gradle_errors.py emulator-out/gradle-build.log; fi
+          exit $code
 
       - name: Aktifkan KVM
         run: |
@@ -261,6 +268,16 @@ jobs:
         with:
           name: emulator-hasil
           path: hasil/emulator
+
+      - name: Unduh log uji unit
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: log-uji-unit
+          path: hasil/uji-unit
+
+      - name: Buang berkas lebih dari 5 MB
+        run: find hasil -type f -size +5M -print -delete
 
       - name: Perkecil tangkapan layar
         run: |
