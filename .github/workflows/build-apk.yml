@@ -2,7 +2,7 @@ name: Build APK
 
 on:
   push:
-    branches: ["**"]
+    branches: ["**", "!ci-hasil-**"]
   pull_request:
   workflow_dispatch:
 
@@ -76,6 +76,33 @@ jobs:
             app/build/test-results/testDebugUnitTest/*.xml
           if-no-files-found: ignore
 
+      - name: Uji UI (Robolectric + Compose, grafik NATIVE, tangkapan layar)
+        timeout-minutes: 30
+        run: |
+          set +e
+          gradle :app:testDebugUnitTest -PuiOnly --stacktrace > ui-test-output.txt 2>&1
+          code=$?
+          python3 tools/ci_test_report.py "app/build/test-results/testDebugUnitTest/*.xml" "Uji UI (Robolectric + Compose)"
+          if [ $code -ne 0 ]; then grep -E "What went wrong|error:|e: " -A3 ui-test-output.txt | head -30 | sed 's/^/::warning::/'; fi
+          exit $code
+
+      - name: Kumpulkan hasil uji UI
+        if: always()
+        run: |
+          mkdir -p uiout
+          cp -r app/build/ui-shots uiout/ui-shots 2>/dev/null || true
+          cp ui-test-output.txt uiout/ 2>/dev/null || true
+          mkdir -p uiout/test-results
+          cp app/build/test-results/testDebugUnitTest/*.xml uiout/test-results/ 2>/dev/null || true
+
+      - name: Unggah hasil uji UI
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uji-ui
+          path: uiout
+          if-no-files-found: ignore
+
       - name: Verifikasi build release (R8) dengan kunci sementara
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/ci-throwaway.jks
@@ -130,3 +157,133 @@ jobs:
             Unduh file .apk di bawah, buka di HP Android, lalu izinkan "Instal aplikasi tidak dikenal" jika diminta.
             Catatan rilis yang jujur (termasuk yang belum teruji): docs/RELEASE_NOTES.md.
           files: dist/*.apk
+
+  emulator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      KEYSTORE_PATH: ${{ github.workspace }}/ci-throwaway.jks
+      STORE_PASSWORD: ci-throwaway
+      KEY_PASSWORD: ci-throwaway
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Siapkan Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Siapkan Android SDK bawaan runner
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "platforms;android-36.1" "build-tools;36.0.0" || "$SDKM" "platforms;android-36" "build-tools;36.0.0" || true
+
+      - name: Siapkan Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.3.1"
+
+      - name: Buat debug keystore dan kunci sementara release (tidak disimpan di repo)
+        run: |
+          keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey \
+            -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+          keytool -genkeypair -keystore "$KEYSTORE_PATH" -storepass "$STORE_PASSWORD" -alias upload \
+            -keypass "$KEY_PASSWORD" -keyalg RSA -keysize 2048 -validity 30 -dname "CN=CI Throwaway"
+
+      - name: Bangun APK debug, APK uji, dan APK release (R8)
+        run: gradle :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease --stacktrace
+
+      - name: Aktifkan KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Jalankan uji di emulator Android 14 (x86_64)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          ram-size: 3072M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash tools/ci-emulator.sh
+
+      - name: Laporan hasil emulator
+        if: always()
+        run: |
+          {
+            echo "### Emulator"
+            cat emulator-out/device.txt 2>/dev/null
+            echo
+            echo '```'; cat emulator-out/status.txt 2>/dev/null; echo '```'
+            echo "Ukuran APK (byte):"; echo '```'; cat emulator-out/apk-sizes.txt 2>/dev/null; echo '```'
+            echo "Monkey pada APK release:"; echo '```'; cat emulator-out/monkey-ringkasan.txt 2>/dev/null; echo '```'
+            echo "Keluaran penting uji instrumented:"; echo '```'; cat emulator-out/art-logcat.txt 2>/dev/null; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          python3 tools/parse_instrument.py emulator-out/instrument.txt >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+
+      - name: Unggah hasil emulator
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: emulator-hasil
+          path: emulator-out
+          if-no-files-found: ignore
+
+      - name: Gagalkan job bila ada pemeriksaan emulator yang gagal
+        run: |
+          cat emulator-out/status.txt
+          ! grep -E "^(instrumented|release_install)=[^0]|^monkey_crash=1|^release_fatal=1|^release_alive_after_(start|monkey)=[^0]" emulator-out/status.txt
+
+  hasil:
+    needs: [build, emulator]
+    if: always() && github.event_name == 'push' && startsWith(github.ref_name, 'claude/')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Unduh hasil uji UI
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: uji-ui
+          path: hasil/uji-ui
+
+      - name: Unduh hasil emulator
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: emulator-hasil
+          path: hasil/emulator
+
+      - name: Perkecil tangkapan layar
+        run: |
+          pip install --quiet pillow
+          python3 - <<'PY'
+          import glob, os
+          from PIL import Image
+          for p in glob.glob('hasil/**/*.png', recursive=True):
+              try:
+                  im = Image.open(p).convert('RGB')
+                  im.thumbnail((720, 1500))
+                  im.save(p[:-4] + '.jpg', 'JPEG', quality=72)
+                  os.remove(p)
+              except Exception as e:
+                  print('gagal memperkecil', p, e)
+          PY
+
+      - name: Terbitkan ke cabang ci-hasil-<cabang> (untuk ditinjau; tidak ikut rilis)
+        run: |
+          branch="ci-hasil-${GITHUB_REF_NAME//\//-}"
+          cd hasil
+          echo "run ${{ github.run_number }}; commit ${{ github.sha }}; cabang ${GITHUB_REF_NAME}; status build=${{ needs.build.result }}, emulator=${{ needs.emulator.result }}" > INFO.txt
+          git init -q -b ci-hasil
+          git add -A
+          git -c user.name="ci" -c user.email="ci@users.noreply.github.com" commit -q -m "Hasil uji run ${{ github.run_number }} (${{ github.sha }})"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "ci-hasil:refs/heads/${branch}"

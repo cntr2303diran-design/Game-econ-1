@@ -73,11 +73,13 @@ for extra in "$T"/*Test.kt; do
     *) TESTS+=("$extra") ;;
   esac
 done
+# Sumber bersama (test + androidTest): ringkasan keadaan dan model fixture putar ulang.
+TESTS+=("$ROOT/app/src/shared/kotlin/com/example/ReplayDigest.kt" "$ROOT/app/src/shared/kotlin/com/example/ReplayFixture.kt")
 "$KC" -nowarn -jvm-target 11 -cp "$OUT/stub.jar:$OUT/engine.jar:$CO" -d "$OUT/tests.jar" "${TESTS[@]}"
 
 DEFAULT_CLASSES=(ArgonCorporateTest ExampleUnitTest StressCalibrationTest ChainCardsTest EraCrisisTest PublicCompanyTest
   EvaluationTest GroupStatementsUiTest TransferPricingAuditTest RivalLearningTest DifficultyTest EraReviewTest
-  StockTest NciTest SuccessionTest BalanceTest PerformanceTest AgentScaleTest WorldLayerTest MacroPlusTest MarketTest CreditSystemTest LongCyclesTest StageAStressTest WorldViewTest IntelBoardTest AntiExploitTest ProductMarketTest OperationsTest FinanceTest DerivativesTest MinorityTest ForensicsTest LawTest ActorsTest InsightTest SaveSlotsTest ActiveBotTest CardDeckTest RolesTest ChallengeTest EraUnlockTest AuditGuardsTest DeterminismGuardTest EventConsequenceTest)
+  StockTest NciTest SuccessionTest BalanceTest PerformanceTest AgentScaleTest WorldLayerTest MacroPlusTest MarketTest CreditSystemTest LongCyclesTest StageAStressTest WorldViewTest IntelBoardTest AntiExploitTest ProductMarketTest OperationsTest FinanceTest DerivativesTest MinorityTest ForensicsTest LawTest ActorsTest InsightTest SaveSlotsTest ActiveBotTest CardDeckTest RolesTest ChallengeTest EraUnlockTest AuditGuardsTest DeterminismGuardTest EventConsequenceTest ReplayFixtureTest)
 if [ "$#" -gt 0 ]; then CLASSES=("$@"); else CLASSES=("${DEFAULT_CLASSES[@]}"); fi
 FQ=(); for c in "${CLASSES[@]}"; do FQ+=("com.example.$c"); done
 exec java -cp "$OUT/stub.jar:$OUT/engine.jar:$OUT/tests.jar:$OUT/runner.jar:$STD:$CO" RunnerKt "${FQ[@]}"

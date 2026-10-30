@@ -66,6 +66,22 @@ android {
     buildConfig = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
+  // Sumber bersama uji JVM dan uji instrumented (emulator): ringkasan keadaan dan fixture putar ulang (src/shared) selalu ikut.
+  // Uji UI Robolectric + Compose (src/uiTest, pembantunya di src/uiShared) hanya dikompilasi bila diminta dengan -PuiOnly, supaya
+  // uji unit biasa (mesin) tidak ikut terganggu; pembantunya juga dipakai uji emulator (androidTest).
+  sourceSets {
+    named("test") {
+      kotlin.directories += "src/shared/kotlin"
+      if (project.hasProperty("uiOnly")) {
+        kotlin.directories += "src/uiShared/kotlin"
+        kotlin.directories += "src/uiTest/kotlin"
+      }
+    }
+    named("androidTest") {
+      kotlin.directories += "src/shared/kotlin"
+      kotlin.directories += "src/uiShared/kotlin"
+    }
+  }
   dependenciesInfo {
     includeInApk = false
     includeInBundle = true
@@ -81,6 +97,16 @@ secrets {
 }
 
 googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }
+
+// Uji UI (paket com.example.ui: Robolectric + Compose) berjalan di langkah CI tersendiri: `gradle :app:testDebugUnitTest -PuiOnly`.
+// Tanpa -PuiOnly, uji unit biasa (mesin) berjalan tanpa uji UI sehingga tetap cepat.
+tasks.withType<Test>().configureEach {
+  maxHeapSize = "3g"
+  filter {
+    if (project.hasProperty("uiOnly")) includeTestsMatching("com.example.ui.*")
+    else excludeTestsMatching("com.example.ui.*")
+  }
+}
 
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
@@ -136,6 +162,7 @@ dependencies {
   testImplementation(libs.robolectric)
   androidTestImplementation(platform(libs.androidx.compose.bom))
   androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+  androidTestImplementation(libs.androidx.core)
   androidTestImplementation(libs.androidx.espresso.core)
   androidTestImplementation(libs.androidx.junit)
   androidTestImplementation(libs.androidx.runner)

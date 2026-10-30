@@ -78,8 +78,9 @@ object ActiveBot {
 
     fun leverage(e: KapitalEngine): Double = e.totalDebt() / maxOf(1.0, e.equity)
 
-    fun step(e: KapitalEngine, t: Int) {
-        TestBots.disciplinedStep(e, t)
+    fun step(e: KapitalEngine, t: Int, rec: MutableList<String>? = null) {
+        fun ap(a: Action): Boolean { val ok = e.apply(a); if (ok) rec?.add(a.encode()); return ok }
+        TestBots.disciplinedStep(e, t, rec)
         if (e.gameOverReason != null) return
         val T = ActiveBotTuning
         val era = KapitalEngine.era(e.turn)
@@ -88,39 +89,39 @@ object ActiveBot {
         if (T.pricing) {
             val util = e.utilization()
             val rev = e.lastIncome["revenue"] ?: e.sc.baseRevenue
-            if (e.cash < 0.25 * rev && e.priceAdjPct < 12) e.apply(Action.AdjustPrice(3))
-            else if (t % 3 == 0 && util > 0.92 && e.priceAdjPct < 10) e.apply(Action.AdjustPrice(2))
-            else if (t % 3 == 0 && util < 0.70 && e.priceAdjPct > -6) e.apply(Action.AdjustPrice(-2))
+            if (e.cash < 0.25 * rev && e.priceAdjPct < 12) ap(Action.AdjustPrice(3))
+            else if (t % 3 == 0 && util > 0.92 && e.priceAdjPct < 10) ap(Action.AdjustPrice(2))
+            else if (t % 3 == 0 && util < 0.70 && e.priceAdjPct > -6) ap(Action.AdjustPrice(-2))
         }
         val levOk = !T.leverage || (leverage(e) < 1.2 && e.covenantDistancePct() > 15.0)
 
         // kapasitas dan produktivitas tak dikekang leverage atau cadangan kas (terbukti memperbanyak kematian Era 1)
-        if (e.utilization() > 0.97 && e.extraLines < 3 && e.cash > 18000.0 * n) e.apply(Action.Invest("line"))
-        if (t % 24 == 7 && e.cash > 15000.0 * n) e.apply(Action.Invest(listOf("automation", "brand", "rnd")[(t / 24) % 3]))
-        if (!e.esgCompliant && spare > 12000.0 * n) e.apply(Action.Invest("solar"))
-        if (T.insure && e.insuranceLevel == 0 && t >= 5 && t % 4 == 1 && spare > 3000.0 * n) e.apply(Action.SetInsurance(1))
+        if (e.utilization() > 0.97 && e.extraLines < 3 && e.cash > 18000.0 * n) ap(Action.Invest("line"))
+        if (t % 24 == 7 && e.cash > 15000.0 * n) ap(Action.Invest(listOf("automation", "brand", "rnd")[(t / 24) % 3]))
+        if (!e.esgCompliant && spare > 12000.0 * n) ap(Action.Invest("solar"))
+        if (T.insure && e.insuranceLevel == 0 && t >= 5 && t % 4 == 1 && spare > 3000.0 * n) ap(Action.SetInsurance(1))
         if (T.hedge) {
-            if (t % 6 == 2 && spare > 1000.0 * n && e.derivBlock("ctf", 50) == null) e.apply(Action.BuyDerivative("ctf", 50))
-            if (e.subsidiaries.isNotEmpty() && t % 12 == 4 && spare > 1000.0 * n && e.derivBlock("fxo", 50) == null) e.apply(Action.BuyDerivative("fxo", 50))
+            if (t % 6 == 2 && spare > 1000.0 * n && e.derivBlock("ctf", 50) == null) ap(Action.BuyDerivative("ctf", 50))
+            if (e.subsidiaries.isNotEmpty() && t % 12 == 4 && spare > 1000.0 * n && e.derivBlock("fxo", 50) == null) ap(Action.BuyDerivative("fxo", 50))
         }
         if (era >= 2 && t % 12 == 3 && levOk) {
-            for (c in listOf("tarsis", "kestrel")) if (e.cash - (if (T.reserve) reserveRs(e) else 0.0) > 30000.0 * n) e.apply(Action.OpenSubsidiary(c))
-            if (e.fxHedgeActive.not() && e.subsidiaries.isNotEmpty()) e.apply(Action.HedgeFx)
-            for (c in e.subsidiaries.keys) e.apply(Action.Repatriate(c))
+            for (c in listOf("tarsis", "kestrel")) if (e.cash - (if (T.reserve) reserveRs(e) else 0.0) > 30000.0 * n) ap(Action.OpenSubsidiary(c))
+            if (e.fxHedgeActive.not() && e.subsidiaries.isNotEmpty()) ap(Action.HedgeFx)
+            for (c in e.subsidiaries.keys) ap(Action.Repatriate(c))
         } else if (era >= 2 && t % 12 == 3) {
-            if (e.fxHedgeActive.not() && e.subsidiaries.isNotEmpty()) e.apply(Action.HedgeFx)
-            for (c in e.subsidiaries.keys) e.apply(Action.Repatriate(c))
+            if (e.fxHedgeActive.not() && e.subsidiaries.isNotEmpty()) ap(Action.HedgeFx)
+            for (c in e.subsidiaries.keys) ap(Action.Repatriate(c))
         }
         if (era >= 3) {
-            if (!e.isPublicCompany && e.ipoBlock() == null && spare > 20000.0 * n) e.apply(Action.ExecuteIpo(20, false))
-            if (e.isPublicCompany && t % 12 == 9 && spare > 60000.0 * n && levOk) e.apply(Action.Buyback(2000))
-            if (t % 12 == 5 && spare > 40000.0 * n) e.apply(Action.OpenCaptiveBank)
+            if (!e.isPublicCompany && e.ipoBlock() == null && spare > 20000.0 * n) ap(Action.ExecuteIpo(20, false))
+            if (e.isPublicCompany && t % 12 == 9 && spare > 60000.0 * n && levOk) ap(Action.Buyback(2000))
+            if (t % 12 == 5 && spare > 40000.0 * n) ap(Action.OpenCaptiveBank)
             // pemulihan leverage: emiten yang terlalu berutang menerbitkan saham baru
-            if (T.leverage && e.isPublicCompany && leverage(e) > 2.0 && t % 12 == 11) e.apply(Action.IssueShares((0.25 * e.equity).toInt().coerceAtLeast(1000)))
+            if (T.leverage && e.isPublicCompany && leverage(e) > 2.0 && t % 12 == 11) ap(Action.IssueShares((0.25 * e.equity).toInt().coerceAtLeast(1000)))
         }
         if (era >= 4) {
-            if (e.appointedSuccessorId == null) e.apply(Action.AppointSuccessor("exec_cfo"))
-            if (e.carbonCredits < 5 && spare > 20000.0 * n) e.apply(Action.CarbonAction("buy", 5))
+            if (e.appointedSuccessorId == null) ap(Action.AppointSuccessor("exec_cfo"))
+            if (e.carbonCredits < 5 && spare > 20000.0 * n) ap(Action.CarbonAction("buy", 5))
         }
     }
 }
@@ -132,21 +133,22 @@ object ActiveBot {
  * ceroboh harus jarang menang.
  */
 object RecklessBot {
-    fun step(e: KapitalEngine, t: Int) {
+    fun step(e: KapitalEngine, t: Int, rec: MutableList<String>? = null) {
         if (e.gameOverReason != null) return
+        fun ap(a: Action): Boolean { val ok = e.apply(a); if (ok) rec?.add(a.encode()); return ok }
         val era = KapitalEngine.era(e.turn)
         val n = e.sc.size
         for (ev in e.openEvents.toList()) {
             val o = ev.options.lastOrNull() ?: continue
-            e.apply(Action.EventChoice(ev.id, o.id))
+            ap(Action.EventChoice(ev.id, o.id))
         }
-        if (e.priceAdjPct > -15) e.apply(Action.AdjustPrice(-3))
-        if (e.cash > 6000.0 * n && e.extraLines < 3) e.apply(Action.Invest("line"))
-        if (t % 12 == 5) e.apply(Action.WindowDress(50))
-        if (era >= 2 && t % 6 == 3 && e.cash > 8000.0 * n) for (c in listOf("tarsis", "kestrel")) e.apply(Action.OpenSubsidiary(c))
+        if (e.priceAdjPct > -15) ap(Action.AdjustPrice(-3))
+        if (e.cash > 6000.0 * n && e.extraLines < 3) ap(Action.Invest("line"))
+        if (t % 12 == 5) ap(Action.WindowDress(50))
+        if (era >= 2 && t % 6 == 3 && e.cash > 8000.0 * n) for (c in listOf("tarsis", "kestrel")) ap(Action.OpenSubsidiary(c))
         if (era >= 3) {
-            if (!e.isPublicCompany && e.ipoBlock() == null) e.apply(Action.ExecuteIpo(30, true))
-            if (e.isPublicCompany && e.cash > 10000.0 * n) e.apply(Action.Buyback((e.cash * 0.5).toInt().coerceAtLeast(1000)))
+            if (!e.isPublicCompany && e.ipoBlock() == null) ap(Action.ExecuteIpo(30, true))
+            if (e.isPublicCompany && e.cash > 10000.0 * n) ap(Action.Buyback((e.cash * 0.5).toInt().coerceAtLeast(1000)))
         }
     }
 }
