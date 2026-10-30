@@ -11,10 +11,20 @@ package com.example.engine
  * Batasan jujur: log aksi tidak menyembunyikan apa pun, jadi pemain yang melihat log pemain lain dapat menyalinnya
  * (kecurangan sosial tidak dicegah). Verifikasi hanya menjamin skor sesuai log, bukan bahwa pemain memainkannya sendiri.
  */
-data class Challenge(val role: Role, val seed: Long, val horizon: Int, val difficulty: Difficulty = Difficulty.MANAJER) {
+data class Challenge(
+    val role: Role,
+    val seed: Long,
+    val horizon: Int,
+    val difficulty: Difficulty = Difficulty.MANAJER,
+    /** Versi mesin pembuat kode; null pada kode lama tanpa cap. Dunia dan skor hanya sebanding pada versi yang sama. */
+    val engineVersion: Int? = ENGINE_VERSION
+) {
     val id: String get() = "${role.code}-$seed-$horizon-${difficulty.name}"
 
-    fun encode(): String = "KAPITAL-TANTANGAN|1|${role.code}|$seed|$horizon|${difficulty.name}"
+    /** Dunia yang sama (peran, seed, panjang, kesulitan) terlepas dari cap versi mesin. */
+    fun sameWorld(o: Challenge): Boolean = role == o.role && seed == o.seed && horizon == o.horizon && difficulty == o.difficulty
+
+    fun encode(): String = "KAPITAL-TANTANGAN|1|${role.code}|$seed|$horizon|${difficulty.name}" + (engineVersion?.let { "|$it" } ?: "")
 
     companion object {
         fun decode(text: String): Challenge? {
@@ -24,15 +34,24 @@ data class Challenge(val role: Role, val seed: Long, val horizon: Int, val diffi
                 val horizon = p[4].toInt()
                 if (horizon !in 6..600) return null
                 val role = Role.of(p[2]) ?: return null
-                Challenge(role, p[3].toLong(), horizon, Difficulty.valueOf(p[5]))
+                Challenge(role, p[3].toLong(), horizon, Difficulty.valueOf(p[5]), p.getOrNull(6)?.trim()?.toIntOrNull())
             } catch (e: Exception) { null }
         }
     }
 }
 
-data class Submission(val player: String, val challenge: Challenge, val log: List<String>, val claimedScore: Int) {
+data class Submission(
+    val player: String,
+    val challenge: Challenge,
+    val log: List<String>,
+    val claimedScore: Int,
+    /** Versi mesin tempat log dimainkan; null pada hasil lama tanpa cap. */
+    val engineVersion: Int? = ENGINE_VERSION
+) {
     fun encode(): String = buildString {
-        append("KAPITAL-HASIL|1|").append(safeName(player)).append('|').append(claimedScore).append('\n')
+        append("KAPITAL-HASIL|1|").append(safeName(player)).append('|').append(claimedScore)
+        engineVersion?.let { append('|').append(it) }
+        append('\n')
         append(challenge.encode())
         for (l in log) append('\n').append(l)
     }
@@ -46,7 +65,7 @@ data class Submission(val player: String, val challenge: Challenge, val log: Lis
                 val h = lines[0].split("|")
                 if (lines.size < 2 || h.size < 4 || h[0] != "KAPITAL-HASIL" || h[1] != "1") return null
                 val c = Challenge.decode(lines[1]) ?: return null
-                Submission(h[2], c, lines.drop(2).filter { it.isNotBlank() }, h[3].toInt())
+                Submission(h[2], c, lines.drop(2).filter { it.isNotBlank() }, h[3].toInt(), h.getOrNull(4)?.trim()?.toIntOrNull())
             } catch (e: Exception) { null }
         }
     }
@@ -61,12 +80,27 @@ object ChallengeVerifier {
         return if (e.gameOverReason != null && !e.isVictory) minOf(total, 25) else total
     }
 
+    /** Alasan penolakan bila hasil dibuat di versi mesin lain (putar ulang lintas versi tidak sebanding), atau null. */
+    fun versionProblem(sub: Submission): String? {
+        for (v in listOfNotNull(sub.engineVersion, sub.challenge.engineVersion)) {
+            if (v != ENGINE_VERSION) {
+                return "Hasil ini dibuat di mesin versi $v, sedangkan aplikasi ini versi $ENGINE_VERSION. Skor tidak bisa diverifikasi lintas versi " +
+                    "karena dunia berjalan berbeda; minta pemain memainkan ulang di versi yang sama atau samakan versi aplikasi (ini bukan tuduhan curang)."
+            }
+        }
+        return null
+    }
+
     fun verify(sub: Submission): Verification {
+        versionProblem(sub)?.let { return Verification(false, 0, it) }
         val c = sub.challenge
         val real = if (c.role == Role.CEO) replayCeo(c, sub.log) else replayRole(c, sub.log)
         if (real.first == null) return Verification(false, 0, real.second)
         val s = real.first!!
-        if (s != sub.claimedScore) return Verification(false, s, "Skor klaim ${sub.claimedScore} tidak sama dengan hasil putar ulang $s.")
+        if (s != sub.claimedScore) {
+            val hint = if (sub.engineVersion == null && c.engineVersion == null) " Hasil ini lama dan tidak memuat cap versi mesin; bisa jadi dibuat di versi lain." else ""
+            return Verification(false, s, "Skor klaim ${sub.claimedScore} tidak sama dengan hasil putar ulang $s.$hint")
+        }
         return Verification(true, s, "Terverifikasi lewat putar ulang.")
     }
 
@@ -98,7 +132,7 @@ class Leaderboard(val challenge: Challenge) {
     private val best = LinkedHashMap<String, LeaderboardEntry>()
 
     fun submit(sub: Submission): Verification {
-        if (sub.challenge != challenge) return Verification(false, 0, "Hasil ini untuk tantangan lain.")
+        if (!sub.challenge.sameWorld(challenge)) return Verification(false, 0, "Hasil ini untuk tantangan lain.")
         val v = ChallengeVerifier.verify(sub)
         if (!v.ok) return v
         val name = Submission.safeName(sub.player)

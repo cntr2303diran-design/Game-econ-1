@@ -169,7 +169,7 @@ class SaveSlotsTest {
         r.newGameFromChallenge(com.example.engine.Challenge(com.example.engine.Role.CEO, seed, 480, Difficulty.MANAJER))
         feed(r, lines.take(30))
         val text = store.text!!
-        assertTrue("simpanan memuat cap versi", text.lines().any { it == "VER:${com.example.data.ENGINE_VERSION}" })
+        assertTrue("simpanan memuat cap versi", text.lines().any { it == "VER:${com.example.engine.ENGINE_VERSION}" })
         assertTrue("SEED tetap baris pertama (kompatibel dengan pembaca lama)", text.lines().first().startsWith("SEED:"))
         // muat ulang dengan versi sama: tanpa peringatan
         val same = Main().also { it.text = text }

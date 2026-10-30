@@ -155,5 +155,38 @@ class ChallengeTest {
         assertTrue("nama tanpa karakter kontrol: ${r.ranking()[0].player}", r.ranking()[0].player.none { it.isISOControl() })
         r.restore("rusak\nx\ty\tz\n\n"); assertEquals(1, r.ranking().size)
     }
-}
 
+    @Test
+    fun challengeAndSubmission_carryTheEngineVersion_andCrossVersionResultsAreRefusedPolitely() {
+        val c = Challenge(Role.GUBERNUR, 4141L, 24)
+        assertEquals(com.example.engine.ENGINE_VERSION, c.engineVersion)
+        assertTrue("kode tantangan memuat cap versi", c.encode().endsWith("|${com.example.engine.ENGINE_VERSION}"))
+        assertEquals(c, Challenge.decode(c.encode()))
+        // kode lama tanpa cap tetap terbaca (versi tidak diketahui) dan menunjuk dunia yang sama
+        val legacy = Challenge.decode("KAPITAL-TANTANGAN|1|GUB|4141|24|MANAJER")!!
+        assertTrue(legacy.engineVersion == null)
+        assertTrue(legacy.sameWorld(c))
+        // hasil bercap versi lain ditolak dengan alasan yang tidak menuduh curang
+        val good = playGovernor(c, RolesTest.Companion::taylorGovernor)
+        assertTrue(ChallengeVerifier.verify(good).ok)
+        val v = ChallengeVerifier.verify(good.copy(engineVersion = com.example.engine.ENGINE_VERSION + 1))
+        assertFalse(v.ok)
+        assertTrue("alasan menyebut versi dan bukan tuduhan curang: ${v.reason}", v.reason.contains("versi") && v.reason.contains("bukan tuduhan curang"))
+        val v2 = ChallengeVerifier.verify(good.copy(challenge = c.copy(engineVersion = com.example.engine.ENGINE_VERSION + 1)))
+        assertFalse(v2.ok)
+        // hasil lama tanpa cap yang skornya benar tetap terverifikasi; yang salah mendapat petunjuk versi
+        val legacySub = good.copy(challenge = legacy, engineVersion = null)
+        assertTrue(ChallengeVerifier.verify(legacySub).ok)
+        val vb = ChallengeVerifier.verify(legacySub.copy(claimedScore = good.claimedScore + 5))
+        assertFalse(vb.ok)
+        assertTrue("petunjuk hasil lama: ${vb.reason}", vb.reason.contains("tanpa cap versi") || vb.reason.contains("tidak memuat cap versi"))
+        // sampai lewat teks: cap ikut terbawa, header lama tanpa cap tetap terbaca
+        val back = Submission.decode(good.encode())!!
+        assertEquals(com.example.engine.ENGINE_VERSION, back.engineVersion)
+        val oldText = good.encode().lines().toMutableList().also { it[0] = it[0].substringBeforeLast('|') }.joinToString("\n")
+        assertTrue(Submission.decode(oldText)!!.engineVersion == null)
+        // papan menerima hasil dari kode lama dan kode baru pada dunia yang sama
+        val board = Leaderboard(legacy)
+        assertTrue(board.submit(good).ok)
+    }
+}

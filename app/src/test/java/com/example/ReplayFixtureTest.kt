@@ -1,6 +1,6 @@
 package com.example
 
-import com.example.data.ENGINE_VERSION
+import com.example.engine.ENGINE_VERSION
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

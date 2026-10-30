@@ -19,6 +19,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.engine.Challenge
 import com.example.engine.Difficulty
+import com.example.engine.ENGINE_VERSION
 import com.example.engine.FundGame
 import com.example.engine.GovernorGame
 import com.example.engine.Leaderboard
@@ -215,6 +216,9 @@ private fun PilihPeran(
                 val c = Challenge.decode(importText)
                 when {
                     c == null -> importError = "Kode tantangan tidak sah."
+                    c.engineVersion != null && c.engineVersion != ENGINE_VERSION ->
+                        importError = "Kode tantangan ini dibuat di mesin versi ${c.engineVersion}, aplikasi Anda versi $ENGINE_VERSION: " +
+                            "dunia dan skor tidak sebanding. Minta kode baru dari pembuatnya atau samakan versi aplikasi."
                     c.role == Role.CEO -> onPlayCeo(c)
                     else -> onStart(c)
                 }

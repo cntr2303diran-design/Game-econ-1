@@ -4,7 +4,7 @@ import android.os.Build
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.example.data.ENGINE_VERSION
+import com.example.engine.ENGINE_VERSION
 import com.example.engine.Action
 import com.example.engine.KapitalEngine
 import org.junit.Assert.assertEquals

@@ -3,7 +3,7 @@ package com.example.ui
 import com.example.ActiveBot
 import com.example.RecklessBot
 import com.example.TestBots
-import com.example.data.ENGINE_VERSION
+import com.example.engine.ENGINE_VERSION
 import com.example.engine.Action
 import com.example.engine.KapitalEngine
 

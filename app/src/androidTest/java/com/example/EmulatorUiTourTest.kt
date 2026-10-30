@@ -3,14 +3,13 @@ package com.example
 import android.graphics.Bitmap
 import android.os.SystemClock
 import android.util.Log
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.example.data.ENGINE_VERSION
+import com.example.engine.ENGINE_VERSION
 import com.example.engine.Action
 import com.example.engine.Difficulty
 import com.example.ui.Soft

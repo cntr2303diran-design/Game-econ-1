@@ -3,7 +3,7 @@ package com.example.tools
 import com.example.ActiveBot
 import com.example.ReplayDigest
 import com.example.ReplayFixture
-import com.example.data.ENGINE_VERSION
+import com.example.engine.ENGINE_VERSION
 import com.example.engine.Action
 import com.example.engine.KapitalEngine
 import java.io.File

@@ -11,6 +11,7 @@ import com.example.engine.Submission
 import com.example.engine.Countries
 import com.example.engine.DataKind
 import com.example.engine.DerivKind
+import com.example.engine.ENGINE_VERSION
 import com.example.engine.Difficulty
 import com.example.engine.FactoryScheme
 import com.example.engine.KapitalEngine
@@ -70,13 +71,6 @@ private data class UiFlags(
     val selectedCountry: Country? = null,
     val counterfactualText: String? = null
 )
-
-/**
- * Versi mesin pada berkas simpanan (baris "VER:n"). Simpanan adalah seed + daftar tindakan yang diputar ulang, sehingga setiap
- * perubahan perilaku mesin mengubah hasil simpanan lama. Naikkan angka ini tiap perubahan yang memengaruhi hasil putar ulang.
- * 1 = simpanan tanpa cap (sampai build-77); 2 = mogok meninggalkan efek pasca-mogok dan efek aktif di laporan.
- */
-const val ENGINE_VERSION = 2
 
 /** Tantangan CEO selalu satu kampanye penuh (480 bulan) atau sampai perusahaan berakhir. */
 const val CEO_CHALLENGE_HORIZON = 480
