@@ -55,6 +55,9 @@ android {
       // Do not remove or modify this signingConfig assignment. It is necessary for Android apps in
       // AI Studio.
       signingConfig = signingConfigs.getByName("debugConfig")
+      // Hanya CI emulator (-PciNoDebuggable): aplikasi debuggable dikompilasi ART dengan optimasi yang dikurangi, jadi pengukuran
+      // kecepatan memutar ulang simpanan di emulator memakai build yang tidak debuggable agar mendekati yang dialami pemain.
+      if (project.hasProperty("ciNoDebuggable")) isDebuggable = false
     }
   }
   compileOptions {

@@ -196,13 +196,26 @@ jobs:
 
       - name: Bangun APK debug, APK uji, dan APK release (R8)
         run: |
-          mkdir -p emulator-out
+          mkdir -p emulator-out apk-dbg apk-nd
           set +e
           gradle :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease --stacktrace > emulator-out/gradle-build.log 2>&1
           code=$?
           tail -n 40 emulator-out/gradle-build.log
-          if [ $code -ne 0 ]; then python3 tools/ci_gradle_errors.py emulator-out/gradle-build.log; fi
-          exit $code
+          if [ $code -ne 0 ]; then python3 tools/ci_gradle_errors.py emulator-out/gradle-build.log; exit $code; fi
+          cp app/build/outputs/apk/debug/*.apk apk-dbg/
+          # Build kedua: APK "debug" yang TIDAK debuggable. ART mengompilasi aplikasi debuggable dengan optimasi yang dikurangi, jadi
+          # kecepatan memutar ulang simpanan diukur pada kedua build agar terlihat selisihnya (lihat tools/ci-emulator.sh).
+          gradle -PciNoDebuggable :app:assembleDebug --stacktrace > emulator-out/gradle-build-nd.log 2>&1
+          code=$?
+          tail -n 15 emulator-out/gradle-build-nd.log
+          if [ $code -ne 0 ]; then python3 tools/ci_gradle_errors.py emulator-out/gradle-build-nd.log; exit $code; fi
+          cp app/build/outputs/apk/debug/*.apk apk-nd/
+          AAPT2=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
+          {
+            echo "dbg debuggable: $("$AAPT2" dump badging apk-dbg/app-debug.apk | grep -c application-debuggable)"
+            echo "nd  debuggable: $("$AAPT2" dump badging apk-nd/app-debug.apk | grep -c application-debuggable)"
+          } | tee emulator-out/apk-flags.txt
+          exit 0
 
       - name: Aktifkan KVM
         run: |
@@ -217,7 +230,8 @@ jobs:
           arch: x86_64
           target: google_apis
           profile: pixel_6
-          ram-size: 3072M
+          ram-size: 4096M
+          cores: 4
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: bash tools/ci-emulator.sh
@@ -232,7 +246,11 @@ jobs:
             echo '```'; cat emulator-out/status.txt 2>/dev/null; echo '```'
             echo "Ukuran APK (byte):"; echo '```'; cat emulator-out/apk-sizes.txt 2>/dev/null; echo '```'
             echo "Monkey pada APK release:"; echo '```'; cat emulator-out/monkey-ringkasan.txt 2>/dev/null; echo '```'
-            echo "Muat simpanan akhir permainan (±380 bulan) dari proses dingin, kompilasi bawaan (jit) lalu AOT penuh (aot):"; echo '```'; cat emulator-out/cold-load.txt 2>/dev/null; echo '```'
+            echo "Debuggable per build (1 = debuggable, 0 = tidak):"; echo '```'; cat emulator-out/apk-flags.txt 2>/dev/null; echo '```'
+            echo "Muat simpanan akhir permainan (380 giliran) dari proses baru; nd = build tidak debuggable, dbg = debuggable; jit = kompilasi bawaan, aot = compile -m speed; uji = diukur dalam uji, app = aplikasi sungguhan:"; echo '```'; cat emulator-out/cold-load.txt 2>/dev/null; echo '```'
+            for f in emulator-out/cold/math_cost-nd-jit.txt emulator-out/cold/art_profile-nd-jit.txt emulator-out/cold/art_profile-nd-aot.txt; do
+              echo "Profil ART: $f"; echo '```'; head -n 90 "$f" 2>/dev/null; echo '```'
+            done
             echo "Keluaran penting uji instrumented:"; echo '```'; cat emulator-out/art-logcat.txt 2>/dev/null; echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           python3 tools/parse_instrument.py emulator-out/instrument.txt >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
@@ -248,7 +266,51 @@ jobs:
       - name: Gagalkan job bila ada pemeriksaan emulator yang gagal
         run: |
           cat emulator-out/status.txt
-          ! grep -E "^(instrumented|release_install)=[^0]|^monkey_crash=1|^release_fatal=1|^release_alive_after_(start|monkey)=[^0]" emulator-out/status.txt
+          ! grep -E "^(instrumented|release_install)=[^0]|^monkey_crash=1|^release_fatal=1|^release_alive_after_(start|monkey)=[^0]|^nd_debuggable=1" emulator-out/status.txt
+
+  arm64:
+    # Mesin deterministik dijalankan di CPU ARM64 (HotSpot aarch64) dan harus menghasilkan ringkasan yang sama bit demi bit dengan
+    # fixture yang dibangkitkan di x86_64. Ini menutup separuh celah "ARM belum diuji"; yang tersisa adalah ART di ARM (tanpa emulator ARM
+    # berkecepatan layak di CI). Berdiri sendiri: hasilnya diterbitkan ke cabang ci-hasil-arm64-<cabang>, tidak ditunggu job `hasil`.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Siapkan Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Unduh kotlinc 2.0.21
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/kotlinc.zip" https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip
+          unzip -q "$RUNNER_TEMP/kotlinc.zip" -d "$RUNNER_TEMP"
+
+      - name: Uji determinisme dan putar ulang di CPU ARM64
+        run: |
+          mkdir -p arm-out
+          { echo "arsitektur: $(uname -m)"; java -version 2>&1; } > arm-out/mesin.txt
+          set +e
+          KOTLINC_HOME="$RUNNER_TEMP/kotlinc" tools/run-tests.sh ReplayFixtureTest DeterminismGuardTest ChallengeTest SaveSlotsTest AsyncRestoreTest StressCalibrationTest > arm-out/uji.txt 2>&1
+          code=$?
+          echo "$code" > arm-out/exit.txt
+          grep -E "^(PASS|FAIL)|REPLAY-FIXTURE|== LULUS" arm-out/uji.txt > arm-out/ringkasan.txt
+          cat arm-out/mesin.txt arm-out/ringkasan.txt
+          { echo "### Mesin di CPU ARM64"; cat arm-out/mesin.txt; echo '```'; grep -E "REPLAY-FIXTURE|== LULUS|^FAIL" arm-out/ringkasan.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $code
+
+      - name: Terbitkan hasil ARM64 ke cabang ci-hasil-arm64-<cabang>
+        if: always() && github.event_name == 'push' && startsWith(github.ref_name, 'claude/')
+        run: |
+          branch="ci-hasil-arm64-${GITHUB_REF_NAME//\//-}"
+          cd arm-out
+          echo "run ${{ github.run_number }}; commit ${{ github.sha }}; cabang ${GITHUB_REF_NAME}" > INFO.txt
+          git init -q -b ci-hasil
+          git add -A
+          git -c user.name="ci" -c user.email="ci@users.noreply.github.com" commit -q -m "Hasil ARM64 run ${{ github.run_number }} (${{ github.sha }})"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "ci-hasil:refs/heads/${branch}"
 
   hasil:
     needs: [build, emulator]
