@@ -1,0 +1,14 @@
+== jendela 0
+      #peran_back "Kembali" [klik]
+      "Peran dan tantangan" 
+        "Selesai: Gubernur Bank Sentral" 
+        "Bulan ke-24 dari 24. Suku bunga acuan 6.25%." 
+        "Inflasi 4.9% (target 3%), kesenjangan output 5.0%, pengangguran 3.7%." 
+        "Inflasi tertinggi 5.1%, kesenjangan terdalam -0.2%. Skor 55." 
+        "Bagikan" 
+        "Kode tantangan memuat seed, sehingga lawan memainkan dunia yang sama. Hasil memuat seluruh log aksi Anda; penerima memutar ulangnya sendiri untuk membuktikan skor, sehingga skor yang dikarang ditolak. Log yang disalin dari pemain lain tidak bisa dicegah." 
+        #salin_tantangan "Salin kode tantangan" [klik]
+        #peran_nama "Nama Anda" [klik]
+        #salin_hasil "Salin hasil saya" [klik]
+        "Papan peringkat (hasil Anda masuk otomatis)" [klik]
+      "Main lagi" [klik]

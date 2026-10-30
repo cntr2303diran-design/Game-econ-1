@@ -1,0 +1,38 @@
+== jendela 0
+        #map_layer_chip_pelayaran "Pelayaran" [klik]
+        #map_layer_chip_zona_konflik "Zona konflik" [klik]
+        #map_layer_chip_risiko_iklim "Risiko iklim" [klik]
+        #map_layer_chip_rantai_pasok "Rantai pasok" [klik]
+      #world_polygon_canvas 
+        (ket: Peta dunia dengan 8 negara inti. Peta hanya bisa dipilih dengan sentuhan; untuk detail tiap negara gunakan daftar negara di sebelah atau di bawah peta.) 
+        (ket: Pabrik) 
+        "[P] Pabrik" 
+        (ket: Gudang) 
+        "[G] Gudang" 
+        (ket: Toko) 
+        "[T] Toko" 
+        (ket: Kapal) 
+        "[K] Kapal" 
+      "Daftar Cepat 8 Negara (Ketuk negara di peta atau di bawah)" 
+      #country_row_aurelia "Aurelia (A$) | Adidaya, mata uang cadangan dunia | Inflasi 1,7–2,9% | Konflik 61/100" [klik]
+      #country_row_norvaldia "Norvaldia (NRV) | Eksportir minyak dan gas | Inflasi 4,6–5,8% | Konflik 59/100" [klik]
+      #country_row_kestrel "Kestrel (KST) | Raksasa manufaktur (80% rantai chip & logam) | Inflasi 1,7–2,9% | Konflik 65/100" [klik]
+      #country_row_halvenia "Halvenia (HLV) | Uni ekonomi maju | Inflasi 1,0–2,2% | Konflik 36/100" [klik]
+      #country_row_meridia "Meridia (MRD) | Pusat keuangan kecil, surga pajak | Inflasi 2,9–4,1% | Konflik 23/100" [klik]
+      #country_row_sundara "Sundara (RS) | Negara berkembang, asal pemain (PT Benang Sundara) | Inflasi 4,4–6,4% | Konflik 41/100" [klik]
+      #country_row_tarsis "Tarsis (TRS) | Agraris, populasi raksasa | Inflasi 6,8–8,0% | Konflik 49/100" [klik]
+      #country_row_velmora "Velmora (VLM) | Rezim otoriter kaya mineral & logam tanah jarang | Inflasi 9,2–10,4% | Konflik 79/100" [klik]
+      #open_menu_button (ket: Menu utama) [klik]
+      "Oktober 2034" 
+      "Giliran 58 · Era 1" 
+      #chip_ap 
+        "AP 7/7" 
+      #chip_runway 
+        "Kas stabil" 
+      #toggle_theme_button (ket: Ganti mode terang atau gelap) [klik]
+        #bottom_nav_markas "Markas" [klik]
+        #bottom_nav_peta "Peta" [klik]
+        #bottom_nav_perusahaan "Usaha" [klik]
+        #bottom_nav_pasar "Pasar" [klik]
+        #bottom_nav_bursa "Bursa" [klik]
+        #bottom_nav_dunia "Dunia" [klik]

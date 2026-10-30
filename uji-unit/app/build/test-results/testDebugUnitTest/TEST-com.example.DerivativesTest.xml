@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.DerivativesTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:30:47.129Z" hostname="runnervm48cm3" time="4.251">
+  <properties/>
+  <testcase name="swap_settlementMovesWithInterestBill" classname="com.example.DerivativesTest" time="0.769"/>
+  <testcase name="actions_roundTrip_andInvalidRejected" classname="com.example.DerivativesTest" time="0.001"/>
+  <testcase name="repositoryView_listsDerivatives_andPurchaseWorks" classname="com.example.DerivativesTest" time="0.004"/>
+  <testcase name="deterministic_andSaveRoundTrip" classname="com.example.DerivativesTest" time="0.022"/>
+  <testcase name="settlement_matchesContractTerms" classname="com.example.DerivativesTest" time="0.102"/>
+  <testcase name="swapAndFutures_settleBothSigns" classname="com.example.DerivativesTest" time="1.021"/>
+  <testcase name="eachKind_isBuyableWithExposure_andLimitedToOneAtATime" classname="com.example.DerivativesTest" time="0.001"/>
+  <testcase name="noFreeMoney_averageNetIsNegative_forEveryKind" classname="com.example.DerivativesTest" time="2.31"/>
+  <testcase name="premium_isExpensed_andStatementsStayConsistent_untilSettlement" classname="com.example.DerivativesTest" time="0.02"/>
+  <system-out><![CDATA[DERIV swap corr(rate path, settlement)=0.6784536898882749 n=69
+DERIV signs swap +36/-37 futures +33/-47
+DERIV FXOPT n=109 meanNet=-87.63446924780911 meanGross=260.0942373818678 pos=47 neg=0
+DERIV COTFUT n=111 meanNet=-530.0589636192587 meanGross=-425.43287810012015 pos=47 neg=64
+DERIV SWAP n=103 meanNet=-27.56804796944679 meanGross=-6.973740771719277 pos=50 neg=52
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

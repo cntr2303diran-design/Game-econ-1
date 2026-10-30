@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.MinorityTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:33:03.424Z" hostname="runnervm48cm3" time="3.821">
+  <properties/>
+  <testcase name="deterministic_sameActionsSameResult" classname="com.example.MinorityTest" time="0.163"/>
+  <testcase name="vetoAtTwentyPercent_blocksAggressiveTransferPricing_only" classname="com.example.MinorityTest" time="0.043"/>
+  <testcase name="withheldTaxOnNciShare_isTracked_andGroupIdentitiesHold" classname="com.example.MinorityTest" time="1.078"/>
+  <testcase name="lowAsk_isRefused_costsAP_andCooldownBlocksRetry" classname="com.example.MinorityTest" time="0.495"/>
+  <testcase name="repositoryView_listsStakes_andStockSeries" classname="com.example.MinorityTest" time="0.002"/>
+  <testcase name="action_roundTrip_andLegacyDecode" classname="com.example.MinorityTest" time="0.001"/>
+  <testcase name="noVeto_whenMinorityBelowTwentyPercent" classname="com.example.MinorityTest" time="0.0"/>
+  <testcase name="blocks_beforeSubsidiaryIsMature_andForBadInputs" classname="com.example.MinorityTest" time="0.043"/>
+  <testcase name="acceptedPrice_isBelowFairValue_andHigherAskAcceptsMoreOften" classname="com.example.MinorityTest" time="1.996"/>
+  <system-out><![CDATA[MINORITAS pajak tertahan atas bagian NCI total=873.6898928321862 seed=17 residu=6.730260793119669E-11
+MINORITAS penerimaan diskon12=3 diskon30=18 dari 18
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.ui.MenuStateUiTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:34:34.187Z" hostname="runnervm48cm3" time="5.445">
+  <properties/>
+  <testcase name="whileRestoring_menuShowsOnlyTheLoadingPanel_andHelpStaysReachable" classname="com.example.ui.MenuStateUiTest" time="4.988"/>
+  <testcase name="freshState_menuOffersStartNotContinue" classname="com.example.ui.MenuStateUiTest" time="0.102"/>
+  <testcase name="afterRestoring_menuOffersContinueNewGameAndRoles" classname="com.example.ui.MenuStateUiTest" time="0.163"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

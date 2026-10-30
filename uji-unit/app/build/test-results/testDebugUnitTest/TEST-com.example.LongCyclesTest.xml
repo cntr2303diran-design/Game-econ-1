@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.LongCyclesTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:33:02.794Z" hostname="runnervm48cm3" time="0.049">
+  <properties/>
+  <testcase name="climate_warmsAcrossEras_andExtremeEventsBecomeMoreFrequent_hittingSectors" classname="com.example.LongCyclesTest" time="0.015"/>
+  <testcase name="effects_areBoundedAndSmall" classname="com.example.LongCyclesTest" time="0.002"/>
+  <testcase name="longCycles_areDeterministic_andEngineIntegrationIsActive" classname="com.example.LongCyclesTest" time="0.026"/>
+  <testcase name="energyResilience_dampensEnergyStraitAndSanctionHits" classname="com.example.LongCyclesTest" time="0.001"/>
+  <testcase name="technologyAdoption_followsSCurves_inOrder_andBreakthroughsAdvanceThem" classname="com.example.LongCyclesTest" time="0.004"/>
+  <testcase name="demography_agesSlowly_andStaysConsistent" classname="com.example.LongCyclesTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

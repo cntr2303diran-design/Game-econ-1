@@ -1,0 +1,1 @@
+ART-UI memuat simpanan 829 baris (±380 bulan): aktivitas kembali 1565 ms, panel/menu pertama tampil 1695 ms, layar tetap responsif saat memuat (dialog terbuka dalam 1317 ms), menu siap 8863 ms

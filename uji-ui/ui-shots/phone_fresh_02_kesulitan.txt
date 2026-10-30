@@ -1,0 +1,15 @@
+== jendela 0
+      "KAPITAL" 
+      "Simulasi ekonomi dunia dan strategi korporasi" 
+      #menu_new_game "Mulai permainan" [klik]
+      #menu_peran "Peran lain dan tantangan" [klik]
+      #menu_how "Cara bermain" [klik]
+      "Ganti tema terang/gelap" [klik]
+      "Tentang permainan" [klik]
+== jendela 1
+        "Pilih tingkat kesulitan" 
+          #difficulty_MAGANG "Magang | Informasi akurat, kejadian ringan, AI pesaing pasif, cocok untuk belajar." [klik]
+          #difficulty_MANAJER "Manajer | Sedikit bising, kejadian normal, pesaing kompetitif." [klik]
+          #difficulty_DIREKTUR "Direktur | Data tertunda dan bias, kejadian berantai aktif, pesaing belajar dari pola Anda." [klik]
+          #difficulty_KRISIS_ABADI "Krisis Abadi | Sangat bising, angsa hitam lebih sering, pesaing berkoalisi melawan pemimpin pasar, Ironman wajib." [klik]
+        "Batal" [klik]

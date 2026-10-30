@@ -1,0 +1,9 @@
+instrumented=0
+release_install=0
+release_alive_after_start=0
+release_alive_after_monkey=0
+monkey_crash=0
+release_fatal=0
+nd_debuggable=0
+cold_load_finished=1
+cold_tests_bad=0

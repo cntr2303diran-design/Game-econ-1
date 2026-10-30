@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.EraReviewTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:30:52.659Z" hostname="runnervm48cm3" time="0.176">
+  <properties/>
+  <testcase name="eraReviewRecordedAtEachBoundary_andDeterministic" classname="com.example.EraReviewTest" time="0.176"/>
+  <system-out><![CDATA[ERAGRADES: [81, 80]
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

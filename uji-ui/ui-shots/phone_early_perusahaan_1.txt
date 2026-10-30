@@ -1,0 +1,83 @@
+== jendela 0
+        #perusahaan_subtab_0 "Laporan keuangan" [klik]
+        #perusahaan_subtab_1 "Organisasi" [klik]
+        #perusahaan_subtab_2 "Proyek" [klik]
+        #perusahaan_subtab_3 "Kontrak" [klik]
+        #perusahaan_subtab_4 "Bank" [klik]
+        #perusahaan_subtab_5 "Pelaku" [klik]
+        #perusahaan_subtab_6 "Investasi" [klik]
+        #perusahaan_subtab_7 "Intelijen" [klik]
+        #perusahaan_subtab_8 "Segmen" [klik]
+        #perusahaan_subtab_9 "Operasi" [klik]
+        "Desain insentif (1 AP per perubahan)" 
+        "Insentif membentuk perilaku siapa pun yang menduduki jabatan, termasuk penggantinya. Tidak ada angka loyalitas pasti; perilaku sebenarnya hanya terlihat lewat audit." 
+        "Direktur Penjualan" 
+        "Bonus omzet mendorong penjualan kredit ke peritel rapuh." 
+        "Bonus berbasis omzet" [klik]
+        "Bonus kas tertagih + clawback 3 tahun" [klik]
+        "Kepala Pabrik" 
+        "KPI penghematan biaya menggoda untuk menunda perawatan." 
+        "KPI penghematan biaya kuartalan" [klik]
+        "KPI keandalan mesin + audit perawatan" [klik]
+      #executive_card_exec_coo 
+        "GP | Gilang Permana | Direktur Operasi (COO)" (ket: Asal data penilaian eksekutif) [klik]
+          "Perkiraan loyalitas" 
+          "Sedang?" 
+          "Perkiraan ambisi" 
+          "Sedang?" 
+        "Insentif: Bonus efisiensi dan ketepatan kirim" 
+        "Sinyal: harga beli kapas 0,9% di atas indeks bursa Tarsis." 
+        "Belum diaudit" 
+        #audit_exec_coo "Audit (2 AP)" [klik]
+        "Konfrontasi (1)" [klik]
+        "Pecat (1)" [klik]
+      #executive_card_exec_sales 
+        "DA | Dimas Aryanto | Direktur Penjualan" (ket: Asal data penilaian eksekutif) [klik]
+          "Perkiraan loyalitas" 
+          "Rendah?" 
+          "Perkiraan ambisi" 
+          "Sangat tinggi?" 
+        "Insentif: Bonus kas tertagih + clawback 3 tahun" 
+        "Sinyal: omzet bulan lalu 24.641 jt RS; piutang berumur >90 hari 0 jt RS." 
+        "Belum diaudit" 
+        #audit_exec_sales "Audit (2 AP)" [klik]
+        "Konfrontasi (1)" [klik]
+        "Pecat (1)" [klik]
+      #executive_card_exec_factory 
+        "IS | Ir. Sutrisno | Kepala Pabrik Kalimas" (ket: Asal data penilaian eksekutif) [klik]
+          "Perkiraan loyalitas" 
+          "Tinggi?" 
+          "Perkiraan ambisi" 
+          "Tinggi?" 
+        "Insentif: KPI keandalan mesin + audit perawatan" 
+        "Sinyal: belanja perawatan bulan lalu 729 jt RS vs kebutuhan teknis ±669 jt RS." 
+        "Belum diaudit" 
+        #audit_exec_factory "Audit (2 AP)" [klik]
+        "Konfrontasi (1)" [klik]
+        "Pecat (1)" [klik]
+      #executive_card_exec_cfo 
+        "DA | Dewi Anggraini | Direktur Keuangan (CFO)" (ket: Asal data penilaian eksekutif) [klik]
+          "Perkiraan loyalitas" 
+          "Tinggi?" 
+          "Perkiraan ambisi" 
+          "Sedang?" 
+        "Insentif: Bonus stabilitas likuiditas dan audit bersih" 
+        "Sinyal: rekonsiliasi kas cocok dengan rekening bank." 
+        "Belum diaudit" 
+        #audit_exec_cfo "Audit (2 AP)" [klik]
+        "Konfrontasi (1)" [klik]
+        "Pecat (1)" [klik]
+      #open_menu_button (ket: Menu utama) [klik]
+      "Oktober 2035" 
+      "Giliran 70 · Era 1" 
+      #chip_ap 
+        "AP 7/7" 
+      #chip_runway 
+        "Runway 1 bln" 
+      #toggle_theme_button (ket: Ganti mode terang atau gelap) [klik]
+        #bottom_nav_markas "Markas" [klik]
+        #bottom_nav_peta "Peta" [klik]
+        #bottom_nav_perusahaan "Usaha" [klik]
+        #bottom_nav_pasar "Pasar" [klik]
+        #bottom_nav_bursa "Bursa" [klik]
+        #bottom_nav_dunia "Dunia" [klik]

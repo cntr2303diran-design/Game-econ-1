@@ -1,0 +1,56 @@
+== jendela 0
+      #card_rivals 
+        "Pesaing dan pasar produk" 
+        "Pangsa Anda" 
+        "16,6% (awal 20%)" 
+        "Pengangguran Sundara" 
+        "3,8%" 
+        "Mitra Tekstil Nusantara" 
+        "Bersaing normal" 
+        "129,20 (indeks)" 
+        "4,9% lebih murah dari Anda" 
+        "Cahaya Weaving" 
+        "Bersaing normal" 
+        "129,37 (indeks)" 
+        "4,8% lebih murah dari Anda" 
+        "Prima Garmen Utama" 
+        "Bersaing normal" 
+        "127,90 (indeks)" 
+        "5,9% lebih murah dari Anda" 
+        "Importir Velmora" 
+        "Bersaing normal" 
+        "130,08 (indeks)" 
+        "4,3% lebih murah dari Anda" 
+        "Harga adalah estimasi intel pasar (±1,5%), bukan data pasti. Ketika Anda memotong harga, pesaing menyamai dalam beberapa bulan dan perang harga menggerus margin semua pihak. Menaikkan harga membuat Anda kehilangan pangsa karena pesaing tidak ikut naik." 
+      "Komoditas, kurs, dan saham (ketuk untuk grafik, tahan untuk asal data)" 
+      #market_instrument_mkt_kapas "Komoditas · CTN-SPOT | Kapas Mentah (Tarsis Grade A) | 2656,1 A$/ton | +1,8% bulan ini" (ket: Grafik tren 6 titik: dari 2767,0 ke 2656,1, turun 4,0 persen.) [klik]
+      #market_instrument_mkt_minyak "Komoditas · OIL-BRN | Minyak Mentah Boreal (Norvaldia) | 80,4 A$/bbl | -1,1% bulan ini" (ket: Grafik tren 6 titik: dari 73,3 ke 80,4, naik 9,6 persen.) [klik]
+      #market_instrument_mkt_baja "Komoditas · STL-KST | Baja Industri & Komponen Mesin (Kestrel) | 504,1 A$/ton | -0,9% bulan ini" (ket: Grafik tren 6 titik: dari 542,8 ke 504,1, turun 7,1 persen.) [klik]
+      #market_instrument_mkt_kurs "Kurs Valas · RS / A$ | Kurs Rial Sundara / Dolar Aurelia | 44.012 RS | Rial melemah 0,2%" (ket: Grafik tren 6 titik: dari 44174,7 ke 44011,7, turun 0,4 persen.) [klik]
+      #market_instrument_mkt_saham_mahkota "Saham & Korporasi Pesaing · MKTX | Grup Mahkota Tekstil Tbk (Pesaing Kroni) | 2.450 RS | -1,8% · M-Score Mencurigakan | Beneish M-Score: -1,15 s.d. -0,85 (Ambang manipulasi > -1,78). Laba bersih dilaporkan naik, tetapi arus kas operasi negatif (indikasi Channel Stuffing)!" (ket: Grafik tren 6 titik: dari 2300,0 ke 2450,0, naik 6,5 persen.) [klik]
+      #market_instrument_mkt_saham_kestrel_loom "Saham & Korporasi Pesaing · KLFC | Kestrel Loom & Fiber Corp (Perampas Harga) | 38,4 A$ | +3,1% · Likuiditas Kuat | Beneish M-Score: -2,55 s.d. -2,15 (Aman < -1,78). Kualitas laba sehat (CFO/NI = 1,14x)." (ket: Grafik tren 6 titik: dari 34,5 ke 38,4, naik 11,3 persen.) [klik]
+        "FanChart Proyeksi: Kapas Mentah (Tarsis Grade A)" 
+        "Pita ketidakpastian 50% & 90%" 
+        "CTN-SPOT" 
+        (ket: Grafik proyeksi FanChart Proyeksi: Kapas Mentah (Tarsis Grade A), satuan CTN-SPOT. Nilai terakhir 2656,1. Median di ujung proyeksi 2515,3, rentang 50 persen 2261,1 sampai 2769,5, rentang 90 persen 2006,9 sampai 3023,7.) 
+        "← Data Historis (Terealisasi)" 
+        "Proyeksi Rentang 50% & 90% →" 
+        "Rincian Pasar & Akuntansi Forensik" 
+        "Asal data" [klik]
+        "Kapas Mentah (Tarsis Grade A) (CTN-SPOT) — 2656,1 A$/ton" 
+        "Proses mean-reverting (kecepatan 0,96/bulan) dengan guncangan pasokan dan permintaan global. Pita = 1,65 simpangan baku." 
+        "Gejala El Niño di Tarsis melebarkan pita proyeksi FanChart ke atas dalam 6 bulan ke depan." 
+      #open_menu_button (ket: Menu utama) [klik]
+      "Agustus 2066" 
+      "Giliran 440 · Era 4" 
+      #chip_ap 
+        "AP 7/7" 
+      #chip_runway 
+        "Kas stabil" 
+      #toggle_theme_button (ket: Ganti mode terang atau gelap) [klik]
+        #bottom_nav_markas "Markas" [klik]
+        #bottom_nav_peta "Peta" [klik]
+        #bottom_nav_perusahaan "Usaha" [klik]
+        #bottom_nav_pasar "Pasar" [klik]
+        #bottom_nav_bursa "Bursa" [klik]
+        #bottom_nav_dunia "Dunia" [klik]

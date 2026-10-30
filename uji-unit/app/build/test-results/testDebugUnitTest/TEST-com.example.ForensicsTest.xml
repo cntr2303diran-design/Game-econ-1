@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.ForensicsTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:32:40.012Z" hostname="runnervm48cm3" time="1.325">
+  <properties/>
+  <testcase name="repositoryView_showsForensics_andActionsWork" classname="com.example.ForensicsTest" time="0.003"/>
+  <testcase name="auditor_findsDressing_chargesFine_andClearsEvidence" classname="com.example.ForensicsTest" time="0.419"/>
+  <testcase name="mScore_risesWhenProfitOutrunsCash" classname="com.example.ForensicsTest" time="0.0"/>
+  <testcase name="deterministic_andSaveRoundTrip" classname="com.example.ForensicsTest" time="0.03"/>
+  <testcase name="mScore_honestFalsePositiveRateLow" classname="com.example.ForensicsTest" time="0.822"/>
+  <testcase name="restatement_removesDressingEvidence" classname="com.example.ForensicsTest" time="0.001"/>
+  <testcase name="windowDress_isTimingOnly_cashNeutralNowAndProfitNeutralLater" classname="com.example.ForensicsTest" time="0.048"/>
+  <testcase name="actions_roundTrip_andBlocks" classname="com.example.ForensicsTest" time="0.001"/>
+  <system-out><![CDATA[FORENSIK koreksi dengan auditor=60 tanpa=0
+FORENSIK skor-M jujur: tanda=0.047229791099000905 dari 1101 pengamatan
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

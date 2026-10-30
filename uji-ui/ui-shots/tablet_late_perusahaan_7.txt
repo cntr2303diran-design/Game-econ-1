@@ -1,0 +1,70 @@
+== jendela 0
+        #perusahaan_subtab_0 "Laporan keuangan" [klik]
+        #perusahaan_subtab_1 "Organisasi" [klik]
+        #perusahaan_subtab_2 "Proyek" [klik]
+        #perusahaan_subtab_3 "Kontrak" [klik]
+        #perusahaan_subtab_4 "Bank" [klik]
+        #perusahaan_subtab_5 "Pelaku" [klik]
+        #perusahaan_subtab_6 "Investasi" [klik]
+        #perusahaan_subtab_7 "Intelijen" [klik]
+        #perusahaan_subtab_8 "Segmen" [klik]
+        #perusahaan_subtab_9 "Operasi" [klik]
+      "Intelijen dan dewan" 
+        "Rapat dewan" 
+        "Kepercayaan dewan 17/100 · benar 0 · salah 0 · mengelak 0 · tak dijawab 132" 
+        "Wakil Pemegang Saham Pengendali" 
+        "Pemegang saham pengendali ingin kepastian soal pendapatan bulanan. Apa taruhan Anda untuk kuartal depan?" 
+        "Metrik: pendapatan bulanan · Dinilai Agustus 2066" 
+        #dewan_naik "Naik" [klik]
+        #dewan_turun "Turun" [klik]
+        #dewan_tetap "Tetap" [klik]
+        #dewan_abstain "Tidak tahu" [klik]
+        "Benar +6, salah −6, tidak dijawab −4, mengelak netral (tiga kali berturut-turut mulai merugikan)." 
+        "Pasar prediksi (taruhan poin, bukan kas)" 
+        "Poin 100 (awal 100) · 0/0 posisi menang · bonus skor +0" 
+        "Harga YA = peluang menurut kerumunan. Benar membayar taruhan ÷ harga (dikurangi 2%); salah kehilangan taruhan. Maks. 20% poin per pertanyaan. Poin hanya menambah skor kualitas keputusan (maks. +10)." 
+        #pmk_stake_1 "1 poin" [klik]
+        #pmk_stake_5 "5 poin" [klik]
+        #pmk_stake_10 "10 poin" [klik]
+        #pmk_stake_20 "20 poin" [klik]
+        "Kurs RS/A$ 6 bulan lagi lebih tinggi (RS melemah) dari sekarang (44639.2042)?" 
+        "Kerumunan: 86% YA · selesai 2 bulan lagi" 
+        #pmk_yes_102 "YA 86%" [klik]
+        #pmk_no_102 "TIDAK 14%" [klik]
+        "Suku bunga acuan 6 bulan lagi lebih tinggi dari sekarang (8.25%)?" 
+        "Kerumunan: 55% YA · selesai 5 bulan lagi" 
+        #pmk_yes_103 "YA 55%" [klik]
+        #pmk_no_103 "TIDAK 45%" [klik]
+        "Inflasi Sundara 6 bulan lagi lebih tinggi dari sekarang (3.7%)? → TIDAK (kerumunan 44% YA)" 
+        "Suku bunga acuan 6 bulan lagi lebih tinggi dari sekarang (6.25%)? → YA (kerumunan 63% YA)" 
+        "Output gap Sundara 6 bulan lagi negatif (ekonomi di bawah potensi)? → TIDAK (kerumunan 28% YA)" 
+        "Output gap Sundara 6 bulan lagi negatif (ekonomi di bawah potensi)? → TIDAK (kerumunan 30% YA)" 
+        "Inflasi Sundara 6 bulan lagi lebih tinggi dari sekarang (1.9%)? → YA (kerumunan 60% YA)" 
+        "Beli laporan riset (1 poin aksi)" 
+        "Perkiraan selalu berderau; anggaran lebih besar memperkecil galat tetapi tidak pernah menghilangkannya." 
+        #intel_kind_0 "Laporan sektor" [klik]
+        #intel_kind_1 "Laporan negara" [klik]
+        #intel_kind_2 "Laporan pesaing" [klik]
+        #intel_kind_3 "Laporan segmen konsumen" [klik]
+        "◀" [klik]
+        "Pangan" 
+        "▶" [klik]
+        #intel_buy_1 "Tingkat 1: 262 jt RS (galat ±25%)" [klik]
+        #intel_buy_2 "Tingkat 2: 655 jt RS (galat ±12%)" [klik]
+        #intel_buy_3 "Tingkat 3: 1.474 jt RS (galat ±6%)" [klik]
+        "Laporan yang sudah dibeli" 
+        "Belum ada laporan." 
+      #open_menu_button (ket: Menu utama) [klik]
+      "Agustus 2066" 
+      "Giliran 440 · Era 4" 
+      #chip_ap 
+        "AP 7/7" 
+      #chip_runway 
+        "Kas stabil" 
+      #toggle_theme_button (ket: Ganti mode terang atau gelap) [klik]
+        #bottom_nav_markas "Markas" [klik]
+        #bottom_nav_peta "Peta" [klik]
+        #bottom_nav_perusahaan "Usaha" [klik]
+        #bottom_nav_pasar "Pasar" [klik]
+        #bottom_nav_bursa "Bursa" [klik]
+        #bottom_nav_dunia "Dunia" [klik]

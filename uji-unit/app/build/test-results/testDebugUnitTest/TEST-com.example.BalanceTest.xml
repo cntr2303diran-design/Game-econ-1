@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.BalanceTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:30:16.727Z" hostname="runnervm48cm3" time="15.529">
+  <properties/>
+  <testcase name="activePlayBeatsPassivePlay_butIsNotGuaranteed" classname="com.example.BalanceTest" time="15.529"/>
+  <system-out><![CDATA[  MATI e4 giliran=472 krisis=[131, 263, 421] aktif=false
+  MATI e4 giliran=478 krisis=[180, 343, 436] aktif=false
+  MATI e1 giliran=88 krisis=[139, 247, 448] aktif=false
+  MATI e1 giliran=85 krisis=[201, 342, 401] aktif=false
+  MATI e1 giliran=95 krisis=[200, 283, 440] aktif=false
+  MATI e1 giliran=83 krisis=[152, 290, 420] aktif=false
+  MATI e1 giliran=85 krisis=[135, 273, 441] aktif=false
+  MATI e4 giliran=460 krisis=[119, 318, 429] aktif=false
+  MATI e1 giliran=67 krisis=[192, 331, 412] aktif=false
+  MATI e1 giliran=73 krisis=[181, 337, 453] aktif=false
+  MATI e1 giliran=65 krisis=[172, 326, 444] aktif=false
+  MATI e1 giliran=70 krisis=[113, 257, 425] aktif=false
+  MATI e4 giliran=420 krisis=[129, 268, 438] aktif=false
+BALANS PASIF: menang=28/60 mati per era=[9, 11, 8, 4] skor rata2 menang=79 sebab={E3:Dewan Direksi =6, E2:Kas habis dan =5, E4:Dewan Direksi =2, E3:Covenant dilan=2, E4:Kas habis dan =2, E1:Dewan Direksi =3, E2:Dewan Direksi =4, E2:Covenant dilan=2, E1:Kas habis dan =3, E1:Covenant dilan=3}
+  MATI e1 giliran=84 krisis=[201, 342, 401] aktif=true
+  MATI e1 giliran=88 krisis=[200, 283, 440] aktif=true
+  MATI e1 giliran=85 krisis=[135, 273, 441] aktif=true
+  MATI e1 giliran=73 krisis=[192, 331, 412] aktif=true
+  MATI e1 giliran=82 krisis=[181, 337, 453] aktif=true
+  MATI e1 giliran=70 krisis=[113, 257, 425] aktif=true
+BALANS AKTIF: menang=46/60 mati per era=[6, 6, 2, 0] skor rata2 menang=82 sebab={E3:Dewan Direksi =2, E2:Covenant dilan=1, E1:Kas habis dan =1, E1:Covenant dilan=3, E2:Dewan Direksi =3, E2:Kas habis dan =2, E1:Dewan Direksi =2}
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

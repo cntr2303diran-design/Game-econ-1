@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.EventConsequenceLateTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:31:13.564Z" hostname="runnervm48cm3" time="70.883">
+  <properties/>
+  <testcase name="lateBases_areReallyLate_publicWithSubsidiaries" classname="com.example.EventConsequenceLateTest" time="0.72"/>
+  <testcase name="conditionalEffects_actWhenTheirConditionHolds" classname="com.example.EventConsequenceLateTest" time="1.318"/>
+  <testcase name="everyEffectKind_isLiveInTheLateGame" classname="com.example.EventConsequenceLateTest" time="46.417"/>
+  <testcase name="sampledCardOutcomes_changeTheLateSimulation" classname="com.example.EventConsequenceLateTest" time="17.749"/>
+  <testcase name="moneyEffects_landOnTheStatementsExactly" classname="com.example.EventConsequenceLateTest" time="4.211"/>
+  <testcase name="emptyOutcome_changesNothing_soTheSweepsMeanSomething" classname="com.example.EventConsequenceLateTest" time="0.468"/>
+  <system-out><![CDATA[JENIS EFEK DI AKHIR PERMAINAN: diuji 375 contoh; dilewati karena syarat keadaan tak terpenuhi 13
+HASIL KARTU DI AKHIR PERMAINAN: diuji 144; dilewati (syarat keadaan) 0; ditolak 0; tanpa perubahan 0
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

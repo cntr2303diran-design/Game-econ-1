@@ -1,0 +1,20 @@
+== jendela 0
+      "KAPITAL" 
+      "Simulasi ekonomi dunia dan strategi korporasi" 
+      #menu_new_game "Mulai permainan" [klik]
+      #menu_peran "Peran lain dan tantangan" [klik]
+      #menu_how "Cara bermain" [klik]
+      "Ganti tema terang/gelap" [klik]
+      "Tentang permainan" [klik]
+== jendela 1
+        "Cara bermain" 
+          "• Anda CEO PT Benang Sundara. Tiap permainan baru dimulai dari premis, tanggal, angka perusahaan, dan kejadian yang berbeda. Satu giliran = satu bulan." 
+          "• Setiap tindakan memakai Attention Points (AP). AP habis tiap bulan; gunakan untuk hal yang paling penting." 
+          "• Tujuan: bertahan, menjaga kas dan covenant bank, lalu bertumbuh lewat ekspansi dan investasi saham." 
+          "• Laba bukan kas. Perhatikan arus kas operasi, piutang, dan persediaan di laporan keuangan." 
+          "• Data tidak sempurna: inflasi terlambat, berita bisa bias, bawahan bisa berbohong. Periksa silang dan audit." 
+          "• Ketuk atau tahan angka untuk melihat asal data dan tingkat keyakinannya." 
+          "• Kartu keputusan muncul dari kondisi dunia (kurs, bunga, geopolitik, pesaing, regulasi). Tiap kartu punya beberapa pilihan dengan untung-rugi; sebagian keputusan memicu kartu lanjutan beberapa bulan kemudian, dan peringatan di kartu lanjutan menjelaskan sebab-akibatnya." 
+          "• Layar Intel memuat grafik riwayat kas, ekuitas, dan laba, derivatif lindung nilai, pasar prediksi, serta pasca-mortem. Peta menampilkan aset Anda per negara." 
+          "• Permainan tersimpan otomatis. Menu utama bisa dibuka dari ikon menu di kiri atas." 
+        "Mengerti" [klik]

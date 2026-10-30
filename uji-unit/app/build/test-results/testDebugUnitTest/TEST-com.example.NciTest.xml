@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.NciTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:33:07.247Z" hostname="runnervm48cm3" time="2.564">
+  <properties/>
+  <testcase name="minorityStakeKeepsGroupIdentities_andAttributesIncome" classname="com.example.NciTest" time="2.564"/>
+  <system-out><![CDATA[NCI: penjualan=306 seed dengan NCI=34 SPO=0 residu ekuitas konsolidasi terbesar=1.2641976354643703E-10
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

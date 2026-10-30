@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.IntelBoardTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:32:53.400Z" hostname="runnervm48cm3" time="0.992">
+  <properties/>
+  <testcase name="invalidPurchases_areRejected_andCostNothing" classname="com.example.IntelBoardTest" time="0.001"/>
+  <testcase name="boardTrust_cannotBeFarmed_byAlwaysGuessingOneWay" classname="com.example.IntelBoardTest" time="0.524"/>
+  <testcase name="intel_costsRealMoney_noFreeCash_andKeepsBooksBalanced" classname="com.example.IntelBoardTest" time="0.005"/>
+  <testcase name="actions_roundTripThroughEncoding" classname="com.example.IntelBoardTest" time="0.0"/>
+  <testcase name="higherBudget_meansSmallerError_andBandIsHonest" classname="com.example.IntelBoardTest" time="0.035"/>
+  <testcase name="boardMeeting_asksEveryQuarter_gradesAnswers_andIsDeterministic" classname="com.example.IntelBoardTest" time="0.426"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,10 @@
+uji   nd-jit1: COLD label=nd-jit1; debuggable=false; giliran simpanan=380; konstruktor=43 ms; pemulihan=1250 ms; uji mulai 61 ms setelah proses dibuat; vm=2.1.0; giliran akhir=420
+uji   nd-jit2: COLD label=nd-jit2; debuggable=false; giliran simpanan=380; konstruktor=41 ms; pemulihan=1088 ms; uji mulai 64 ms setelah proses dibuat; vm=2.1.0; giliran akhir=420
+app   nd-jit1: restorePending selesai dalam 3881 ms; sejak proses mulai 4129 ms | diamati skrip 5 s | TotalTime: 1010 WaitTime: 1018 
+uji   nd-aot1: COLD label=nd-aot1; debuggable=false; giliran simpanan=380; konstruktor=41 ms; pemulihan=1142 ms; uji mulai 64 ms setelah proses dibuat; vm=2.1.0; giliran akhir=420
+uji   nd-aot2: COLD label=nd-aot2; debuggable=false; giliran simpanan=380; konstruktor=40 ms; pemulihan=1107 ms; uji mulai 64 ms setelah proses dibuat; vm=2.1.0; giliran akhir=420
+app   nd-aot1: restorePending selesai dalam 2747 ms; sejak proses mulai 2945 ms | diamati skrip 4 s | TotalTime: 800 WaitTime: 809 
+uji   dbg-jit1: COLD label=dbg-jit1; debuggable=true; giliran simpanan=380; konstruktor=444 ms; pemulihan=9671 ms; uji mulai 715 ms setelah proses dibuat; vm=2.1.0; giliran akhir=420
+app   dbg-jit1: restorePending selesai dalam 12502 ms; sejak proses mulai 13578 ms | diamati skrip 13 s | TotalTime: 1796 WaitTime: 1816 
+uji   dbg-aot1: COLD label=dbg-aot1; debuggable=true; giliran simpanan=380; konstruktor=386 ms; pemulihan=9973 ms; uji mulai 88 ms setelah proses dibuat; vm=2.1.0; giliran akhir=420
+app   dbg-aot1: restorePending selesai dalam 12446 ms; sejak proses mulai 12973 ms | diamati skrip 13 s | TotalTime: 1446 WaitTime: 1462 

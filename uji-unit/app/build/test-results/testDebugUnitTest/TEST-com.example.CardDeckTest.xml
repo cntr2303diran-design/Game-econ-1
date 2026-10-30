@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.CardDeckTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:30:32.259Z" hostname="runnervm48cm3" time="9.142">
+  <properties/>
+  <testcase name="generatorDraw_isDeterministic_andDoesNotShiftOldDeckStream" classname="com.example.CardDeckTest" time="0.018"/>
+  <testcase name="cardsFire_onWorldConditions_notRandomly" classname="com.example.CardDeckTest" time="5.353"/>
+  <testcase name="oldDeckNeverDrawsGeneratorCards_soStreamsAreIndependent" classname="com.example.CardDeckTest" time="0.054"/>
+  <testcase name="everyBuiltCard_hasThreeRealTradeOffs_andNoFreeMoney" classname="com.example.CardDeckTest" time="0.008"/>
+  <testcase name="cardsAreWellFormed_uniqueIds_validChains" classname="com.example.CardDeckTest" time="0.007"/>
+  <testcase name="deckSizeAndChainCount_meetC1" classname="com.example.CardDeckTest" time="0.002"/>
+  <testcase name="cardsActuallyAppearInPlay" classname="com.example.CardDeckTest" time="3.7"/>
+  <system-out><![CDATA[KARTU util: p5=0.84 p25=0.87 median=0.93 p75=0.93; harga turun=408/3416
+KARTU pemicu: 3416 sampel kondisi; tak pernah aktif=0/482 []; hampir selalu aktif=29; rata-rata aktif=0.32
+KARTU C1: generator=579, tulisan tangan=42, total=621, kartu berantai=106, aturan rantai=108, per kategori={Pasokan=37, Regulasi=39, Operasi=55, Pasar=50, Teknologi=46, SDM=44, Keuangan=53, Persaingan=53, Geopolitik=25, Makro=32, Tata kelola=51, Lingkungan=46, Korporasi=48}
+KARTU main: 60 permainan, kartu generator muncul 1835 kali (berantai 20), 354 kartu berbeda
+KARTU dominasi: terbanyak geo_border_clash = 31/1835 (1.7%)
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

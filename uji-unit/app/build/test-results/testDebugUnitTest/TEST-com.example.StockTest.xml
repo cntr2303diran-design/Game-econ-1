@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.StockTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:33:41.411Z" hostname="runnervm48cm3" time="3.964">
+  <properties/>
+  <testcase name="spoDilutesFounder_andHasCooldown" classname="com.example.StockTest" time="1.831"/>
+  <testcase name="privateCompanyCannotBuyback" classname="com.example.StockTest" time="0.001"/>
+  <testcase name="buybackRetiresSharesRaisesFounderStake_andKeepsBooksBalanced" classname="com.example.StockTest" time="2.132"/>
+  <system-out><![CDATA[SAHAM: seed dengan buyback terlaksana=18, dengan riwayat harga=18
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

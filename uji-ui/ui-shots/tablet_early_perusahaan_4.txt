@@ -1,0 +1,133 @@
+== jendela 0
+        #perusahaan_subtab_0 "Laporan keuangan" [klik]
+        #perusahaan_subtab_1 "Organisasi" [klik]
+        #perusahaan_subtab_2 "Proyek" [klik]
+        #perusahaan_subtab_3 "Kontrak" [klik]
+        #perusahaan_subtab_4 "Bank" [klik]
+        #perusahaan_subtab_5 "Pelaku" [klik]
+        #perusahaan_subtab_6 "Investasi" [klik]
+        #perusahaan_subtab_7 "Intelijen" [klik]
+        #perusahaan_subtab_8 "Segmen" [klik]
+        #perusahaan_subtab_9 "Operasi" [klik]
+      "Bank dan pembiayaan" 
+      "Bank melihat angka yang sama dengan yang bisa Anda hitung sendiri, tetapi skor internalnya tidak ditampilkan. Pengajuan memakan 2 poin aksi dan biaya persiapan 30 jt RS. Penolakan tercatat di biro kredit dan menurunkan peluang di bank lain selama 6 bulan." 
+        "Yang dilihat bank tentang Anda" 
+        "EBIT 12 bulan" 
+        "16.794 jt RS" 
+        "EBITDA 12 bulan" 
+        "22.684 jt RS" 
+        "Beban bunga 12 bulan" 
+        "3.379 jt RS" 
+        "ICR (EBIT / bunga)" 
+        "4,97x" 
+        "Utang bersih / EBITDA" 
+        "0,99x" 
+        "Rasio lancar" 
+        "2,45x" 
+        "Kas dalam bulan biaya" 
+        "0,1 bulan" 
+        "DSO (umur piutang)" 
+        "47,0 hari" 
+        "Gagal covenant berturut-turut" 
+        "0 kuartal" 
+        "Pengajuan ditolak 6 bulan terakhir" 
+        "0 (tercatat di biro kredit)" 
+        "Agunan yang tersedia (setelah haircut bank)" 
+        "Pabrik dan mesin (haircut 45%, lebih besar bila perawatan tertunda)" 
+        "33.324 jt RS" 
+        "Piutang lancar (haircut 30%)" 
+        "26.997 jt RS" 
+        "Persediaan (haircut 50%)" 
+        "14.189 jt RS" 
+        "Portofolio saham (haircut 50%)" 
+        "0 jt RS" 
+        "Dikurangi utang yang sudah berjalan" 
+        "-24.013 jt RS" 
+        "Agunan bebas yang bisa dijaminkan" 
+        "50.497 jt RS" 
+      "Pilih bank untuk mengajukan kredit" 
+        "Bank Niaga Sundara" 
+        "Rudi Hartanto · Relationship manager korporasi" 
+        "Hubungan cukup (47/100)" 
+        "Komersial, cepat, mengejar volume kredit." 
+        "Kepentingan bankir: Bonus kuartalan dari volume kredit baru; paling longgar di akhir kuartal, paling ketat saat awal kuartal." 
+        "Bunga" 
+        "≈8,55% + premi risiko, biaya 1,00%" 
+        "Kecepatan" 
+        "Keputusan ±2 giliran" 
+        "Tenor maks / plafon" 
+        "60 bln · plafon mengikuti agunan dan EBITDA" 
+        #apply_bk_niaga "Ajukan kredit" [klik]
+        "Bank Pembangunan Sundara" 
+        "Ibu Sulastri · Kepala cabang korporasi (BUMN)" 
+        "Hubungan cukup (38/100)" 
+        "Milik negara, bunga paling murah, birokratis, komite kredit lambat." 
+        "Kepentingan bankir: Dinilai dari kepatuhan prosedur dan kredit macet, bukan dari volume; takut disalahkan auditor negara." 
+        "Bunga" 
+        "≈7,35% + premi risiko, biaya 0,50%" 
+        "Kecepatan" 
+        "Keputusan ±3 giliran" 
+        "Tenor maks / plafon" 
+        "84 bln · plafon mengikuti agunan dan EBITDA" 
+        #apply_bk_pembangunan "Ajukan kredit" [klik]
+        "Aurelia Global CitiTrust" 
+        "Nathan Brooks · Managing director pembiayaan pasar berkembang" 
+        "Hubungan dingin (17/100)" 
+        "Bank asing, pinjaman dalam A$ berbunga murah, dokumen tebal." 
+        "Kepentingan bankir: Mengejar fee transaksi dan sindikasi; risiko kurs ditanggung peminjam, bukan bank." 
+        "Bunga" 
+        "≈5,20% dalam A$ + premi risiko (kurs ditanggung Anda)" 
+        "Kecepatan" 
+        "Keputusan ±3 giliran" 
+        "Tenor maks / plafon" 
+        "60 bln · plafon mengikuti agunan dan EBITDA" 
+        #apply_bk_aurelia "Ajukan kredit" [klik]
+        "Dana Cepat Nusantara" 
+        "Sistem penilai otomatis "Kilat" · Pinjaman daring (shadow banking)" 
+        "Belum dikenal (0/100)" 
+        "Cair dalam 1 giliran, tanpa pengawasan ketat, sangat mahal." 
+        "Kepentingan bankir: Margin tinggi dan portofolio jangka pendek; menarik dana saat pasar panik." 
+        "Bunga" 
+        "≈17,75% + premi risiko, biaya 3,00%" 
+        "Kecepatan" 
+        "Keputusan ±1 giliran" 
+        "Tenor maks / plafon" 
+        "12 bln · maks 3.000 jt RS" 
+        #apply_bk_dana "Ajukan kredit" [klik]
+      "Pinjaman berjalan" 
+        "Bank Pembangunan (pinjaman lama)" 
+        "Saldo" 
+        "12.722 jt RS" 
+        "Bunga" 
+        "11,80%" 
+        "Jatuh tempo" 
+        "tanpa tenor tetap" 
+        "Pembayaran" 
+        "cicilan pokok 206 jt RS/bulan" 
+        "Covenant" 
+        "tanpa covenant" 
+        "Bank Pembangunan Sundara" 
+        "Saldo" 
+        "11.292 jt RS" 
+        "Bunga" 
+        "11,50%" 
+        "Jatuh tempo" 
+        "jatuh tempo Mei 2037" 
+        "Pembayaran" 
+        "cicilan pokok 565 jt RS/bulan" 
+        "Covenant" 
+        "ICR ≥ 1,50x" 
+      #open_menu_button (ket: Menu utama) [klik]
+      "Oktober 2035" 
+      "Giliran 70 · Era 1" 
+      #chip_ap 
+        "AP 7/7" 
+      #chip_runway 
+        "Runway 1 bln" 
+      #toggle_theme_button (ket: Ganti mode terang atau gelap) [klik]
+        #bottom_nav_markas "Markas" [klik]
+        #bottom_nav_peta "Peta" [klik]
+        #bottom_nav_perusahaan "Usaha" [klik]
+        #bottom_nav_pasar "Pasar" [klik]
+        #bottom_nav_bursa "Bursa" [klik]
+        #bottom_nav_dunia "Dunia" [klik]

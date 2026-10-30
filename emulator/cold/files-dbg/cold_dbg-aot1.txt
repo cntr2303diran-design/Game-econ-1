@@ -1,0 +1,1 @@
+COLD label=dbg-aot1; debuggable=true; giliran simpanan=380; konstruktor=386 ms; pemulihan=9973 ms; uji mulai 88 ms setelah proses dibuat; vm=2.1.0; giliran akhir=420

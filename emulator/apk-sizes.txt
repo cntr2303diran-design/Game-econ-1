@@ -1,0 +1,3 @@
+18108979 apk-dbg/app-debug.apk
+12483723 apk-nd/app-debug.apk
+1851355 app/build/outputs/apk/release/app-release.apk

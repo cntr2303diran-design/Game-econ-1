@@ -1,0 +1,1 @@
+ART-LOAD putar ulang murni 960 baris log (ms, berurutan, pertama = dingin): [11406, 7627, 6877, 6471]

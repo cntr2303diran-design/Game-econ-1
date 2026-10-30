@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.DifficultyTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:30:51.541Z" hostname="runnervm48cm3" time="0.983">
+  <properties/>
+  <testcase name="harderDifficultyMeansMoreEventsAndLowerSurvival" classname="com.example.DifficultyTest" time="0.981"/>
+  <testcase name="difficultyOnlyAsFirstAction_andSurvivesReplay" classname="com.example.DifficultyTest" time="0.002"/>
+  <system-out><![CDATA[DIFF: magang kejadian=15.3 hidup=0.73 | krisis kejadian=28.0 hidup=0.60
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

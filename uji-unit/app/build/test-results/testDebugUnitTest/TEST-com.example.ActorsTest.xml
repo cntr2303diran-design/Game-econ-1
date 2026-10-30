@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.ActorsTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:29:29.221Z" hostname="runnervm48cm3" time="14.423">
+  <properties/>
+  <testcase name="politician_learnsFromPlayerStyle_sameSeedDifferentBehavior" classname="com.example.ActorsTest" time="2.721"/>
+  <testcase name="activist_targetsPublicCompanies_andGreenmailAttractsMore" classname="com.example.ActorsTest" time="3.276"/>
+  <testcase name="selfishExecutives_actOnlyWhenDisloyal_andLeaveEvidence" classname="com.example.ActorsTest" time="2.314"/>
+  <testcase name="deterministic_sameStyleSameState" classname="com.example.ActorsTest" time="1.946"/>
+  <testcase name="rivals_reactToAggressivePricing_differentlyThanToPassivePlayer" classname="com.example.ActorsTest" time="2.216"/>
+  <testcase name="politicianEvent_hasThreeOptions_andPaymentLeavesEthicsEvidence" classname="com.example.ActorsTest" time="1.949"/>
+  <system-out><![CDATA[AKTOR politisi: elang tuntutan=10 nafsu=0.22634401337914195 dendam=0.1688244979530007 denda=568.1773450139166 | merpati tuntutan=26 nafsu=0.41282158335069374 dendam=0.0
+AKTOR aktivis: melawan=4 greenmail=4 (dibayar 4) dari 20 seed
+AKTOR eksekutif egois bertindak 5 kali dari 20 seed
+AKTOR pesaing mengamati bulan potong harga: elang=28 merpati=0
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

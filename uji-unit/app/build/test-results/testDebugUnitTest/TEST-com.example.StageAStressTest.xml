@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.StageAStressTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:33:22.814Z" hostname="runnervm48cm3" time="18.596">
+  <properties/>
+  <testcase name="determinism_includesAllWorldLayers" classname="com.example.StageAStressTest" time="0.083"/>
+  <testcase name="stressAtLeast5000RandomTurns_withAllWorldLayers" classname="com.example.StageAStressTest" time="18.513"/>
+  <system-out><![CDATA[STRESS TAHAP A: 10219 giliran acak diperiksa; selisih neraca induk terbesar=1.280568540096283E-9; EndTurn rata2=0.43 ms maks=3.6 ms; downgrade Sundara=25, bank run=3, bank gagal=402, giliran bersanksi=2358
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

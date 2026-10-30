@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.PublicCompanyTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:33:12.050Z" hostname="runnervm48cm3" time="7.923">
+  <properties/>
+  <testcase name="publicCompanyFacesActivistsAndShortSellers_privateDoesNot" classname="com.example.PublicCompanyTest" time="7.923"/>
+  <system-out><![CDATA[PUBLIK: IPO=30 kartu pasar modal diterima: publik=90 swasta=0
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

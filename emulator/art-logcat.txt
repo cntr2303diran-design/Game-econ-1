@@ -1,0 +1,10 @@
+--------- beginning of main
+10-30 03:38:52.853  6241  6284 I KAPITAL-ART: ART-LOAD putar ulang murni 960 baris log (ms, berurutan, pertama = dingin): [11406, 7627, 6877, 6471]
+10-30 03:39:11.260  6241  6284 I KAPITAL-ART: ART-REPLAY runtime=Dalvik 2.1.0; sdk=34; abi=x86_64, arm64-v8a
+10-30 03:39:11.260  6241  6284 I KAPITAL-ART: ART-REPLAY log=960 baris; titik periksa=38; ditolak=0; giliran akhir=481
+10-30 03:39:11.260  6241  6284 I KAPITAL-ART: ART-REPLAY waktu putar ulang termasuk ringkasan refleksi (ms): [6009, 5720, 6657]
+10-30 03:39:11.260  6241  6284 I KAPITAL-ART: ART-REPLAY ketidakcocokan dengan JVM: 0
+10-30 03:39:20.183  6241  6284 I KAPITAL-ART: ART-UI memuat simpanan 829 baris (±380 bulan): aktivitas kembali 1565 ms, panel/menu pertama tampil 1695 ms, layar tetap responsif saat memuat (dialog terbuka dalam 1317 ms), menu siap 8863 ms
+10-30 03:39:59.245  6241  6284 I KAPITAL-ART: ART-UI tombol korporasi 34, dilaksanakan 5
+10-30 03:41:18.890  6241  6284 I KAPITAL-ART: ART-UI penjelajah acak: 200 aksi
+10-30 03:41:21.727  6241  6284 I KAPITAL-ART: ART-UI peluncuran pemasangan baru: aktivitas kembali 604 ms, panel/menu pertama tampil 634 ms, pemuatan terlalu cepat untuk uji responsivitas, menu siap 635 ms

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.ui.PhoneUiTest" tests="17" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:34:39.649Z" hostname="runnervm48cm3" time="18.874">
+  <properties/>
+  <testcase name="role_minister_playsToTheEnd" classname="com.example.ui.PhoneUiTest" time="1.328"/>
+  <testcase name="role_fundManager_playsToTheEnd" classname="com.example.ui.PhoneUiTest" time="0.938"/>
+  <testcase name="corporateButtons_inEra1_explainWhyTheyAreRefused" classname="com.example.ui.PhoneUiTest" time="0.797"/>
+  <testcase name="ceoChallenge_startsFromPeranScreen_withTypedSeed" classname="com.example.ui.PhoneUiTest" time="0.373"/>
+  <testcase name="freshInstall_menuToFirstTurn_andBack" classname="com.example.ui.PhoneUiTest" time="1.216"/>
+  <testcase name="role_governor_playsToTheEnd" classname="com.example.ui.PhoneUiTest" time="0.48"/>
+  <testcase name="fromMenu_monkeyWalk_neverCrashes" classname="com.example.ui.PhoneUiTest" time="4.396"/>
+  <testcase name="lostGame_showsGameOverPanel_andNewGameWorks" classname="com.example.ui.PhoneUiTest" time="0.322"/>
+  <testcase name="earlyGame_monkeyWalk_neverCrashes" classname="com.example.ui.PhoneUiTest" time="3.072"/>
+  <testcase name="chronicleCounterfactual_runsInBackground_andShowsTheResult" classname="com.example.ui.PhoneUiTest" time="0.254"/>
+  <testcase name="currentSave_hasNoNoticeBanner" classname="com.example.ui.PhoneUiTest" time="0.125"/>
+  <testcase name="lateGame_everyCorporateButtonAnswers" classname="com.example.ui.PhoneUiTest" time="1.271"/>
+  <testcase name="legacySave_showsNoticeBanner_andItCanBeDismissed" classname="com.example.ui.PhoneUiTest" time="0.168"/>
+  <testcase name="autosaveSlot_loadsInBackground_thenOpensMarkas" classname="com.example.ui.PhoneUiTest" time="0.312"/>
+  <testcase name="lateGame_monkeyWalk_neverCrashes" classname="com.example.ui.PhoneUiTest" time="2.915"/>
+  <testcase name="savedGame_everyTabAndSubtabRenders" classname="com.example.ui.PhoneUiTest" time="0.232"/>
+  <testcase name="lateGame_everyTabAndSubtabRenders" classname="com.example.ui.PhoneUiTest" time="0.664"/>
+  <system-out><![CDATA[UI-MONKEY menu: 200 aksi
+UI-MONKEY early: 250 aksi
+UI-LATE tombol korporasi: 34; dilaksanakan=5; ditolak atau terkunci=29
+UI-MONKEY late: 250 aksi
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

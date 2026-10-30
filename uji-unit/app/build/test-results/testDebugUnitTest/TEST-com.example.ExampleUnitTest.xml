@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.ExampleUnitTest" tests="21" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:32:36.887Z" hostname="runnervm48cm3" time="0.596">
+  <properties/>
+  <testcase name="commodities_areMeanReverting_andFeedCosts" classname="com.example.ExampleUnitTest" time="0.005"/>
+  <testcase name="everyNewGameStartsDifferently" classname="com.example.ExampleUnitTest" time="0.015"/>
+  <testcase name="competitors_matchPriceCuts_butNotRises" classname="com.example.ExampleUnitTest" time="0.012"/>
+  <testcase name="initialState_matchesStartingScenario" classname="com.example.ExampleUnitTest" time="0.004"/>
+  <testcase name="foreignEconomies_areDynamic_andFxFollowsInflationGap" classname="com.example.ExampleUnitTest" time="0.008"/>
+  <testcase name="saveAndReload_reproducesSameWorld" classname="com.example.ExampleUnitTest" time="0.027"/>
+  <testcase name="actionEncoding_roundTrips" classname="com.example.ExampleUnitTest" time="0.0"/>
+  <testcase name="taylorRule_raisesRatesWhenCurrencyCollapses" classname="com.example.ExampleUnitTest" time="0.001"/>
+  <testcase name="balanceSheetAlwaysBalances" classname="com.example.ExampleUnitTest" time="0.032"/>
+  <testcase name="credit_stressedBorrowerIsRejectedAndOversizedLoanIsCut" classname="com.example.ExampleUnitTest" time="0.004"/>
+  <testcase name="taxLossCarryforward_offsetsFutureProfit" classname="com.example.ExampleUnitTest" time="0.006"/>
+  <testcase name="credit_applicationTakesTimeAndCanBeAcceptedOrRefused" classname="com.example.ExampleUnitTest" time="0.013"/>
+  <testcase name="statementsReconcile_cashFlowEquityAndCostBreakdown" classname="com.example.ExampleUnitTest" time="0.13"/>
+  <testcase name="credit_savedGameReplaysSameBankDecisions" classname="com.example.ExampleUnitTest" time="0.01"/>
+  <testcase name="actionsRequireEnoughAp_andCannotRepeat" classname="com.example.ExampleUnitTest" time="0.001"/>
+  <testcase name="ignoringEvent_appliesDefaultOutcomeAtDeadline" classname="com.example.ExampleUnitTest" time="0.002"/>
+  <testcase name="bourse_buySell_balanceAndRoundTrip" classname="com.example.ExampleUnitTest" time="0.007"/>
+  <testcase name="macro_isEndogenousAndStable" classname="com.example.ExampleUnitTest" time="0.008"/>
+  <testcase name="eventsDifferBetweenGames_andEventChoicesReplay" classname="com.example.ExampleUnitTest" time="0.297"/>
+  <testcase name="investment_buildsCapacityOverTime_andNeedsCashAndAp" classname="com.example.ExampleUnitTest" time="0.006"/>
+  <testcase name="hedgeAndEquityCure_workAndRoundTrip" classname="com.example.ExampleUnitTest" time="0.007"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

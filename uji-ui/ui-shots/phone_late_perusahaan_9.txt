@@ -1,0 +1,131 @@
+== jendela 0
+        #perusahaan_subtab_0 "Laporan keuangan" [klik]
+        #perusahaan_subtab_1 "Organisasi" [klik]
+        #perusahaan_subtab_2 "Proyek" [klik]
+        #perusahaan_subtab_3 "Kontrak" [klik]
+        #perusahaan_subtab_4 "Bank" [klik]
+        #perusahaan_subtab_5 "Pelaku" [klik]
+        #perusahaan_subtab_6 "Investasi" [klik]
+        #perusahaan_subtab_7 "Intelijen" [klik]
+        #perusahaan_subtab_8 "Segmen" [klik]
+        #perusahaan_subtab_9 "Operasi" [klik]
+      "Operasi: karyawan kunci, R&D, logistik" 
+        "Biaya operasi tambahan 195 jt RS per bulan" 
+        "Pesaing bisa membajak karyawan berloyalitas rendah atau bergaji di bawah pasar. Jabatan kosong menghilangkan efeknya; perekrutan baru berisiko karena skill asli baru terlihat setelah 3 bulan." 
+        #operasi_tier_1 "Tingkat 1: 196 jt RS" [klik]
+        #operasi_tier_2 "Tingkat 2: 314 jt RS" [klik]
+        #operasi_tier_3 "Tingkat 3: 491 jt RS" [klik]
+        "Insinyur produksi" 
+        "skill 0,47 (terukur) · loyalitas 70% · gaji 100% upah pasar" 
+        #operasi_raise_insinyur "Naikkan gaji 10%" [klik]
+        #operasi_fire_insinyur "Pecat" [klik]
+        "Kepala desain dan R&D" 
+        "skill 0,55 (terukur) · loyalitas 70% · gaji 100% upah pasar" 
+        #operasi_raise_perancang "Naikkan gaji 10%" [klik]
+        #operasi_fire_perancang "Pecat" [klik]
+        "Supervisor lantai pabrik" 
+        "skill 0,54 (terukur) · loyalitas 70% · gaji 100% upah pasar" 
+        #operasi_raise_supervisor "Naikkan gaji 10%" [klik]
+        #operasi_fire_supervisor "Pecat" [klik]
+        "Manajer penjualan kunci" 
+        "skill 0,52 (terukur) · loyalitas 70% · gaji 100% upah pasar" 
+        #operasi_raise_penjual "Naikkan gaji 10%" [klik]
+        #operasi_fire_penjual "Pecat" [klik]
+        "Kepala teknisi mesin" 
+        "skill 0,76 (terukur) · loyalitas 70% · gaji 100% upah pasar" 
+        #operasi_raise_teknisi "Naikkan gaji 10%" [klik]
+        #operasi_fire_teknisi "Pecat" [klik]
+        "R&D tingkat 0 · kualitas produk +0,00% · 0 inovasi" 
+        #operasi_rd_0 "Mati" [klik]
+        #operasi_rd_1 "Tingkat 1" [klik]
+        #operasi_rd_2 "Tingkat 2" [klik]
+        #operasi_rd_3 "Tingkat 3" [klik]
+        "Logistik tingkat 0 (meredam guncangan biaya pasokan 0%)" 
+        #operasi_log_0 "Dasar" [klik]
+        #operasi_log_1 "Tingkat 1" [klik]
+        #operasi_log_2 "Tingkat 2" [klik]
+        "Armada sendiri: belum (investasi di tab Investasi)" 
+        "Keuangan lanjut" 
+        "Asuransi tingkat 1 (0 tanpa, 1 menanggung 60%, 2 menanggung 85% biaya perbaikan mesin) · klaim 24 bulan terakhir 0 (premi naik 15% per klaim)" 
+        #keu_ins_0 "Tanpa" [klik]
+        #keu_ins_1 "Tingkat 1" [klik]
+        #keu_ins_2 "Tingkat 2" [klik]
+        "L/C mati: utang dagang 35 hari. Mengaktifkan memperpanjang menjadi 50 hari (kas lebih longgar) dengan biaya bulanan." 
+        #keu_lc "Aktifkan L/C" [klik]
+        "Aset tetap disewa kembali 0 jt RS (sewa 0 jt RS per bulan). Dijual pada nilai buku, batas 40% aset tetap, tidak bisa dibeli kembali." 
+        #keu_slb_5 "Jual-sewa 5%" [klik]
+        #keu_slb_10 "Jual-sewa 10%" [klik]
+        #keu_slb_20 "Jual-sewa 20%" [klik]
+        "Forensik dan audit" 
+        "Skor-M Beneish -2.12 (ambang -1.00): wajar" 
+        "Auditor tidak ada · biaya 0 jt RS per bulan · koreksi laporan sejauh ini 0x. Auditor memeriksa percantikan laporan tiap bulan; temuan berakibat denda 30% dari jumlah yang dipercantik, jauh lebih ringan daripada skandal." 
+        #aud_0 "Tanpa" [klik]
+        #aud_1 "Regional" [klik]
+        #aud_2 "Internasional" [klik]
+        "Percantikan laporan: kapitalisasi biaya operasi ke persediaan menaikkan laba bulan ini (membantu ICR dan harga saham) lalu berbalik sebagai beban dalam beberapa bulan; pajak dibayar lebih awal, kas tidak berubah. Meninggalkan bukti etika. Sisa belum berbalik 0 jt RS." 
+        #wdr_10 "Percantik 10%" [klik]
+        #wdr_25 "Percantik 25%" [klik]
+        #wdr_50 "Percantik 50%" [klik]
+        "SPV di luar laporan resmi: utang tersembunyi 0 jt RS (utang nyata 0, tampak bagi kreditur 0). Biaya struktur 3%, bunga kebijakan + 5,5%, bullet 36 bulan, maks. 30% aset. Tiap bulan ada peluang terbongkar (lebih besar dengan auditor, skor-M tinggi, atau covenant gagal): denda 20% utang, skandal, kredit mengetat. Terbongkar 0x." 
+        #spv_2000 "SPV 2000" [klik]
+        #spv_5000 "SPV 5000" [klik]
+        #spv_10000 "SPV 10000" [klik]
+        "Pangsa pasar 16,6% (penyelidikan dominasi mulai 35%, merger bersyarat ≥ 33%, diblokir ≥ 45%). Denda antimonopoli 0x. Pembocor mengungkap bukti lama 1x; bukti makin mudah bocor seiring umur dan kedaluwarsa setelah 60 bulan. Bukti aktif: 0." 
+        "Riwayat perusahaan" 
+        "Kas 283.239 · ekuitas 581.653 · laba bersih bulan lalu 17.804 (jt RS) · 60 bulan terakhir. Garis tipis = nol." 
+        "Kas" 
+        "Awal 332719 → kini 283239" 
+        #grafik_kas (ket: Grafik Kas, 60 bulan. Awal 332719 → kini 283239) 
+        "Ekuitas" 
+        "Awal 643011 → kini 581653" 
+        #grafik_ekuitas (ket: Grafik Ekuitas, 60 bulan. Awal 643011 → kini 581653) 
+        "Laba bersih per bulan" 
+        "Rata-rata 10160 · terendah -4108" 
+        #grafik_laba (ket: Grafik Laba bersih per bulan, 60 bulan. Rata-rata 10160 · terendah -4108) 
+        "Harga saham" 
+        "Harga 2.018 RS · kapitalisasi 1.651.194 jt RS · 60 bulan: -24.6%" 
+        #grafik_saham (ket: Grafik harga saham, 60 bulan: awal 2677, kini 2018) 
+        "Saham minoritas anak usaha" 
+        "Anda menawarkan diskon dari nilai wajar. Investor menolak bila diskon terlalu sempit (batasnya 8–34% dan tidak diketahui), lalu menghilang tiga bulan. Porsi 20% ke atas memberi hak veto atas transfer pricing agresif. Pajak tertahan atas dividen minoritas ditanggung mereka." 
+        "Porsi dijual" 
+        #nci_pct_5 "5%" [klik]
+        #nci_pct_10 "10%" [klik]
+        #nci_pct_20 "20%" [klik]
+        "Diskon yang ditawarkan" 
+        #nci_ask_10 "10%" [klik]
+        #nci_ask_20 "20%" [klik]
+        #nci_ask_30 "30%" [klik]
+        "Tarsis" 
+        "Nilai wajar 100%: 6.838 jt RS · minoritas sekarang 0,0%" 
+        #nci_jual_tarsis "Tawarkan 10% dengan diskon 20% (2 AP)" [klik]
+        "Kestrel" 
+        "Nilai wajar 100%: 8.216 jt RS · minoritas sekarang 0,0%" 
+        #nci_jual_kestrel "Tawarkan 10% dengan diskon 20% (2 AP)" [klik]
+        "Derivatif lindung nilai" 
+        "Diselesaikan tunai saat jatuh tempo. Premi dibayar di muka dan sudah memuat marjin; derivatif bukan sumber untung rata-rata, tetapi meredam guncangan. Satu kontrak per jenis dan hanya sampai besar eksposur." 
+        "Opsi beli A$ (call)" 
+        "Membayar bila kurs RS/A$ naik lebih dari 3% dalam 6 bulan. Melindungi utang A$ dan biaya impor. Rugi terbatas pada premi." 
+        "Aktif: Pokok 40.290 jt RS, jatuh tempo giliran 444, premi dibayar 352 jt RS" 
+        "Futures kapas (posisi beli)" 
+        "Mengunci harga kapas 6 bulan: menerima selisih bila harga naik, membayar bila turun. Lindung nilai pembelian kapas." 
+        "Aktif: Pokok 73.993 jt RS, jatuh tempo giliran 442, premi dibayar 370 jt RS" 
+        "Swap bunga (bayar tetap, terima mengambang)" 
+        "Membayar bunga tetap, menerima suku bunga kebijakan selama 12 bulan, untuk utang rupiah berbunga mengambang." 
+        #drv_swp_25 "25% · premi 0" [klik]
+        #drv_swp_50 "50% · premi 0" [klik]
+        #drv_swp_100 "100% · premi 0" [klik]
+        "Tidak ada utang RS berbunga mengambang yang perlu dilindungi." 
+      #open_menu_button (ket: Menu utama) [klik]
+      "Agustus 2066" 
+      "Giliran 440 · Era 4" 
+      #chip_ap 
+        "AP 7/7" 
+      #chip_runway 
+        "Kas stabil" 
+      #toggle_theme_button (ket: Ganti mode terang atau gelap) [klik]
+        #bottom_nav_markas "Markas" [klik]
+        #bottom_nav_peta "Peta" [klik]
+        #bottom_nav_perusahaan "Usaha" [klik]
+        #bottom_nav_pasar "Pasar" [klik]
+        #bottom_nav_bursa "Bursa" [klik]
+        #bottom_nav_dunia "Dunia" [klik]

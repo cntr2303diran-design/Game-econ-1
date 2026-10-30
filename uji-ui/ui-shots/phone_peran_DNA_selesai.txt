@@ -1,0 +1,14 @@
+== jendela 0
+      #peran_back "Kembali" [klik]
+      "Peran dan tantangan" 
+        "Selesai: Manajer Dana" 
+        "Bulan ke-24 dari 24. NAV 99840 jt RS (kas 99774)." 
+        "Imbal hasil dana -0.2% vs indeks -23.1%; drawdown dana 0% vs indeks 30%." 
+        "Dividen 13 jt RS, biaya transaksi 0 jt RS. Skor 68." 
+        "Bagikan" 
+        "Kode tantangan memuat seed, sehingga lawan memainkan dunia yang sama. Hasil memuat seluruh log aksi Anda; penerima memutar ulangnya sendiri untuk membuktikan skor, sehingga skor yang dikarang ditolak. Log yang disalin dari pemain lain tidak bisa dicegah." 
+        #salin_tantangan "Salin kode tantangan" [klik]
+        #peran_nama "Nama Anda" [klik]
+        #salin_hasil "Salin hasil saya" [klik]
+        "Papan peringkat (hasil Anda masuk otomatis)" [klik]
+      "Main lagi" [klik]

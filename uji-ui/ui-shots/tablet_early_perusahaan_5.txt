@@ -1,0 +1,50 @@
+== jendela 0
+        #perusahaan_subtab_0 "Laporan keuangan" [klik]
+        #perusahaan_subtab_1 "Organisasi" [klik]
+        #perusahaan_subtab_2 "Proyek" [klik]
+        #perusahaan_subtab_3 "Kontrak" [klik]
+        #perusahaan_subtab_4 "Bank" [klik]
+        #perusahaan_subtab_5 "Pelaku" [klik]
+        #perusahaan_subtab_6 "Investasi" [klik]
+        #perusahaan_subtab_7 "Intelijen" [klik]
+        #perusahaan_subtab_8 "Segmen" [klik]
+        #perusahaan_subtab_9 "Operasi" [klik]
+      "Pelaku di dunia Anda" 
+      "Setiap pihak di bawah ini mengejar kepentingannya sendiri, bukan melayani Anda. Mereka hanya bertindak dari informasi yang wajar mereka ketahui, dan setiap manuver meninggalkan jejak yang bisa Anda baca." 
+      "Di dalam perusahaan" 
+      #actor_exec_coo "Gilang Permana | Direktur Operasi (COO) | Yang diincar: Efisiensi, ketepatan kirim, dan komisi dari pemasok yang ia pilih. | Terakhir: Tidak ada kejadian khusus bulan ini. | Ketuk untuk melihat tanda dan cara menghadapi" [klik]
+      #actor_exec_sales "Dimas Aryanto | Direktur Penjualan | Yang diincar: Bonus penjualan dan karier. Jika bonusnya dari omzet, ia mengobral kredit ke pelanggan rapuh. | Terakhir: Tidak ada kejadian khusus bulan ini. | Ketuk untuk melihat tanda dan cara menghadapi" [klik]
+      #actor_exec_factory "Ir. Sutrisno | Kepala Pabrik Kalimas | Yang diincar: Biaya kuartal tampak hemat dan aman dari pemecatan; perawatan mesin bisa ia tunda. | Terakhir: Tidak ada kejadian khusus bulan ini. | Ketuk untuk melihat tanda dan cara menghadapi" [klik]
+      #actor_exec_cfo "Dewi Anggraini | Direktur Keuangan (CFO) | Yang diincar: Stabilitas likuiditas dan audit bersih; paling selaras dengan Anda tetapi tetap punya kepentingan karier. | Terakhir: Tidak ada kejadian khusus bulan ini. | Ketuk untuk melihat tanda dan cara menghadapi" [klik]
+      "Bank dan pemberi dana" 
+      #actor_bk_niaga "Rudi Hartanto | Relationship manager korporasi · Bank Niaga Sundara | Yang diincar: Bonus kuartalan dari volume kredit baru; paling longgar di akhir kuartal, paling ketat saat awal kuartal. | Terakhir: Belum pernah berurusan dengan Anda. | Ketuk untuk melihat tanda dan cara menghadapi" [klik]
+      #actor_bk_pembangunan "Ibu Sulastri | Kepala cabang korporasi (BUMN) · Bank Pembangunan Sundara | Yang diincar: Dinilai dari kepatuhan prosedur dan kredit macet, bukan dari volume; takut disalahkan auditor negara. | Terakhir: Belum pernah berurusan dengan Anda. | Ketuk untuk melihat tanda dan cara menghadapi" [klik]
+      #actor_bk_aurelia "Nathan Brooks | Managing director pembiayaan pasar berkembang · Aurelia Global CitiTrust | Yang diincar: Mengejar fee transaksi dan sindikasi; risiko kurs ditanggung peminjam, bukan bank. | Terakhir: Belum pernah berurusan dengan Anda. | Ketuk untuk melihat tanda dan cara menghadapi" [klik]
+      #actor_bk_dana "Sistem penilai otomatis "Kilat" | Pinjaman daring (shadow banking) · Dana Cepat Nusantara | Yang diincar: Margin tinggi dan portofolio jangka pendek; menarik dana saat pasar panik. | Terakhir: Belum pernah berurusan dengan Anda. | Ketuk untuk melihat tanda dan cara menghadapi" [klik]
+      "Pesaing" 
+      #actor_riv_mitra "Mitra Tekstil Nusantara | Pesaing: Raksasa konservatif | Yang diincar: Lambat, kaya kas; membeli pemain yang terlihat lemah. | Terakhir: Menaikkan harga ke 119,3% dari harga awal. | Ketuk untuk melihat tanda dan cara menghadapi" [klik]
+      #actor_riv_cahaya "Cahaya Weaving | Pesaing: Startup agresif | Yang diincar: Membakar uang demi pangsa pasar; menyamai potongan harga Anda. | Terakhir: Sudah keluar pasar. | Ketuk untuk melihat tanda dan cara menghadapi" [klik]
+      #actor_riv_prima "Prima Garmen Utama | Pesaing: Pemain kroni | Yang diincar: Bergantung pada kedekatan dengan pejabat; biaya tertinggi. | Terakhir: Sudah keluar pasar. | Ketuk untuk melihat tanda dan cara menghadapi" [klik]
+      #actor_riv_importir "Importir Velmora | Pesaing: Perampas harga | Yang diincar: Membanting harga untuk mengusir pemain lain; paling cepat membalas. | Terakhir: Menaikkan harga ke 118,7% dari harga awal. | Ketuk untuk melihat tanda dan cara menghadapi" [klik]
+      "Pelanggan dan pemasok" 
+      #actor_act_mahkota "Grup Mahkota Ritel | Pelanggan ritel terbesar | Yang diincar: Harga rendah dan termin bayar panjang; memindahkan risiko arus kas ke pemasok. | Terakhir: Termin pembayaran kontrak saat ini mengikat Anda; DSO Anda 47,0 hari. | Ketuk untuk melihat tanda dan cara menghadapi" [klik]
+      #actor_act_kestrel "Kestrel Precision Loom Parts | Pemasok suku cadang dan mesin | Yang diincar: Margin maksimal; saat Anda bergantung padanya ia menaikkan harga atau menahan kiriman (hold-up). | Terakhir: Indeks baja 1,00; kapas 1,55. | Ketuk untuk melihat tanda dan cara menghadapi" [klik]
+      "Pekerja" 
+      #actor_act_serikat "Serikat Pekerja Tekstil Kalimas | Serikat pekerja | Yang diincar: Upah riil dan keamanan kerja bagi 349 pekerja. | Terakhir: Tidak ada tuntutan aktif. | Ketuk untuk melihat tanda dan cara menghadapi" [klik]
+      "Negara dan pasar" 
+      #actor_act_bank_sentral "Bank Sentral Sundara | Otoritas moneter (aturan Taylor, kepribadian politis) | Yang diincar: Inflasi 3%, lapangan kerja, stabilitas kurs; mendekati pemilu cenderung menahan bunga. | Terakhir: Suku bunga acuan 4,75%; aturan Taylor menyarankan 6,13%. | Ketuk untuk melihat tanda dan cara menghadapi" [klik]
+      #actor_act_investor "Investor Bursa Efek Sundara | Pasar saham (investor ritel dan institusi) | Yang diincar: Keuntungan modal cepat; bereaksi berlebihan pada berita dan laporan triwulan. | Terakhir: Indeks BES 1.718 (awal 1.000). | Ketuk untuk melihat tanda dan cara menghadapi" [klik]
+      #open_menu_button (ket: Menu utama) [klik]
+      "Oktober 2035" 
+      "Giliran 70 · Era 1" 
+      #chip_ap 
+        "AP 7/7" 
+      #chip_runway 
+        "Runway 1 bln" 
+      #toggle_theme_button (ket: Ganti mode terang atau gelap) [klik]
+        #bottom_nav_markas "Markas" [klik]
+        #bottom_nav_peta "Peta" [klik]
+        #bottom_nav_perusahaan "Usaha" [klik]
+        #bottom_nav_pasar "Pasar" [klik]
+        #bottom_nav_bursa "Bursa" [klik]
+        #bottom_nav_dunia "Dunia" [klik]

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.InsightTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:32:41.415Z" hostname="runnervm48cm3" time="11.983">
+  <properties/>
+  <testcase name="betRules_blockDoubleBetsAndOversizedStakes" classname="com.example.InsightTest" time="0.006"/>
+  <testcase name="biasDetector_flagsOverconfidence_planning_underconfidence_statusQuo" classname="com.example.InsightTest" time="0.001"/>
+  <testcase name="biasDetector_marketPatterns_directionAndLossChasing" classname="com.example.InsightTest" time="3.55"/>
+  <testcase name="postMortem_ongoingGame_hasHeadlineAndHistory" classname="com.example.InsightTest" time="0.021"/>
+  <testcase name="crowdIsInformativeButNotPerfect_andRandomBettorsGainNothing_200seeds" classname="com.example.InsightTest" time="6.124"/>
+  <testcase name="actionEncodeDecode_roundTrip" classname="com.example.InsightTest" time="0.0"/>
+  <testcase name="betsMoveOnlyPoints_neverCashOrEquity_sameSeedIdenticalMoneyPath" classname="com.example.InsightTest" time="0.206"/>
+  <testcase name="postMortem_explainsFailure_deterministically" classname="com.example.InsightTest" time="2.071"/>
+  <testcase name="resolution_paysAtCrowdPriceWithFee" classname="com.example.InsightTest" time="0.004"/>
+  <system-out><![CDATA[INSIGHT bias pasar: selalu-YA terdeteksi=40/40; pengejar kerugian terdeteksi=28/40
+INSIGHT pasar: pertanyaan selesai=3399 Brier kerumunan=0.212 | penebak acak 200 seed: rata-rata poin=98.11 maks=181.6 dipertaruhkan=10032 bonus skor maks=8
+INSIGHT post-mortem: 12 permainan gagal diperiksa, 12 dengan penyebab teridentifikasi
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

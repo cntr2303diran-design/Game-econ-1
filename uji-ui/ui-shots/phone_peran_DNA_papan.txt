@@ -1,0 +1,11 @@
+== jendela 0
+      #peran_back "Kembali" [klik]
+      "Peran dan tantangan" 
+        "Papan peringkat" 
+        "Manajer Dana · seed 7919 · 24 bulan · Manajer" 
+        "Tempel hasil pemain satu per satu. Skor dihitung ulang dari log aksinya; yang tidak cocok ditolak. Hasil CEO butuh beberapa detik." 
+        #papan_tempel "Hasil pemain" [klik]
+        #papan_tambah "Verifikasi dan tambahkan" [klik]
+        "1. Penguji · skor 68 · 25 aksi" 
+        "Kosongkan papan" [klik]
+      "Tutup" [klik]

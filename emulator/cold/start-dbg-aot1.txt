@@ -1,0 +1,7 @@
+Starting: Intent { cmp=com.aistudio.kapital.xkrpzv/com.example.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: com.aistudio.kapital.xkrpzv/com.example.MainActivity
+TotalTime: 1446
+WaitTime: 1462
+Complete

@@ -1,0 +1,24 @@
+== nd setelah pasang
+    flags=0x0
+    flags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]
+  [com.aistudio.kapital.xkrpzv]
+    path: /data/app/~~aj1fzEVE53Wpgmf0VCeWxQ==/com.aistudio.kapital.xkrpzv-RPqVFcCMenv7a5GL9PJ_OQ==/base.apk
+      x86_64: [status=verify] [reason=install] [primary-abi]
+== nd setelah compile -m speed
+    flags=0x0
+    flags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]
+  [com.aistudio.kapital.xkrpzv]
+    path: /data/app/~~aj1fzEVE53Wpgmf0VCeWxQ==/com.aistudio.kapital.xkrpzv-RPqVFcCMenv7a5GL9PJ_OQ==/base.apk
+      x86_64: [status=speed] [reason=cmdline] [primary-abi]
+== dbg setelah pasang
+    flags=0x0
+    flags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]
+  [com.aistudio.kapital.xkrpzv]
+    path: /data/app/~~dYJlA_7vofTc9j_fpG3HWw==/com.aistudio.kapital.xkrpzv-Ns70wkYH4ICFo3bp78PEWg==/base.apk
+      x86_64: [status=run-from-apk] [reason=unknown] [primary-abi]
+== dbg setelah compile -m speed
+    flags=0x0
+    flags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]
+  [com.aistudio.kapital.xkrpzv]
+    path: /data/app/~~dYJlA_7vofTc9j_fpG3HWw==/com.aistudio.kapital.xkrpzv-Ns70wkYH4ICFo3bp78PEWg==/base.apk
+      x86_64: [status=verify] [reason=cmdline] [primary-abi]

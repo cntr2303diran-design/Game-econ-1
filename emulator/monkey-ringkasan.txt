@@ -1,0 +1,2 @@
+Events injected: 2500
+## Network stats: elapsed time=52091ms (0ms mobile, 0ms wifi, 52091ms not connected)

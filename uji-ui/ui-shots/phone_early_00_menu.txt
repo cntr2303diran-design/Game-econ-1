@@ -1,0 +1,12 @@
+== jendela 0
+      "KAPITAL" 
+      "Simulasi ekonomi dunia dan strategi korporasi" 
+        "Permainan tersimpan" 
+        "CEO PT Benang Sundara · Oktober 2035" 
+        "Kas 1.634 jt RS · Ekuitas 86.414 jt RS" 
+      #menu_continue "Lanjutkan permainan" [klik]
+      #menu_new_game "Permainan baru" [klik]
+      #menu_peran "Peran lain dan tantangan" [klik]
+      #menu_how "Cara bermain" [klik]
+      "Ganti tema terang/gelap" [klik]
+      "Tentang permainan" [klik]

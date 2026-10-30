@@ -1,0 +1,1 @@
+COLD label=nd-jit1; debuggable=false; giliran simpanan=380; konstruktor=43 ms; pemulihan=1250 ms; uji mulai 61 ms setelah proses dibuat; vm=2.1.0; giliran akhir=420

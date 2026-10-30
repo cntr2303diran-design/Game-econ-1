@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.AgentScaleTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:29:43.646Z" hostname="runnervm48cm3" time="0.201">
+  <properties/>
+  <testcase name="engineWithNewHouseholdSector_isDeterministicAcrossReplay" classname="com.example.AgentScaleTest" time="0.086"/>
+  <testcase name="engineSimulates200kHouseholds_acrossEightCountries" classname="com.example.AgentScaleTest" time="0.001"/>
+  <testcase name="householdStep_costDoesNotGrowWithAgentCount" classname="com.example.AgentScaleTest" time="0.065"/>
+  <testcase name="binomialSampler_matchesTheory_inAllRegimes" classname="com.example.AgentScaleTest" time="0.032"/>
+  <testcase name="householdSector_at200kAgents_hasStationaryUnemploymentAndIsDeterministic" classname="com.example.AgentScaleTest" time="0.015"/>
+  <testcase name="normalQuantile_isAccurateAndSymmetric" classname="com.example.AgentScaleTest" time="0.0"/>
+  <system-out><![CDATA[KOHORT: 2.000 langkah: 50k agen=39.9 ms, 200k agen=18.3 ms
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

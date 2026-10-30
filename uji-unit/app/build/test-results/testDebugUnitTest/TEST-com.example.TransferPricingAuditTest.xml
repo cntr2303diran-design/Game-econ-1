@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.TransferPricingAuditTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:34:04.032Z" hostname="runnervm48cm3" time="5.681">
+  <properties/>
+  <testcase name="auditRiskScalesWithProfitShifted" classname="com.example.TransferPricingAuditTest" time="5.681"/>
+  <system-out><![CDATA[AUDIT-TP: 45 permainan x 80 giliran: {WAJAR=0, OPTIMAL=24, AGRESIF=88}
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

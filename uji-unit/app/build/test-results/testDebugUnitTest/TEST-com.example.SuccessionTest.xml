@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.SuccessionTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:33:54.211Z" hostname="runnervm48cm3" time="9.82">
+  <properties/>
+  <testcase name="handoverDependsOnSuccessor" classname="com.example.SuccessionTest" time="9.82"/>
+  <system-out><![CDATA[SUKSESI: mulus dengan penerus=22, darurat tanpa penerus=22 dari 44
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

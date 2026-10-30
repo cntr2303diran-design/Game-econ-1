@@ -1,0 +1,53 @@
+== jendela 0
+      #koran_pagi_back_button (ket: Kembali ke Markas) [klik]
+      "Koran pagi · 5 sudut pandang" 
+      "Geser untuk membandingkan peristiwa yang sama" 
+        "AP 0/7" 
+          #media_tab_0 "Harian Bisnis | Bisnis" [klik]
+          #media_tab_1 "Suara Sundara | Pro-Pemerintah" [klik]
+          #media_tab_2 "Mimbar Rakyat | Oposisi" [klik]
+          #media_tab_3 "Kilat Sore | Sensasional" [klik]
+          #media_tab_4 "Lensa Independen | Independen" [klik]
+          "Harian Bisnis · Bisnis" 
+          "1 September 2032" 
+            "Keyakinan sedang" 
+          "Survei: upah pabrik tekstil naik rata-rata 4,2% tahun ini" 
+          "Asosiasi pengusaha mencatat tekanan upah di kawasan industri." 
+            "Profil Redaksi & Kepentingan Tersembunyi:" 
+            "Fokus likuiditas, suku bunga, rantai pasok, dan covenant bank" 
+          "Asal data" [klik]
+          #crosscheck_news_news_33_BISNIS "Periksa silang (1 AP)" [klik]
+          "Topik yang sama di 5 media" 
+          "1. Harian Bisnis (Bisnis)" 
+          "Survei: upah pabrik tekstil naik rata-rata 4,2% tahun ini" 
+            "Keyakinan sedang" 
+          "2. Suara Sundara (Pro-Pemerintah)" 
+          "Pemerintah: kenaikan upah akan 'terukur dan adil'" 
+            "Keyakinan sedang" 
+          "3. Mimbar Rakyat (Oposisi)" 
+          "Harga pangan melonjak, buruh tekstil makin terjepit" 
+            "Keyakinan sedang" 
+          "4. Kilat Sore (Sensasional)" 
+          "MOGOK NASIONAL TEKSTIL SEBULAN LAGI?!" 
+            "Keyakinan rendah" 
+          "5. Lensa Independen (Independen)" 
+          "Inflasi 5,7% menggerus upah riil; tuntutan baru diperkirakan dalam beberapa bulan" 
+            "Keyakinan tinggi" 
+== jendela 1
+      (ket: Close sheet) [klik]
+        (ket: Drag handle) 
+          "Asal data" 
+            "Keyakinan sedang" 
+          "Indikator:" 
+          "Jarak ke covenant" 
+          "Nilai Tercatat:" 
+          "ICR proyeksi 5,01x vs batas 1,05x" 
+          "Sumber:" 
+          "Divisi Treasury (perkiraan bulan berjalan)" 
+          "Tanggal Data:" 
+          "Proyeksi September 2032" 
+            "Cara hitung & Rumus:" 
+            "ICR = EBIT 3 bulan / beban bunga 3 bulan. Bulan berjalan memakai perkiraan tanpa kejadian acak. Juga diuji: utang bersih/EBITDA ≤ 3,5x." 
+            "Catatan bias, keterlambatan & akuntansi forensik:" 
+            "Perkiraan tidak memasukkan mogok, kerusakan mesin, atau kredit macet yang belum terjadi." 
+          "Tutup" [klik]

@@ -1,0 +1,2 @@
+--------- beginning of main
+10-30 03:44:33.304  8141  8163 I KAPITAL-LOAD: restorePending selesai dalam 12446 ms; sejak proses mulai 12973 ms

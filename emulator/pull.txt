@@ -1,0 +1,1 @@
+/sdcard/Android/data/com.aistudio.kapital.xkrpzv/files/./: 41 files pulled, 0 skipped. 36.2 MB/s (9795295 bytes in 0.258s)

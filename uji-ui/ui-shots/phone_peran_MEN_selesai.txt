@@ -1,0 +1,15 @@
+== jendela 0
+      #peran_back "Kembali" [klik]
+      "Peran dan tantangan" 
+        "Selesai: Menteri Keuangan" 
+        "Bulan ke-24 dari 24. Belanja 17.0% PDB, pajak 15.0% PDB (defisit struktural 2.0%)." 
+        "Utang 43.2% PDB (tertinggi 43.2%), bunga 3.5% PDB, premi risiko 0.1 poin." 
+        "Inflasi 3.9%, kesenjangan output 1.0%, pengangguran 4.8%." 
+        "Skor 67." 
+        "Bagikan" 
+        "Kode tantangan memuat seed, sehingga lawan memainkan dunia yang sama. Hasil memuat seluruh log aksi Anda; penerima memutar ulangnya sendiri untuk membuktikan skor, sehingga skor yang dikarang ditolak. Log yang disalin dari pemain lain tidak bisa dicegah." 
+        #salin_tantangan "Salin kode tantangan" [klik]
+        #peran_nama "Nama Anda" [klik]
+        #salin_hasil "Salin hasil saya" [klik]
+        "Papan peringkat (hasil Anda masuk otomatis)" [klik]
+      "Main lagi" [klik]

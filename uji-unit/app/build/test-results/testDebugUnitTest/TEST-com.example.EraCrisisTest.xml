@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.EraCrisisTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:30:52.525Z" hostname="runnervm48cm3" time="0.132">
+  <properties/>
+  <testcase name="crisesAppearInChronicleWhenReached" classname="com.example.EraCrisisTest" time="0.112"/>
+  <testcase name="oneCrisisPerEra2to4_withinEraBounds_andDeterministic" classname="com.example.EraCrisisTest" time="0.02"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,8 @@
+android: 14 (sdk 34)
+abi: x86_64
+model: sdk_gphone64_x86_64
+runtime: libart.so
+grep: name: No such file or directory
+cpu emulator: 4 inti; /proc/cpuinfo:model		: 6
+cpu host: 4 inti; model name	: AMD EPYC 7763 64-Core Processor
+memori emulator: MemTotal:        4016092 kB

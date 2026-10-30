@@ -1,0 +1,1 @@
+COLD label=nd-aot2; debuggable=false; giliran simpanan=380; konstruktor=40 ms; pemulihan=1107 ms; uji mulai 64 ms setelah proses dibuat; vm=2.1.0; giliran akhir=420

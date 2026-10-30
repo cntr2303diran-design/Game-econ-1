@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.OperationsTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:33:09.812Z" hostname="runnervm48cm3" time="0.096">
+  <properties/>
+  <testcase name="hiring_higherTierMeansBetterButNoisyCandidates_andSkillRevealsLater" classname="com.example.OperationsTest" time="0.003"/>
+  <testcase name="repositoryView_listsStaffAndActionsWork" classname="com.example.OperationsTest" time="0.004"/>
+  <testcase name="neutralStaff_changeNothing_andVacancyIsWorseThanItSaves" classname="com.example.OperationsTest" time="0.001"/>
+  <testcase name="operations_inEngine_areDeterministic_andKeepBooksBalanced" classname="com.example.OperationsTest" time="0.067"/>
+  <testcase name="rdProgram_buildsBoundedQualitySlowly_andCostsMoney" classname="com.example.OperationsTest" time="0.0"/>
+  <testcase name="logisticsAndFleet_costMoneyAndChangeCostsAsDocumented" classname="com.example.OperationsTest" time="0.003"/>
+  <testcase name="actions_roundTrip_andRulesAreEnforced" classname="com.example.OperationsTest" time="0.001"/>
+  <testcase name="poaching_isRealButRare_andPayingMoreProtects" classname="com.example.OperationsTest" time="0.015"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

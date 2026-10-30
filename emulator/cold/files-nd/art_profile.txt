@@ -1,0 +1,166 @@
+== putaran 1 (dingin): 1332 ms, 254 sampel
+-- waktu SENDIRI (bingkai teratas), 30 teratas
+    5.1%  java.lang.StrictMath.log
+    4.7%  java.lang.StrictMath.cos
+    3.5%  com.example.engine.AgentsKt.binomialDraw
+    3.5%  kotlin.jvm.internal.Intrinsics.checkNotNullParameter
+    3.1%  java.lang.Double.valueOf
+    2.4%  java.lang.StrictMath.pow
+    2.4%  java.util.ArrayList.iterator
+    2.0%  java.lang.Object.internalClone
+    1.6%  java.util.LinkedHashMap.afterNodeInsertion
+    1.6%  java.util.ArrayList.get
+    1.6%  com.example.engine.AgentsKt.stdNormal
+    1.6%  java.lang.StrictMath.exp
+    1.6%  java.util.ArrayList.add
+    1.2%  kotlin.jvm.internal.Intrinsics.areEqual
+    1.2%  java.lang.StringBuilder.<init>
+    1.2%  android.icu.impl.number.AffixUtils.hasCurrencySymbols
+    1.2%  java.util.ArrayList$Itr.next
+    1.2%  kotlin.TuplesKt.to
+    1.2%  java.lang.StringBuilder.append
+    0.8%  java.util.concurrent.ConcurrentHashMap.get
+    0.8%  com.example.engine.World.getRivals
+    0.8%  jdk.internal.math.FloatingDecimal$BinaryToASCIIBuffer.dtoa
+    0.8%  kotlin.random.Random.nextDouble
+    0.8%  android.icu.impl.number.PropertiesAffixPatternProvider.<init>
+    0.8%  com.example.engine.DataDesk$$ExternalSyntheticLambda0.invoke
+    0.8%  android.icu.impl.ICUBinary.compareKeys
+    0.8%  kotlin.collections.SetsKt__SetsKt.mutableSetOf
+    0.8%  java.util.LinkedHashMap$LinkedValueIterator.next
+    0.8%  android.icu.text.DecimalFormatSymbols.setZeroDigit
+    0.8%  java.util.HashMap.resize
+-- waktu INKLUSIF (ada di tumpukan), 40 teratas selain thread dasar
+   96.9%  com.example.engine.KapitalEngine.apply
+   96.1%  com.example.engine.KapitalEngine.endTurn
+   34.6%  com.example.engine.Dunia.step
+   18.9%  java.util.Formatter.format
+   18.9%  java.lang.String.format
+   18.1%  com.example.engine.KapitalEngine$Companion.fmt
+   17.7%  java.util.Formatter$FormatSpecifier.print
+   17.7%  java.util.Formatter$FormatSpecifier.printFloat
+   15.4%  java.util.Formatter$FormatSpecifier.localizedMagnitude
+   15.4%  com.example.engine.CreditSystem.step
+   13.8%  java.text.NumberFormat.getInstance
+   13.8%  java.text.NumberFormat.getIntegerInstance
+   13.0%  java.text.DecimalFormat.<init>
+   12.6%  java.text.DecimalFormat.initPattern
+   11.4%  com.example.engine.AgentsKt.stdNormal
+    9.4%  com.example.engine.KapitalEngine$Companion.signed
+    9.1%  com.example.engine.DataDesk.step
+    9.1%  com.example.engine.KapitalEngine.drawEvents
+    8.3%  java.text.DecimalFormatSymbols.getIcuDecimalFormatSymbols
+    7.9%  com.example.engine.World.step$default
+    7.9%  com.example.engine.World.step
+    6.7%  com.example.engine.Bourse.step
+    6.3%  com.example.engine.EventCards.draw
+    5.9%  com.example.engine.AgentsKt.binomialDraw
+    5.9%  com.example.engine.HouseholdSector.step
+    5.5%  com.example.engine.DMathKt.ln
+    5.1%  java.text.DecimalFormatSymbols.initializeCurrency
+    5.1%  java.lang.StrictMath.log
+    5.1%  java.util.Currency.getInstance
+    4.7%  java.lang.StrictMath.cos
+    4.7%  com.example.engine.DMathKt.cos
+    4.3%  com.android.icu.text.CompatibleDecimalFormatFactory.create
+    3.9%  com.example.engine.EventCards$$ExternalSyntheticLambda27.invoke
+    3.9%  android.icu.text.DecimalFormat.refreshFormatter
+    3.9%  libcore.icu.ICU.getCurrencyCode
+    3.5%  kotlin.jvm.internal.Intrinsics.checkNotNullParameter
+    3.5%  com.example.engine.EventCards.trigger$lambda$44
+    3.5%  android.icu.util.Currency.getAvailableCurrencyCodes
+    3.5%  android.icu.text.DecimalFormat.<init>
+    3.1%  com.example.engine.MacroPlus.step
+-- kelompok (waktu sendiri)
+  StrictMath (JNI): sendiri 13.8%
+  java.lang.Math: sendiri 0.0%
+  DMath (pembungkus): sendiri 0.8%
+  mesin com.example.engine: sendiri 31.1%
+  java.util.* koleksi: sendiri 16.9%
+  kotlin.*: sendiri 13.0%
+  java.lang.String/Formatter/StringBuilder: sendiri 7.9%
+  Random: sendiri 0.8%
+  paling banyak ada di tumpukan lewat StrictMath atau DMath: 5.5% (batas bawah porsi fungsi matematika)
+== putaran 2 (hangat): 1018 ms, 194 sampel
+-- waktu SENDIRI (bingkai teratas), 30 teratas
+   10.3%  java.lang.StrictMath.cos
+    6.7%  java.lang.StrictMath.log
+    4.1%  com.example.engine.AgentsKt.binomialDraw
+    3.1%  java.lang.StrictMath.exp
+    2.6%  com.example.engine.AgentsKt.stdNormal
+    2.1%  java.lang.StrictMath.pow
+    2.1%  kotlin.jvm.internal.Intrinsics.areEqual
+    2.1%  kotlin.jvm.internal.Intrinsics.checkNotNullExpressionValue
+    2.1%  java.util.ArrayList$Itr.next
+    2.1%  java.lang.StringBuilder.append
+    1.5%  java.util.LinkedHashMap.afterNodeInsertion
+    1.5%  java.lang.Double.valueOf
+    1.5%  java.lang.Object.internalClone
+    1.5%  kotlin.ranges.RangesKt___RangesKt.coerceIn
+    1.5%  java.lang.String.getBytes
+    1.0%  java.lang.StringBuilder.<init>
+    1.0%  java.util.ArrayList.get
+    1.0%  java.util.ArrayList.grow
+    1.0%  com.example.engine.SectorModel.leontief
+    1.0%  java.lang.StringFactory.newStringFromBytes
+    1.0%  java.util.ArrayList.iterator
+    1.0%  kotlin.jvm.internal.Intrinsics.checkNotNullParameter
+    1.0%  java.text.DecimalFormatSymbols.maybeStripMarkers
+    1.0%  com.example.engine.CountryMacroState.getGuidance
+    1.0%  java.lang.String.toCharArray
+    0.5%  android.icu.util.ULocale.getRegionForSupplementalData
+    0.5%  java.util.Formatter.parse
+    0.5%  com.example.engine.DMathKt.exp
+    0.5%  java.lang.StringBuilder.toString
+    0.5%  android.icu.impl.SoftCache.getInstance
+-- waktu INKLUSIF (ada di tumpukan), 40 teratas selain thread dasar
+   99.0%  com.example.engine.KapitalEngine.apply
+   94.3%  com.example.engine.KapitalEngine.endTurn
+   36.6%  com.example.engine.Dunia.step
+   21.1%  com.example.engine.CreditSystem.step
+   19.6%  com.example.engine.AgentsKt.stdNormal
+   19.6%  java.lang.String.format
+   18.0%  com.example.engine.KapitalEngine$Companion.fmt
+   17.5%  java.util.Formatter.format
+   15.5%  java.util.Formatter$FormatSpecifier.print
+   15.5%  java.util.Formatter$FormatSpecifier.printFloat
+   14.9%  java.util.Formatter$FormatSpecifier.localizedMagnitude
+   13.9%  java.text.NumberFormat.getInstance
+   13.9%  java.text.NumberFormat.getIntegerInstance
+   11.3%  java.text.DecimalFormat.<init>
+   10.8%  java.text.DecimalFormat.initPattern
+   10.3%  java.lang.StrictMath.cos
+   10.3%  com.example.engine.DMathKt.cos
+    8.2%  java.text.DecimalFormatSymbols.getIcuDecimalFormatSymbols
+    7.2%  com.example.engine.KapitalEngine$Companion.signed
+    7.2%  com.example.engine.Bourse.step
+    7.2%  com.example.engine.DMathKt.ln
+    6.7%  java.lang.StrictMath.log
+    6.7%  com.example.engine.KapitalEngine.drawEvents
+    6.2%  com.example.engine.AgentsKt.binomialDraw
+    5.7%  com.example.engine.World.step
+    5.7%  com.example.engine.HouseholdSector.step
+    5.7%  com.example.engine.World.step$default
+    5.2%  java.text.DecimalFormatSymbols.initializeCurrency
+    5.2%  java.util.Currency.getInstance
+    4.6%  com.example.engine.DataDesk.step
+    4.1%  com.example.engine.Geopolitics.step
+    3.6%  com.example.engine.DMathKt.exp
+    3.6%  libcore.icu.ICU.getCurrencyCode
+    3.6%  com.example.engine.MacroPlus.step
+    3.6%  java.lang.StringBuilder.append
+    3.1%  android.icu.util.Currency.getAvailableCurrencyCodes
+    3.1%  com.example.engine.EventCards.draw
+    3.1%  com.example.engine.CreditSystem.logistic
+    3.1%  java.lang.StrictMath.exp
+    3.1%  com.example.engine.KapitalEngine.activeModsLine
+-- kelompok (waktu sendiri)
+  StrictMath (JNI): sendiri 22.2%
+  java.lang.Math: sendiri 0.0%
+  DMath (pembungkus): sendiri 1.0%
+  mesin com.example.engine: sendiri 26.3%
+  java.util.* koleksi: sendiri 15.5%
+  kotlin.*: sendiri 12.9%
+  java.lang.String/Formatter/StringBuilder: sendiri 9.3%
+  Random: sendiri 0.0%
+  paling banyak ada di tumpukan lewat StrictMath atau DMath: 10.3% (batas bawah porsi fungsi matematika)

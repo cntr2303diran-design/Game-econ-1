@@ -1,0 +1,52 @@
+== jendela 0
+      #covenant_warning_card "Jarak ke covenant 503% | Uji kuartalan di akhir giliran ini" (ket: Covenant aman | Asal data covenant) [klik]
+      #morning_paper_card "Harian Bisnis | Keyakinan sedang | Kestrel perketat kuota ekspor komponen mesin | +4 sudut pandang lain · 1 rumor | Buka Koran Pagi" [klik]
+      "Indikator utama" 
+      "Ketuk / tahan angka untuk Asal data" 
+      #uncertain_value_kas "Kas | 9.369 jt RS | −937/bulan | Rekening bank · Akhir Februari 2036 | Keyakinan tinggi" (ket: Asal data Kas) [klik]
+      #uncertain_value_utilisasi_pabrik "Utilisasi pabrik | 88% | normal | Kepala Pabrik · Laporan Februari 2036 | Keyakinan sedang" (ket: Asal data Utilisasi pabrik) [klik]
+      #uncertain_value_siklus_kas "Siklus kas | 88 hari | DSO 72 · DIO 53 · DPO 37 | Akuntansi CFO · Akhir Februari 2036 | Keyakinan sedang" (ket: Asal data Siklus kas) [klik]
+      #uncertain_value_inflasi_sundara "Inflasi Sundara | 2,4–4,4% | data Januari 2036 | Biro Statistik Sundara · terlambat 2 bln | Keyakinan rendah" (ket: Asal data Inflasi Sundara) [klik]
+        "Memo eksekutif" 
+        "Gilang Permana · Direktur Operasi (COO)" 
+        "“Pemasok kapas Tarsis meminta pembayaran lebih cepat karena El Niño.”" 
+        "Ratna Pramudita · Direktur Keuangan (CFO)" 
+        "“Piutang berumur di atas 90 hari kini 1.385 jt RS. Runway 9 bulan; jarak covenant 503%.”" 
+        "Baskoro Wijaya · Direktur Penjualan" 
+        "“Mohon jangan perketat kredit sekarang; momentum penjualan sedang bagus.”" 
+        "Memo mencerminkan kepentingan penulisnya. Cocokkan dengan data sebelum percaya." 
+      "Menunggu keputusan" 
+      "Keputusan besar wajib jurnal" 
+      #decision_item_evt_75_0_retail_terms "Grup Mahkota menuntut termin 120 hari | Pelanggan · Pelanggan ritel terbesar meminta termin pembayaran diperpanjang menjadi 120 hari dan disko… | tenggat 3 giliran" [klik]
+      #decision_item_dec_termsheet "Term sheet dari 2 bank | Refinancing Bank B yang jatuh tempo Desember 2036 (pilih salah satu) | 2 AP" [klik]
+      #decision_item_dec_pemintalan "Proposal pabrik pemintalan | Integrasi hulu benang di Kalimas · 16.158 jt RS; pembiayaan harus Anda cari sendiri (kas atau kredit bank) | 3 AP" [klik]
+        "Harga jual: +0% dari harga pasar" 
+        "Harga naik = margin naik, pangsa turun. Pesaing menyamai potongan harga, tapi tidak ikut kenaikan. 1 AP per perubahan." 
+        "−3%" [klik]
+        "+3%" [klik]
+        "Proyeksi kas dan ketidakpastian" 
+        "Pita 50% dan 90% untuk 6 giliran ke depan · garis merah = kas nol" 
+        "juta RS" 
+        (ket: Grafik proyeksi Proyeksi kas dan ketidakpastian, satuan juta RS. Nilai terakhir 9368,8. Median di ujung proyeksi 3747,5, rentang 50 persen 2600,1 sampai 4895,0, rentang 90 persen 1452,6 sampai 6042,4. Batas bahaya 0,0.) 
+        "← Data Historis (Terealisasi)" 
+        "Proyeksi Rentang 50% & 90% →" 
+        "Kalibrasi dan jurnal" 
+          "Brier 0,06 · 1 dinilai" 
+        "• Confirmation bias: Anda belum pernah memeriksa silang berita sejak memimpin perusahaan." 
+        "Jurnal Terakhir: Pengetatan syarat kredit ritel (giliran 67) (Keyakinan 75% · Evaluasi Giliran 73)" 
+      #end_turn_button "Akhiri giliran" [klik]
+      "Lihat laporan bulan lalu" [klik]
+      #open_menu_button (ket: Menu utama) [klik]
+      "Maret 2036" 
+      "Giliran 75 · Era 1" 
+      #chip_ap 
+        "AP 4/7" 
+      #chip_runway 
+        "Runway 9 bln" 
+      #toggle_theme_button (ket: Ganti mode terang atau gelap) [klik]
+        #bottom_nav_markas "Markas" [klik]
+        #bottom_nav_peta "Peta" [klik]
+        #bottom_nav_perusahaan "Usaha" [klik]
+        #bottom_nav_pasar "Pasar" [klik]
+        #bottom_nav_bursa "Bursa" [klik]
+        #bottom_nav_dunia "Dunia" [klik]

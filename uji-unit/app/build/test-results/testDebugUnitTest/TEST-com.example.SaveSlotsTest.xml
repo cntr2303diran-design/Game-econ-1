@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.SaveSlotsTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:33:22.322Z" hostname="runnervm48cm3" time="0.49">
+  <properties/>
+  <testcase name="newGame_inheritsDifficultyUnlessExplicit" classname="com.example.SaveSlotsTest" time="0.007"/>
+  <testcase name="mainSave_ignoresMetaLines_andSlotWithoutMetaStillLoads" classname="com.example.SaveSlotsTest" time="0.034"/>
+  <testcase name="corporateButtons_alwaysTellThePlayerWhatHappened" classname="com.example.SaveSlotsTest" time="0.003"/>
+  <testcase name="newGame_afterGameOver_inheritsDifficultyAndUsesFreshSeed" classname="com.example.SaveSlotsTest" time="0.016"/>
+  <testcase name="fiveRotatingSlots_holdTheLastFiveAutosaves" classname="com.example.SaveSlotsTest" time="0.131"/>
+  <testcase name="saves_carryEngineVersion_andMismatchIsReportedToThePlayer" classname="com.example.SaveSlotsTest" time="0.092"/>
+  <testcase name="loadingSlot_restoresExactState_andReplayIsDeterministic" classname="com.example.SaveSlotsTest" time="0.178"/>
+  <testcase name="ironman_hasNoAutosave_andCannotLoadWhileRunning" classname="com.example.SaveSlotsTest" time="0.027"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

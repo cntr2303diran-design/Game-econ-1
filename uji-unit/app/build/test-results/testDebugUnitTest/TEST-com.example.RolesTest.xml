@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.RolesTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:33:21.490Z" hostname="runnervm48cm3" time="0.829">
+  <properties/>
+  <testcase name="minister_isDeterministic_andReplayMatches" classname="com.example.RolesTest" time="0.009"/>
+  <testcase name="minister_rulesAreEnforced" classname="com.example.RolesTest" time="0.0"/>
+  <testcase name="governor_skillIsRewarded_recklessIsNot" classname="com.example.RolesTest" time="0.331"/>
+  <testcase name="minister_skillIsRewarded_recklessIsNot_andDebtCrisisEndsTheGame" classname="com.example.RolesTest" time="0.248"/>
+  <testcase name="actionCodec_roundTrip" classname="com.example.RolesTest" time="0.001"/>
+  <testcase name="fund_ledgerIsConsistent_andTradingCostsMoney" classname="com.example.RolesTest" time="0.001"/>
+  <testcase name="governor_isDeterministic_andReplayMatches" classname="com.example.RolesTest" time="0.006"/>
+  <testcase name="governor_rulesAreEnforced" classname="com.example.RolesTest" time="0.0"/>
+  <testcase name="fund_isDeterministic_andReplayMatches" classname="com.example.RolesTest" time="0.007"/>
+  <testcase name="fund_scoresSeparateStrategies" classname="com.example.RolesTest" time="0.223"/>
+  <system-out><![CDATA[GUBERNUR skor rata-rata: taylor=67.8 tahan=16.3 dovish=0.0 hawkish=0.0
+MENTERI skor rata-rata: kontra-siklus=77.3 tahan=65.9 pro-siklus=0.0 boros=0.0
+DANA skor rata-rata: indeks=55.1 kas=37.8 penjudi=37.1
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

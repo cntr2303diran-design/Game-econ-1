@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.EventConsequenceTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:32:24.449Z" hostname="runnervm48cm3" time="6.327">
+  <properties/>
+  <testcase name="activeEventEffects_areListedInTheMonthlyReport" classname="com.example.EventConsequenceTest" time="0.036"/>
+  <testcase name="everyOutcomeWithEffects_actuallyChangesTheSimulation" classname="com.example.EventConsequenceTest" time="6.1"/>
+  <testcase name="wageEffect_raisesPermanentWageCost_exactly" classname="com.example.EventConsequenceTest" time="0.053"/>
+  <testcase name="unionCard_everyOptionHasItsPromisedConsequence" classname="com.example.EventConsequenceTest" time="0.047"/>
+  <testcase name="everyFreeOption_saysSoOnItsFace_andTheyStayRare" classname="com.example.EventConsequenceTest" time="0.039"/>
+  <testcase name="strike_cutsProductionTwoMonths_leavesAftermath_thenRecovers" classname="com.example.EventConsequenceTest" time="0.052"/>
+  <system-out><![CDATA[HASIL BERUBAH vs KONTROL: diuji 435 hasil dari 114 kartu; tanpa perubahan: 0
+OPSI TANPA EFEK: 191 dari 1841 (10.4%)
+RASIO PENDAPATAN MOGOK per bulan: [0.582, 0.582, 0.970, 0.970, 0.970, 0.970, 1.000, 1.000]; laporan menyebut mogok: [true, true, false, false, false, false, false, false]
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

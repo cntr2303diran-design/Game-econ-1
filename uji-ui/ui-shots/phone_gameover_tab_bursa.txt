@@ -1,0 +1,38 @@
+== jendela 0
+      "Bursa Efek Sundara" 
+        "Indeks BES" 
+        "448" 
+        "+0,9% bulan ini" 
+        (ket: Grafik tren 12 titik: dari 1000,0 ke 447,7, turun 55,2 persen.) 
+        "Portofolio Anda" 
+        "Nilai pasar" 
+        "0 jt RS" 
+        "Untung/rugi belum direalisasi" 
+        "+0 jt RS" 
+        "Dividen diterima (total)" 
+        "0 jt RS" 
+        "Kas perusahaan" 
+        "243 jt RS" 
+        "Setiap jual atau beli memakai 1 poin aksi (tersisa 7). Dana berasal dari kas perusahaan, bukan kantong pribadi, jadi kas yang terlalu tipis bisa memicu krisis likuiditas." 
+      "Emiten tercatat (ketuk untuk laporan keuangan)" 
+      #stock_sx_mitra "MTNU · Mitra Tekstil Nusantara | Tekstil · belum punya | 593 RS | -5,8%" (ket: Grafik tren 12 titik: dari 2490,0 ke 592,6, turun 76,2 persen.) [klik]
+      #stock_sx_cahaya "CAWE · Cahaya Weaving | Tekstil · belum punya | 804 RS | +10,3%" (ket: Grafik tren 12 titik: dari 2220,0 ke 804,0, turun 63,8 persen.) [klik]
+      #stock_sx_prima "PRGU · Prima Garmen Utama | Tekstil · belum punya | 779 RS | -0,0%" (ket: Grafik tren 12 titik: dari 1950,0 ke 779,1, turun 60,0 persen.) [klik]
+      #stock_sx_velmora "VELM · Importir Velmora | Tekstil · belum punya | 1.519 RS | -3,7%" (ket: Grafik tren 12 titik: dari 3030,0 ke 1518,6, turun 49,9 persen.) [klik]
+      #stock_sx_mahkota "MHKT · Grup Mahkota Ritel | Ritel · belum punya | 1.087 RS | +6,5%" (ket: Grafik tren 12 titik: dari 1905,0 ke 1087,1, turun 42,9 persen.) [klik]
+      #stock_sx_kestrel "KPLP · Kestrel Precision Loom Parts | Industri · belum punya | 2.635 RS | +0,3%" (ket: Grafik tren 12 titik: dari 2760,0 ke 2634,9, turun 4,5 persen.) [klik]
+      #stock_sx_tarsis "TAKA · Tarsis Agro Kapas | Agribisnis · belum punya | 758 RS | -14,4%" (ket: Grafik tren 12 titik: dari 2400,0 ke 758,2, turun 68,4 persen.) [klik]
+      #open_menu_button (ket: Menu utama) [klik]
+      "Oktober 2034" 
+      "Giliran 58 · Era 1" 
+      #chip_ap 
+        "AP 7/7" 
+      #chip_runway 
+        "Kas stabil" 
+      #toggle_theme_button (ket: Ganti mode terang atau gelap) [klik]
+        #bottom_nav_markas "Markas" [klik]
+        #bottom_nav_peta "Peta" [klik]
+        #bottom_nav_perusahaan "Usaha" [klik]
+        #bottom_nav_pasar "Pasar" [klik]
+        #bottom_nav_bursa "Bursa" [klik]
+        #bottom_nav_dunia "Dunia" [klik]

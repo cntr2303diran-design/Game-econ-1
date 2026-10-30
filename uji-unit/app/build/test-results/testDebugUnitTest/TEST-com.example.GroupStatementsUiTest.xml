@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.GroupStatementsUiTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:32:41.338Z" hostname="runnervm48cm3" time="0.074">
+  <properties/>
+  <testcase name="consolidatedAndEntityRowsAppearOnlyWithSubsidiary" classname="com.example.GroupStatementsUiTest" time="0.074"/>
+  <system-out><![CDATA[UI-GRUP: 30 baris grup, 6 baris entitas
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

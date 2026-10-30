@@ -1,0 +1,46 @@
+== jendela 0
+      "Bursa Efek Sundara" 
+        "Indeks BES" 
+        "665" 
+        "-1,3% bulan ini" 
+        (ket: Grafik tren 12 titik: dari 1000,0 ke 664,7, turun 33,5 persen.) 
+        "Portofolio Anda" 
+        "Nilai pasar" 
+        "0 jt RS" 
+        "Untung/rugi belum direalisasi" 
+        "+0 jt RS" 
+        "Dividen diterima (total)" 
+        "0 jt RS" 
+        "Kas perusahaan" 
+        "16.049 jt RS" 
+        "Setiap jual atau beli memakai 1 poin aksi (tersisa 7). Dana berasal dari kas perusahaan, bukan kantong pribadi, jadi kas yang terlalu tipis bisa memicu krisis likuiditas." 
+        "Kabar bursa bulan ini" 
+        "• Mitra Tekstil Nusantara (MTNU) merilis laporan Triwulan 3 2036: pendapatan 63.019 jt RS, laba bersih 3.254 jt RS, di bawah konsensus analis 21,4%." 
+        "• Cahaya Weaving (CAWE) merilis laporan Triwulan 3 2036: pendapatan 52.797 jt RS, laba bersih 1.690 jt RS, di bawah konsensus analis 17,8%." 
+        "• Prima Garmen Utama (PRGU) merilis laporan Triwulan 3 2036: pendapatan 31.376 jt RS, laba bersih 235 jt RS, melampaui konsensus analis 74,8%." 
+        "• Importir Velmora (VELM) merilis laporan Triwulan 3 2036: pendapatan 21.181 jt RS, laba bersih 2.113 jt RS, sesuai konsensus." 
+        "• Grup Mahkota Ritel (MHKT) merilis laporan Triwulan 3 2036: pendapatan 66.060 jt RS, laba bersih 633 jt RS, di bawah konsensus analis 61,8%." 
+        "• Kestrel Precision Loom Parts (KPLP) merilis laporan Triwulan 3 2036: pendapatan 18.762 jt RS, laba bersih 1.894 jt RS, melampaui konsensus analis 17,2%." 
+        "• Tarsis Agro Kapas (TAKA) merilis laporan Triwulan 3 2036: pendapatan 29.166 jt RS, laba bersih 2.039 jt RS, melampaui konsensus analis 15,7%." 
+      "Emiten tercatat (ketuk untuk laporan keuangan)" 
+      #stock_sx_mitra "MTNU · Mitra Tekstil Nusantara | Tekstil · belum punya | 2.020 RS | -2,3%" (ket: Grafik tren 12 titik: dari 2365,5 ke 2019,9, turun 14,6 persen.) [klik]
+      #stock_sx_cahaya "CAWE · Cahaya Weaving | Tekstil · belum punya | 1.215 RS | -6,1%" (ket: Grafik tren 12 titik: dari 2109,0 ke 1215,0, turun 42,4 persen.) [klik]
+      #stock_sx_prima "PRGU · Prima Garmen Utama | Tekstil · belum punya | 826 RS | -6,1%" (ket: Grafik tren 12 titik: dari 1852,5 ke 826,2, turun 55,4 persen.) [klik]
+      #stock_sx_velmora "VELM · Importir Velmora | Tekstil · belum punya | 3.869 RS | +5,5%" (ket: Grafik tren 12 titik: dari 2878,5 ke 3868,5, naik 34,4 persen.) [klik]
+      #stock_sx_mahkota "MHKT · Grup Mahkota Ritel | Ritel · belum punya | 765 RS | -9,5%" (ket: Grafik tren 12 titik: dari 1809,8 ke 764,7, turun 57,7 persen.) [klik]
+      #stock_sx_kestrel "KPLP · Kestrel Precision Loom Parts | Industri · belum punya | 2.847 RS | +9,1%" (ket: Grafik tren 12 titik: dari 2622,0 ke 2846,7, naik 8,6 persen.) [klik]
+      #stock_sx_tarsis "TAKA · Tarsis Agro Kapas | Agribisnis · belum punya | 1.702 RS | +3,5%" (ket: Grafik tren 12 titik: dari 2280,0 ke 1702,0, turun 25,3 persen.) [klik]
+      #open_menu_button (ket: Menu utama) [klik]
+      "September 2036" 
+      "Giliran 81 · Era 1" 
+      #chip_ap 
+        "AP 7/7" 
+      #chip_runway 
+        "Runway 21 bln" 
+      #toggle_theme_button (ket: Ganti mode terang atau gelap) [klik]
+        #bottom_nav_markas "Markas" [klik]
+        #bottom_nav_peta "Peta" [klik]
+        #bottom_nav_perusahaan "Usaha" [klik]
+        #bottom_nav_pasar "Pasar" [klik]
+        #bottom_nav_bursa "Bursa" [klik]
+        #bottom_nav_dunia "Dunia" [klik]

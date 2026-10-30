@@ -1,0 +1,8 @@
+== jendela 0
+      "KAPITAL" 
+      "Simulasi ekonomi dunia dan strategi korporasi" 
+      #menu_new_game "Mulai permainan" [klik]
+      #menu_peran "Peran lain dan tantangan" [klik]
+      #menu_how "Cara bermain" [klik]
+      "Ganti tema terang/gelap" [klik]
+      "Tentang permainan" [klik]

@@ -1,0 +1,37 @@
+== jendela 0
+      #peran_back "Kembali" [klik]
+      "Peran dan tantangan" 
+        "Manajer Dana" 
+        "Bulan ke-0 dari 24. NAV 100000 jt RS (kas 100000)." 
+        "Imbal hasil dana 0.0% vs indeks 0.0%; drawdown dana 0% vs indeks 0%." 
+        "Dividen 0 jt RS, biaya transaksi 0 jt RS. Skor 50." 
+        #dana_lanjut "Lanjut 1 bulan" [klik]
+        "MTNU · Mitra Tekstil Nusantara" 
+        "Harga 2490 · punya 0 lot" 
+        #beli_sx_mitra "Beli 1 lot" [klik]
+        #jual_sx_mitra "Jual 1 lot" [klik]
+        "CAWE · Cahaya Weaving" 
+        "Harga 2220 · punya 0 lot" 
+        #beli_sx_cahaya "Beli 1 lot" [klik]
+        #jual_sx_cahaya "Jual 1 lot" [klik]
+        "PRGU · Prima Garmen Utama" 
+        "Harga 1950 · punya 0 lot" 
+        #beli_sx_prima "Beli 1 lot" [klik]
+        #jual_sx_prima "Jual 1 lot" [klik]
+        "VELM · Importir Velmora" 
+        "Harga 3030 · punya 0 lot" 
+        #beli_sx_velmora "Beli 1 lot" [klik]
+        #jual_sx_velmora "Jual 1 lot" [klik]
+        "MHKT · Grup Mahkota Ritel" 
+        "Harga 1905 · punya 0 lot" 
+        #beli_sx_mahkota "Beli 1 lot" [klik]
+        #jual_sx_mahkota "Jual 1 lot" [klik]
+        "KPLP · Kestrel Precision Loom Parts" 
+        "Harga 2760 · punya 0 lot" 
+        #beli_sx_kestrel "Beli 1 lot" [klik]
+        #jual_sx_kestrel "Jual 1 lot" [klik]
+        "TAKA · Tarsis Agro Kapas" 
+        "Harga 2400 · punya 0 lot" 
+        #beli_sx_tarsis "Beli 1 lot" [klik]
+        #jual_sx_tarsis "Jual 1 lot" [klik]
+      "Tinggalkan sesi ini" [klik]

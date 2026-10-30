@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.ChainCardsTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:30:41.403Z" hostname="runnervm48cm3" time="1.126">
+  <properties/>
+  <testcase name="decisionsTriggerFollowUpCards_andReplayIsDeterministic" classname="com.example.ChainCardsTest" time="1.117"/>
+  <testcase name="everyTemplateBuildsValidCards" classname="com.example.ChainCardsTest" time="0.009"/>
+  <system-out><![CDATA[RANTAI: dari 150 permainan, ada rantai terjadwal/selesai di 116, kartu lanjutan muncul di 107
+KARTU: 621 template, 621 terbangun valid, 108 aturan rantai
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

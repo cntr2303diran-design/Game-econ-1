@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.EraUnlockTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:30:52.837Z" hostname="runnervm48cm3" time="16.783">
+  <properties/>
+  <testcase name="switchOff_neverUnlocksEarly" classname="com.example.EraUnlockTest" time="1.359"/>
+  <testcase name="earlyUnlock_isLatched_oneEraAhead_andReallyOpensFeatures" classname="com.example.EraUnlockTest" time="6.549"/>
+  <testcase name="botOutcomes_areUnchangedBySwitch_becauseBotsFollowTheCalendar" classname="com.example.EraUnlockTest" time="4.933"/>
+  <testcase name="earlyUnlock_isDeterministic" classname="com.example.EraUnlockTest" time="3.471"/>
+  <testcase name="calendarIsAlwaysTheSafetyNet" classname="com.example.EraUnlockTest" time="0.471"/>
+  <system-out><![CDATA[C5 pembukaan dini: 17 dari 48 permainan; anak usaha terbuka dini diperiksa 3 kali
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

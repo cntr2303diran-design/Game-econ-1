@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.AsyncRestoreTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:29:47.568Z" hostname="runnervm48cm3" time="0.99">
+  <properties/>
+  <testcase name="withoutSavedGame_deferRestoreStartsFreshAndNeedsNothing" classname="com.example.AsyncRestoreTest" time="0.029"/>
+  <testcase name="deferredRestore_rejectsCommandsUntilDone_thenMatchesSynchronousLoad" classname="com.example.AsyncRestoreTest" time="0.077"/>
+  <testcase name="deferredSlotLoad_matchesSynchronousLoad_andWritesMainSave" classname="com.example.AsyncRestoreTest" time="0.259"/>
+  <testcase name="restoringAndIronman_refuseCounterfactual" classname="com.example.AsyncRestoreTest" time="0.057"/>
+  <testcase name="restoreOnBackgroundThread_matchesSynchronousLoad" classname="com.example.AsyncRestoreTest" time="0.082"/>
+  <testcase name="backgroundCounterfactual_matchesSynchronous_evenIfTheGameAdvancesMeanwhile" classname="com.example.AsyncRestoreTest" time="0.273"/>
+  <testcase name="beginLoadSlot_rejectsEmptyOrBrokenSlots_withoutTouchingState" classname="com.example.AsyncRestoreTest" time="0.124"/>
+  <testcase name="deferredRestore_keepsVersionNotice_forLegacyAndCurrentSaves" classname="com.example.AsyncRestoreTest" time="0.085"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

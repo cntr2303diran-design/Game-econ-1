@@ -1,0 +1,20 @@
+== jendela 0
+      #peran_back "Kembali" [klik]
+      "Peran dan tantangan" 
+        "Menteri Keuangan" 
+        "Bulan ke-0 dari 24. Belanja 17.0% PDB, pajak 15.0% PDB (defisit struktural 2.0%)." 
+        "Utang 40.0% PDB (tertinggi 40.0%), bunga 0.0% PDB, premi risiko 0.0 poin." 
+        "Inflasi 5.0%, kesenjangan output 0.0%, pengangguran 5.0%." 
+        "Skor 100." 
+        "Defisit struktural di atas 2% PDB mendorong permintaan, tetapi utang yang tinggi menaikkan premi risiko dan bunga. Utang 120% PDB berarti gagal bayar." 
+        "Belanja pemerintah (% PDB)" 
+        #men_belanja_turun "-0,5" [klik]
+        "17.0%" 
+        #men_belanja_naik "+0,5" [klik]
+        "Penerimaan pajak (% PDB)" 
+        #men_pajak_turun "-0,5" [klik]
+        "15.0%" 
+        #men_pajak_naik "+0,5" [klik]
+        #men_lanjut "Tetapkan anggaran dan lanjut 1 bulan" [klik]
+        "Tahan anggaran dan lanjut 6 bulan" [klik]
+      "Tinggalkan sesi ini" [klik]

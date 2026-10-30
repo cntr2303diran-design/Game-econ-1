@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.ReplayFixtureTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:33:19.974Z" hostname="runnervm48cm3" time="0.626">
+  <properties/>
+  <testcase name="replayIsIdenticalOnRepeat" classname="com.example.ReplayFixtureTest" time="0.412"/>
+  <testcase name="fixtureMatchesCurrentEngine_soEngineChangesMustBumpTheVersion" classname="com.example.ReplayFixtureTest" time="0.214"/>
+  <system-out><![CDATA[REPLAY-FIXTURE JVM: 960 baris log, 212 ms, 38 titik periksa cocok
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

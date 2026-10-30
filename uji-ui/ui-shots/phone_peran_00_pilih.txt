@@ -1,0 +1,28 @@
+== jendela 0
+      #peran_back "Kembali" [klik]
+      "Peran dan tantangan" 
+        "Pilih peran" 
+        #peran_GUB "Gubernur Bank Sentral: Jaga inflasi dekat target 3%, kesenjangan output dan pengangguran kecil." [klik]
+        #peran_MEN "Menteri Keuangan: Stabilkan ekonomi lewat belanja dan pajak tanpa membiarkan utang negara lepas kendali." [klik]
+        #peran_DNA "Manajer Dana: Kalahkan indeks bursa dengan penurunan nilai (drawdown) lebih kecil." [klik]
+        #peran_seed "Seed (kosong = acak)" [klik]
+        "Lama permainan" 
+        #peran_h24 "24 bln" [klik]
+        #peran_h60 "60 bln" [klik]
+        #peran_h120 "120 bln" [klik]
+        #peran_mulai "Mulai" [klik]
+        "Terima tantangan" 
+        "Tempel kode tantangan dari pemain lain; Anda dan dia memainkan dunia yang persis sama." 
+        #peran_impor "Kode tantangan" [klik]
+        "Mainkan tantangan" [klik]
+        "Tantangan CEO" 
+        "Satu kampanye penuh sebagai CEO pada seed dan kesulitan yang sama (permainan CEO yang sedang berjalan akan diganti). Setelah kampanye berakhir, kembali ke sini untuk membagikan hasilnya." 
+        #ceo_seed "Seed (kosong = acak)" [klik]
+        #ceo_dif_MAGANG "Magang" [klik]
+        #ceo_dif_MANAJER "Manajer" [klik]
+        #ceo_dif_DIREKTUR "Direktur" [klik]
+        #ceo_dif_KRISIS_ABADI "Krisis Abadi" [klik]
+        #ceo_mulai "Mulai tantangan CEO (kode disalin otomatis)" [klik]
+        #peran_nama_ceo "Nama Anda" [klik]
+        #ceo_bagikan "Salin hasil kampanye CEO terakhir" [klik]
+      #peran_papan "Papan peringkat" [klik]

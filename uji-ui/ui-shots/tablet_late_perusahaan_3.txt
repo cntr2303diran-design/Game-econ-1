@@ -1,0 +1,29 @@
+== jendela 0
+        #perusahaan_subtab_0 "Laporan keuangan" [klik]
+        #perusahaan_subtab_1 "Organisasi" [klik]
+        #perusahaan_subtab_2 "Proyek" [klik]
+        #perusahaan_subtab_3 "Kontrak" [klik]
+        #perusahaan_subtab_4 "Bank" [klik]
+        #perusahaan_subtab_5 "Pelaku" [klik]
+        #perusahaan_subtab_6 "Investasi" [klik]
+        #perusahaan_subtab_7 "Intelijen" [klik]
+        #perusahaan_subtab_8 "Segmen" [klik]
+        #perusahaan_subtab_9 "Operasi" [klik]
+      "Pemasok Tier-2 | Kestrel | Kestrel Precision Loom Parts | Suku cadang dan sensor tenun (±1.850 jt RS/tahun) | Dual sourcing aktif (HPP +1,2%) | Klausul dan covenant: Memasok 80% kebutuhan sensor dan jarum mesin tenun Kalimas. | Belum ditinjau penasihat hukum. Klausul berisiko tidak terlihat." [klik]
+        #contract_cnt_sup_kestrel_review "Tinjau dengan penasihat hukum (1 AP, 50 jt RS)" [klik]
+      "Kontrak berjangka kapas | Tarsis | Bursa Komoditas Tarsis–Sundara | Kunci harga kapas 2656,1 A$/ton (+2% premi) selama 6 bulan | Belum ada lindung nilai · HPP mengikuti harga pasar | Klausul dan covenant: Biaya 60 jt RS. Melindungi dari kenaikan harga, tetapi Anda tidak menikmati penurunan harga selama kontrak. | Kapas ±45% dari biaya produksi. Harga kapas bisa bergerak ±25% per tahun dan melonjak saat El Niño." [klik]
+        #contract_cnt_hedge_kapas_hedge "Lindung nilai kapas 6 bulan (1 AP, 60 jt RS)" [klik]
+      #open_menu_button (ket: Menu utama) [klik]
+      "Agustus 2066" 
+      "Giliran 440 · Era 4" 
+      #chip_ap 
+        "AP 7/7" 
+      #chip_runway 
+        "Kas stabil" 
+      #toggle_theme_button (ket: Ganti mode terang atau gelap) [klik]
+        #bottom_nav_markas "Markas" [klik]
+        #bottom_nav_peta "Peta" [klik]
+        #bottom_nav_perusahaan "Usaha" [klik]
+        #bottom_nav_pasar "Pasar" [klik]
+        #bottom_nav_bursa "Bursa" [klik]
+        #bottom_nav_dunia "Dunia" [klik]

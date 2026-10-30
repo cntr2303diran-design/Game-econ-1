@@ -1,0 +1,1 @@
+COLD label=dbg-jit1; debuggable=true; giliran simpanan=380; konstruktor=444 ms; pemulihan=9671 ms; uji mulai 715 ms setelah proses dibuat; vm=2.1.0; giliran akhir=420

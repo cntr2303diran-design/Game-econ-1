@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.WorldLayerTest" tests="14" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:34:09.715Z" hostname="runnervm48cm3" time="1.569">
+  <properties/>
+  <testcase name="straitClosure_followsTension" classname="com.example.WorldLayerTest" time="0.0"/>
+  <testcase name="crisisPressureRaisesTension_andCanTriggerSanctionsAndBlockades" classname="com.example.WorldLayerTest" time="0.404"/>
+  <testcase name="noShock_meansNoShortage" classname="com.example.WorldLayerTest" time="0.0"/>
+  <testcase name="upstreamShock_propagatesDownstream_toAvailabilityAndPrices" classname="com.example.WorldLayerTest" time="0.0"/>
+  <testcase name="ladder_matchesDesignThresholds" classname="com.example.WorldLayerTest" time="0.0"/>
+  <testcase name="tensionMatrix_has276Pairs_boundedAndMeanReverting" classname="com.example.WorldLayerTest" time="0.038"/>
+  <testcase name="elections_happenEveryFourToFiveYears_perCountry_andShiftStance" classname="com.example.WorldLayerTest" time="0.014"/>
+  <testcase name="sanctionOnKestrel_raisesPlayerCosts_andAuditMitigates" classname="com.example.WorldLayerTest" time="0.001"/>
+  <testcase name="chain_hasThreeTiers_withHiddenTier3_andAuditRevealsIt" classname="com.example.WorldLayerTest" time="0.0"/>
+  <testcase name="countryRegistry_has8Core16SecondaryInFourBlocks" classname="com.example.WorldLayerTest" time="0.0"/>
+  <testcase name="leontief_solvesExactly_andInverseIsNonNegative" classname="com.example.WorldLayerTest" time="0.0"/>
+  <testcase name="electionOutcome_dependsOnMacro_highInflationFavoursMarketParties" classname="com.example.WorldLayerTest" time="1.075"/>
+  <testcase name="secondaryWorld_isBounded_deterministic_andLinkedOnesAreFullySimulated" classname="com.example.WorldLayerTest" time="0.017"/>
+  <testcase name="geopolitics_isDeterministic_andStageHasHysteresis" classname="com.example.WorldLayerTest" time="0.018"/>
+  <system-out><![CDATA[GEO: tekanan krisis -> sanksi aktif di 19/25 seed, blokade di 0/25; tanpa krisis sanksi di 3/25
+SANKSI-KESTREL: pengali biaya tanpa uji tuntas=1.088 dengan uji tuntas=1.055
+PEMILU: pangsa pro-pasar inflasi tinggi=0.39 vs rendah=0.26
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

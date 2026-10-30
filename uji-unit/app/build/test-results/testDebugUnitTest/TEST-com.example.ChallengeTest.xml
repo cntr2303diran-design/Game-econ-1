@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.ChallengeTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:30:42.531Z" hostname="runnervm48cm3" time="3.523">
+  <properties/>
+  <testcase name="governorChallenge_rankingFollowsSkill_andIsVerifiedByReplay" classname="com.example.ChallengeTest" time="0.031"/>
+  <testcase name="leaderboard_exportRestoreRoundTrip_andNamesAreSanitized" classname="com.example.ChallengeTest" time="0.003"/>
+  <testcase name="ceoChallenge_replayVerified_andDeterministic" classname="com.example.ChallengeTest" time="0.056"/>
+  <testcase name="challengeAndSubmission_carryTheEngineVersion_andCrossVersionResultsAreRefusedPolitely" classname="com.example.ChallengeTest" time="0.01"/>
+  <testcase name="fundChallenge_works" classname="com.example.ChallengeTest" time="0.011"/>
+  <testcase name="codec_roundTrip_andRejectsGarbage" classname="com.example.ChallengeTest" time="0.0"/>
+  <testcase name="tamperingIsRejected" classname="com.example.ChallengeTest" time="0.014"/>
+  <testcase name="ceoChallenge_throughRepository_exportsAndVerifiesOnAnotherDevice" classname="com.example.ChallengeTest" time="3.398"/>
+  <system-out><![CDATA[TANTANGAN peringkat: [Cermat=71, Cermat2=71, Diam=64]
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

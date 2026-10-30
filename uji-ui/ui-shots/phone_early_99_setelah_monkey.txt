@@ -1,0 +1,115 @@
+== jendela 0
+        "Arsip Sejarah & Pohon Sebab-Akibat" 
+        "Telusuri rantai transmisi makro-mikro sejak Januari 2030" 
+        #kronik_dunia_button "Kronik Dunia" [klik]
+        "Skor Ketegangan Antarnegara (0–100) & Selat Strategis" 
+        "Aurelia ↔ Kestrel" 
+        "52 / 100" 
+        "Selat Kestrel (jalur chip dan barang jadi) · Perang tarif (skor ≥45)" 
+        "Bea masuk naik; pemain memindah pemasok atau menaikkan harga." 
+        "Norvaldia ↔ Halvenia" 
+        "52 / 100" 
+        "Selat Norvaldia–Halvenia (jalur energi) · Perang tarif (skor ≥45)" 
+        "Bea masuk naik; pemain memindah pemasok atau menaikkan harga." 
+        "Aurelia ↔ Velmora" 
+        "50 / 100" 
+        "Sanksi dan mineral tanah jarang · Perang tarif (skor ≥45)" 
+        "Bea masuk naik; pemain memindah pemasok atau menaikkan harga." 
+        "Tarsis ↔ Sundara" 
+        "44 / 100" 
+        "Selat Tarsis–Sundara (jalur pangan) · Perang kata-kata (skor ≥30)" 
+        "Volatilitas kurs dan saham naik, rumor membanjir." 
+        "Kalender Pemilu & Siklus Politik" 
+        "Aurelia (Hawkish (Kredibilitas tinggi))" 
+          "Bulan ini" 
+        "Norvaldia (Politis)" 
+          "Bulan ini" 
+        "Kestrel (Dovish terkendali)" 
+          "Bulan ini" 
+        "Halvenia (Hawkish)" 
+          "Bulan ini" 
+        "Meridia (Dovish)" 
+          "11 bulan lagi" 
+        "Sundara (Politis (Rentan tekanan jelang pemilu))" 
+          "23 bulan lagi" 
+        "Tarsis (Dovish)" 
+          "Bulan ini" 
+        "Velmora (Tidak independen)" 
+          "Bulan ini" 
+      #dunia_lanjutan 
+        "Dunia Lanjutan: Utang, Peringkat, Bank, Data Resmi" 
+        "Sundara" 
+        "Peringkat BBB" 
+        "utang 55,0% PDB · imbal hasil 10 th 6,00% · kurva normal +6,00" 
+        "Aurelia" 
+        "Peringkat BBB" 
+        "utang 95,0% PDB · imbal hasil 10 th 6,00% · kurva normal +6,00" 
+        "Norvaldia" 
+        "Peringkat BBB" 
+        "utang 40,0% PDB · imbal hasil 10 th 6,00% · kurva normal +6,00" 
+        "Kestrel" 
+        "Peringkat BBB" 
+        "utang 70,0% PDB · imbal hasil 10 th 6,00% · kurva normal +6,00" 
+        "Halvenia" 
+        "Peringkat BBB" 
+        "utang 60,0% PDB · imbal hasil 10 th 6,00% · kurva normal +6,00" 
+        "Meridia" 
+        "Peringkat BBB" 
+        "utang 35,0% PDB · imbal hasil 10 th 6,00% · kurva normal +6,00" 
+        "Tarsis" 
+        "Peringkat BBB" 
+        "utang 50,0% PDB · imbal hasil 10 th 6,00% · kurva normal +6,00" 
+        "Velmora" 
+        "Peringkat BBB" 
+        "utang 80,0% PDB · imbal hasil 10 th 6,00% · kurva normal +6,00" 
+        "Indeks panik Sundara" 
+        "10,0 / 100" 
+        "Bank Sundara" 
+        "CAR rata-rata 14,0% · 0% bank lemah · gagal bayar 2,4%/th · 0 bank pernah diselamatkan" 
+        "Suhu global" 
+        "+0,00 °C · 0 kejadian ekstrem sejauh ini" 
+        "Adopsi teknologi" 
+        "otomasi dan AI industri 1% · energi terbarukan 0% · bioteknologi dan farmasi 0%" 
+        "Demografi Sundara" 
+        "usia 65+ 7,0% · usia kerja 66,0%" 
+      "Daftar Negara & Indikator Makro (Inflasi, Bunga, Pertumbuhan)" 
+      #world_country_card_aurelia "Aurelia (A$) | Adidaya, mata uang cadangan dunia | Keyakinan tinggi | Inflasi | 2,0–3,2% | Bunga Acuan | 4,25% | Pertumbuhan | 2,3% | Ketegangan | 58/100 | Pemilu: Bulan ini · Listrik: 97% (Sangat stabil)" (ket: Asal data) [klik]
+      #world_country_card_norvaldia "Norvaldia (NRV) | Eksportir minyak dan gas | Keyakinan sedang | Inflasi | 5,1–6,3% | Bunga Acuan | 7,00% | Pertumbuhan | 3,1% | Ketegangan | 66/100 | Pemilu: Bulan ini · Listrik: 88% (Stabil)" (ket: Asal data) [klik]
+      #world_country_card_kestrel "Kestrel (KST) | Raksasa manufaktur (80% rantai chip & logam) | Keyakinan sedang | Inflasi | 1,5–2,7% | Bunga Acuan | 3,10% | Pertumbuhan | 4,9% | Ketegangan | 64/100 | Pemilu: Bulan ini · Listrik: 94% (Stabil)" (ket: Asal data) [klik]
+      #world_country_card_halvenia "Halvenia (HLV) | Uni ekonomi maju | Keyakinan tinggi | Inflasi | 1,5–2,8% | Bunga Acuan | 3,50% | Pertumbuhan | 1,2% | Ketegangan | 32/100 | Pemilu: Bulan ini · Listrik: 98% (Hijau & stabil)" (ket: Asal data) [klik]
+      #world_country_card_meridia "Meridia (MRD) | Pusat keuangan kecil, surga pajak | Keyakinan sedang | Inflasi | 2,2–3,4% | Bunga Acuan | 3,25% | Pertumbuhan | 3,6% | Ketegangan | 24/100 | Pemilu: 11 bulan lagi · Listrik: 97% (Stabil)" (ket: Asal data) [klik]
+      #world_country_card_sundara "Sundara (RS) | Negara berkembang, asal pemain (PT Benang Sundara) | Keyakinan rendah | Inflasi | 1,7–3,7% | Bunga Acuan | 4,75% | Pertumbuhan | 5,1–5,6% | Ketegangan | 39/100 | Pemilu: 23 bulan lagi · Listrik: 68% (Pemadaman bergilir di Kalimas)" (ket: Asal data) [klik]
+      #world_country_card_tarsis "Tarsis (TRS) | Agraris, populasi raksasa | Keyakinan rendah | Inflasi | 7,0–8,2% | Bunga Acuan | 6,75% | Pertumbuhan | 5,9% | Ketegangan | 44/100 | Pemilu: Bulan ini · Listrik: 72% (Sedang)" (ket: Asal data) [klik]
+      #world_country_card_velmora "Velmora (VLM) | Rezim otoriter kaya mineral & logam tanah jarang | Keyakinan rendah | Inflasi | 9,9–11,1% | Bunga Acuan | 10,00% | Pertumbuhan | 2,5% | Ketegangan | 76/100 | Pemilu: Bulan ini · Listrik: 74% (Prioritas tambang negara)" (ket: Asal data) [klik]
+      #open_menu_button (ket: Menu utama) [klik]
+      "Mei 2034" 
+      "Giliran 53 · Era 1" 
+      #chip_ap 
+        "AP 0/7" 
+      #chip_runway 
+        "Runway 9 bln" 
+      #toggle_theme_button (ket: Ganti mode terang atau gelap) [klik]
+        #bottom_nav_markas "Markas" [klik]
+        #bottom_nav_peta "Peta" [klik]
+        #bottom_nav_perusahaan "Usaha" [klik]
+        #bottom_nav_pasar "Pasar" [klik]
+        #bottom_nav_bursa "Bursa" [klik]
+        #bottom_nav_dunia "Dunia" [klik]
+== jendela 1
+      (ket: Close sheet) [klik]
+        (ket: Drag handle) 
+          "Asal data" 
+            "Keyakinan rendah" 
+          "Indikator:" 
+          "Data Makro Sundara" 
+          "Nilai Tercatat:" 
+          "Inflasi 7–9% · Bunga 8,25% · Pemilu 9 bln lagi" 
+          "Sumber:" 
+          "Biro Statistik & Bank Sentral Sundara" 
+          "Tanggal Data:" 
+          "Data Maret 2034 (Terlambat 2 bulan)" 
+            "Cara hitung & Rumus:" 
+            "Aturan Taylor dengan bias politik menjelang pemilu presiden." 
+            "Catatan bias, keterlambatan & akuntansi forensik:" 
+            "PERINGATAN SIKLUS POLITIK: Presiden menekan bank sentral menahan bunga dan mengobral subsidi jelang pemilu; berisiko memicu lonjakan inflasi 12 bulan setelah pemilu." 
+          "Tutup" [klik]

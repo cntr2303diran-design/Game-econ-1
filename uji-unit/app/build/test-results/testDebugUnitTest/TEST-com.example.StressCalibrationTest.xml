@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.StressCalibrationTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:33:45.375Z" hostname="runnervm48cm3" time="8.835">
+  <properties/>
+  <testcase name="identities_hold_inEra3And4_withCorporateActions" classname="com.example.StressCalibrationTest" time="5.343"/>
+  <testcase name="sameSeedAndActions_giveIdenticalState" classname="com.example.StressCalibrationTest" time="0.019"/>
+  <testcase name="identities_hold_100Seeds_60Turns_randomActions" classname="com.example.StressCalibrationTest" time="3.472"/>
+  <system-out><![CDATA[STRESS ERA 3-4: 1791 giliran-permainan diperiksa
+STRESS (mulai Era 2): 3778 giliran-permainan diperiksa, selisih neraca induk terbesar=2.0372681319713593E-10
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

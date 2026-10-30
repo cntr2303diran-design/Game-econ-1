@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.CreditSystemTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:30:46.057Z" hostname="runnervm48cm3" time="1.068">
+  <properties/>
+  <testcase name="engineCensus_adds_to207168" classname="com.example.CreditSystemTest" time="0.001"/>
+  <testcase name="creditSystem_isDeterministic" classname="com.example.CreditSystemTest" time="0.238"/>
+  <testcase name="engine_creditLayerIsBounded_andDoesNotBreakAccountingOverACampaign" classname="com.example.CreditSystemTest" time="0.068"/>
+  <testcase name="agentCounts_are2000Firms_120Banks_acrossEightCountries" classname="com.example.CreditSystemTest" time="0.0"/>
+  <testcase name="severeRecession_raisesDefaults_erodesCapital_andForcesRescues" classname="com.example.CreditSystemTest" time="0.329"/>
+  <testcase name="bankRescue_addsToGovernmentDebt" classname="com.example.CreditSystemTest" time="0.004"/>
+  <testcase name="calmEconomy_hasLowDefaults_andNoBankFailures" classname="com.example.CreditSystemTest" time="0.397"/>
+  <testcase name="sectorShortage_hitsSundaraFirmsOnly" classname="com.example.CreditSystemTest" time="0.028"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

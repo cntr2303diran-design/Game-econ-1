@@ -1,0 +1,9 @@
+== jendela 0
+    "KAPITAL" 
+    "Simulasi ekonomi dunia dan strategi korporasi" 
+    #menu_loading 
+      "Memuat permainan tersimpan…" 
+      "80% · memutar ulang riwayat bulan demi bulan" 
+    #menu_how "Cara bermain" [klik]
+    "Ganti tema terang/gelap" [klik]
+    "Tentang permainan" [klik]

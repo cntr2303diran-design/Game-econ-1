@@ -1,0 +1,80 @@
+== jendela 0
+      #card_rivals 
+        "Pesaing dan pasar produk" 
+        "Pangsa Anda" 
+        "20,0% (awal 20%)" 
+        "Pengangguran Sundara" 
+        "5,0%" 
+        "Mitra Tekstil Nusantara" 
+        "Bersaing normal" 
+        "99,40 (indeks)" 
+        "sepadan dengan harga Anda" 
+        "Cahaya Weaving" 
+        "Bersaing normal" 
+        "99,93 (indeks)" 
+        "sepadan dengan harga Anda" 
+        "Prima Garmen Utama" 
+        "Bersaing normal" 
+        "100,36 (indeks)" 
+        "sepadan dengan harga Anda" 
+        "Importir Velmora" 
+        "Bersaing normal" 
+        "101,09 (indeks)" 
+        "1,1% lebih mahal dari Anda" 
+        "Harga adalah estimasi intel pasar (±1,5%), bukan data pasti. Ketika Anda memotong harga, pesaing menyamai dalam beberapa bulan dan perang harga menggerus margin semua pihak. Menaikkan harga membuat Anda kehilangan pangsa karena pesaing tidak ikut naik." 
+      "Komoditas, kurs, dan saham (ketuk untuk grafik, tahan untuk asal data)" 
+      #market_instrument_mkt_kapas "Komoditas · CTN-SPOT | Kapas Mentah (Tarsis Grade A) | 1850,0 A$/ton | +3,4% bulan ini" (ket: Grafik tren 6 titik: dari 1680,0 ke 1850,0, naik 10,1 persen.) [klik]
+      #market_instrument_mkt_minyak "Komoditas · OIL-BRN | Minyak Mentah Boreal (Norvaldia) | 84,5 A$/bbl | +5,4% bulan ini" (ket: Grafik tren 6 titik: dari 74,0 ke 84,5, naik 14,2 persen.) [klik]
+      #market_instrument_mkt_baja "Komoditas · STL-KST | Baja Industri & Komponen Mesin (Kestrel) | 760,0 A$/ton | +4,1% bulan ini" (ket: Grafik tren 6 titik: dari 690,0 ke 760,0, naik 10,1 persen.) [klik]
+      #market_instrument_mkt_kurs "Kurs Valas · RS / A$ | Kurs Rial Sundara / Dolar Aurelia | 14.288 RS | Rial melemah 1,5%" (ket: Grafik tren 6 titik: dari 13687,9 ke 14288,0, naik 4,4 persen.) [klik]
+      #market_instrument_mkt_saham_mahkota "Saham & Korporasi Pesaing · MKTX | Grup Mahkota Tekstil Tbk (Pesaing Kroni) | 2.450 RS | -1,8% · M-Score Mencurigakan | Beneish M-Score: -1,15 s.d. -0,85 (Ambang manipulasi > -1,78). Laba bersih dilaporkan naik, tetapi arus kas operasi negatif (indikasi Channel Stuffing)!" (ket: Grafik tren 6 titik: dari 2300,0 ke 2450,0, naik 6,5 persen.) [klik]
+      #market_instrument_mkt_saham_kestrel_loom "Saham & Korporasi Pesaing · KLFC | Kestrel Loom & Fiber Corp (Perampas Harga) | 38,4 A$ | +3,1% · Likuiditas Kuat | Beneish M-Score: -2,55 s.d. -2,15 (Aman < -1,78). Kualitas laba sehat (CFO/NI = 1,14x)." (ket: Grafik tren 6 titik: dari 34,5 ke 38,4, naik 11,3 persen.) [klik]
+        "FanChart Proyeksi: Kapas Mentah (Tarsis Grade A)" 
+        "Pita ketidakpastian 50% & 90%" 
+        "CTN-SPOT" 
+        (ket: Grafik proyeksi FanChart Proyeksi: Kapas Mentah (Tarsis Grade A), satuan CTN-SPOT. Nilai terakhir 1850,0. Median di ujung proyeksi 1850,0, rentang 50 persen 1673,0 sampai 2027,0, rentang 90 persen 1495,9 sampai 2204,1.) 
+        "← Data Historis (Terealisasi)" 
+        "Proyeksi Rentang 50% & 90% →" 
+        "Rincian Pasar & Akuntansi Forensik" 
+        "Asal data" [klik]
+        "Kapas Mentah (Tarsis Grade A) (CTN-SPOT) — 1850,0 A$/ton" 
+        "Proses mean-reverting (kecepatan 0,96/bulan) dengan guncangan pasokan dan permintaan global. Pita = 1,65 simpangan baku." 
+        "Gejala El Niño di Tarsis melebarkan pita proyeksi FanChart ke atas dalam 6 bulan ke depan." 
+      #open_menu_button (ket: Menu utama) [klik]
+      "Desember 2034" 
+      "Giliran 60 · Era 1" 
+      #chip_ap 
+        "AP 0/6" 
+      #chip_runway 
+        "Runway 9 bln" 
+      #toggle_theme_button (ket: Ganti mode terang atau gelap) [klik]
+        #bottom_nav_markas "Markas" [klik]
+        #bottom_nav_peta "Peta" [klik]
+        #bottom_nav_perusahaan "Usaha" [klik]
+        #bottom_nav_pasar "Pasar" [klik]
+        #bottom_nav_bursa "Bursa" [klik]
+        #bottom_nav_dunia "Dunia" [klik]
+== jendela 1
+      (ket: Close sheet) [klik]
+        (ket: Drag handle) 
+          "Asal data" 
+            "Keyakinan sedang" 
+          "Indikator:" 
+          "Utilisasi pabrik" 
+          "Nilai Tercatat:" 
+          "88%" 
+          "Sumber:" 
+          "Laporan Kepala Pabrik" 
+          "Tanggal Data:" 
+          "November 2034" 
+            "Cara hitung & Rumus:" 
+            "Output aktual dibagi kapasitas terpasang." 
+            "Catatan bias, keterlambatan & akuntansi forensik:" 
+            "Angka utilisasi tidak memberi tahu kondisi mesin. Bandingkan belanja perawatan dengan kebutuhan teknis." 
+          "Tutup" [klik]
+== jendela 2
+        "Selamat datang di Desember 2034" 
+        "Anda memimpin PT Benang Sundara. Premis: Mesin tua, utang ringan. Utang kecil dan kas cukup, tetapi perawatan mesin sudah lama ditunda. Penghematan bertahun-tahun meninggalkan utang teknis yang belum terlihat di laporan." 
+        "Pinjaman Bank B (13.233 jt RS) jatuh tempo di Januari 2036." 
+        "Uji covenant Bank B terjadi di akhir giliran ini." 
+        #monthly_report_close "Lanjutkan" [klik]

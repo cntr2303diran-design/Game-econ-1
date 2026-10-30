@@ -1,0 +1,61 @@
+Calculating task graph as no cached configuration is available for tasks: :app:assembleDebug
+> Task :app:preBuild UP-TO-DATE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:processDebugGoogleServices UP-TO-DATE
+> Task :app:extractProguardFiles UP-TO-DATE
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :app:desugarDebugFileDependencies
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugNativeLibs UP-TO-DATE
+> Task :app:stripDebugDebugSymbols UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :app:kspDebugKotlin SKIPPED
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:extractDebugNativeSymbolTables FROM-CACHE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugRFile UP-TO-DATE
+> Task :app:compileDebugNavigationResources UP-TO-DATE
+> Task :app:mergeDebugArtProfile
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:mergeDebugStartupProfile
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:compressDebugAssets FROM-CACHE
+> Task :app:extractDebugVersionControlInfo
+> Task :app:validateSigningDebug UP-TO-DATE
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:compileDebugKotlin
+> Task :app:mergeExtDexDebug
+> Task :app:processDebugManifestForPackage
+> Task :app:processDebugResources
+> Task :app:optimizeDebugResources
+> Task :app:processDebugJavaRes UP-TO-DATE
+> Task :app:mergeDebugJavaResource UP-TO-DATE
+> Task :app:compileDebugJavaWithJavac
+> Task :app:generateDebugLintVitalReportModel
+> Task :app:dexBuilderDebug
+> Task :app:mergeDebugGlobalSynthetics
+> Task :app:mergeDexDebug
+> Task :app:compileDebugArtProfile
+> Task :app:lintVitalAnalyzeDebug
+> Task :app:lintVitalReportDebug
+> Task :app:lintVitalDebug
+> Task :app:packageDebug
+> Task :app:assembleDebug
+> Task :app:createDebugApkListingFileRedirect
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_3-1793331146144.json
+
+BUILD SUCCESSFUL in 2m 14s
+49 actionable tasks: 23 executed, 2 from cache, 24 up-to-date
+Configuration cache entry stored.

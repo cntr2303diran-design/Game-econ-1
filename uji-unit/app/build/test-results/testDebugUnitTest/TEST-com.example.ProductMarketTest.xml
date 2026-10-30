@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.ProductMarketTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:33:10.386Z" hostname="runnervm48cm3" time="1.662">
+  <properties/>
+  <testcase name="repositoryView_listsFiveSegments_andFocusActionWorks" classname="com.example.ProductMarketTest" time="0.003"/>
+  <testcase name="initialState_isNeutral_andWeightsSumToOne" classname="com.example.ProductMarketTest" time="0.0"/>
+  <testcase name="focusCost_flowsThroughOpex_andSegmentIntelIsHonest" classname="com.example.ProductMarketTest" time="0.014"/>
+  <testcase name="focusActions_followRules_andRoundTrip" classname="com.example.ProductMarketTest" time="0.001"/>
+  <testcase name="adoptionCurves_shiftDemandSlowly_andMonotonic" classname="com.example.ProductMarketTest" time="0.0"/>
+  <testcase name="trends_areBoundedMeanRevert_andDeterministic" classname="com.example.ProductMarketTest" time="0.016"/>
+  <testcase name="strategies_haveRealTradeoffs_ignoringSegmentHurts_focusIsNotFreeMoney" classname="com.example.ProductMarketTest" time="1.628"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

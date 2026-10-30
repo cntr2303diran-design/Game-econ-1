@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.LawTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:32:54.394Z" hostname="runnervm48cm3" time="8.398">
+  <properties/>
+  <testcase name="spv_isNotFreeMoney_onAverage" classname="com.example.LawTest" time="2.489"/>
+  <testcase name="spv_hidesDebtFromReportedMetrics_butBooksStayBalanced" classname="com.example.LawTest" time="0.892"/>
+  <testcase name="spv_getsExposed_withPenalties_andDebtBecomesVisible" classname="com.example.LawTest" time="1.197"/>
+  <testcase name="action_roundTrip_andEraLock" classname="com.example.LawTest" time="0.0"/>
+  <testcase name="antitrust_blocksBigMergers_andRemedyFeeApplies" classname="com.example.LawTest" time="0.572"/>
+  <testcase name="deterministic" classname="com.example.LawTest" time="0.172"/>
+  <testcase name="antitrust_dominantShareDrawsFines" classname="com.example.LawTest" time="2.474"/>
+  <testcase name="repositoryView_showsLawInfo" classname="com.example.LawTest" time="0.003"/>
+  <testcase name="agedEvidence_leaksOverTime_andExpires" classname="com.example.LawTest" time="0.599"/>
+  <system-out><![CDATA[HUKUM SPV selisih ekuitas rata-rata=-2786.9346563127515 n=14
+HUKUM SPV terbongkar 12 dari 14
+HUKUM akuisisi diuji=23 dengan syarat komisi=22
+HUKUM denda antimonopoli=1 dari 2 seed dominan (59 dicoba)
+HUKUM bocoran tertunda=17 dari 40 seed
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

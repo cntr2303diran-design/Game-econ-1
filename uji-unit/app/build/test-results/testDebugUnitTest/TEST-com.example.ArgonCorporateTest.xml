@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.ArgonCorporateTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:29:45.380Z" hostname="runnervm48cm3" time="2.184">
+  <properties/>
+  <testcase name="stageA_rivalLearningAdaptsToPlayerBehavior" classname="com.example.ArgonCorporateTest" time="0.002"/>
+  <testcase name="actionEncodeDecode_roundTripForAllActionTypes" classname="com.example.ArgonCorporateTest" time="0.008"/>
+  <testcase name="accountingIdentities_holdAcrossMultipleSeedsAndStrategies" classname="com.example.ArgonCorporateTest" time="0.055"/>
+  <testcase name="stageE_massSimulation240GamesAcrossPremisesAndBotStrategies" classname="com.example.ArgonCorporateTest" time="1.81"/>
+  <testcase name="stageD_multinationalSubsidiaryConsolidationLocalDebtAndEra3To5Mechanics" classname="com.example.ArgonCorporateTest" time="0.272"/>
+  <testcase name="stageB_cascadingEventChainsAndEthicsWork" classname="com.example.ArgonCorporateTest" time="0.037"/>
+  <system-out><![CDATA[=== MASS SIMULATION REPORT (240 GAMES, 24 TURNS) ===
+STRATEGI PASIF -> Bertahan: 21.7% | Bangkrut: 78.3% | Median Ekuitas: 63977 jt RS | Skor Rata-rata: 55.8
+STRATEGI NEKAT_HARGA -> Bertahan: 1.7% | Bangkrut: 98.3% | Median Ekuitas: 59099 jt RS | Skor Rata-rata: 51.0
+STRATEGI DISIPLIN_OPS -> Bertahan: 73.3% | Bangkrut: 26.7% | Median Ekuitas: 75619 jt RS | Skor Rata-rata: 66.8
+STRATEGI MULTINASIONAL_HEDGING -> Bertahan: 63.3% | Bangkrut: 36.7% | Median Ekuitas: 75173 jt RS | Skor Rata-rata: 65.7
+=== BREAKDOWN PER PREMIS SKENARIO ===
+PREMIS [Bergantung pada satu pelanggan] (n=44) -> Bertahan: 50.0% | Bangkrut: 50.0% | Median Ekuitas: 80488 jt RS
+PREMIS [Pasar lesu] (n=24) -> Bertahan: 45.8% | Bangkrut: 54.2% | Median Ekuitas: 68561 jt RS
+PREMIS [Sengketa serikat] (n=56) -> Bertahan: 28.6% | Bangkrut: 71.4% | Median Ekuitas: 67835 jt RS
+PREMIS [Warisan bangkrut] (n=64) -> Bertahan: 32.8% | Bangkrut: 67.2% | Median Ekuitas: 61131 jt RS
+PREMIS [Mesin tua, utang ringan] (n=28) -> Bertahan: 64.3% | Bangkrut: 35.7% | Median Ekuitas: 73757 jt RS
+PREMIS [Ekspansi berutang] (n=24) -> Bertahan: 33.3% | Bangkrut: 66.7% | Median Ekuitas: 66824 jt RS
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

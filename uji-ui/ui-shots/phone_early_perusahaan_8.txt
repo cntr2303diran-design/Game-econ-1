@@ -1,0 +1,59 @@
+== jendela 0
+        #perusahaan_subtab_0 "Laporan keuangan" [klik]
+        #perusahaan_subtab_1 "Organisasi" [klik]
+        #perusahaan_subtab_2 "Proyek" [klik]
+        #perusahaan_subtab_3 "Kontrak" [klik]
+        #perusahaan_subtab_4 "Bank" [klik]
+        #perusahaan_subtab_5 "Pelaku" [klik]
+        #perusahaan_subtab_6 "Investasi" [klik]
+        #perusahaan_subtab_7 "Intelijen" [klik]
+        #perusahaan_subtab_8 "Segmen" [klik]
+        #perusahaan_subtab_9 "Operasi" [klik]
+      "Pasar produk: lima segmen" 
+        "Merek 40,0/100 (netral 40) · Fokus terpakai 5/6" 
+        "Biaya pemasaran 0 jt RS per bulan" 
+        "Mengabaikan segmen mengurangi cakupan 15%; fokus menambah cakupan 18% tetapi menambah biaya dan membangun merek. Survei konsumen berderau; riset Intelijen memberi angka lebih tepat. Perubahan memakan 1 poin aksi dan ada jeda 6 bulan." 
+        "Pasar rakyat dan konsumen hemat" 
+        "30% dari pasar · survei 1,00 (berderau ±7%) · adopsi jangka panjang -0,2%" 
+        #segmen_hemat_0 "Abaikan" [klik]
+        #segmen_hemat_1 "Layani" [klik]
+        #segmen_hemat_2 "Fokus" [klik]
+        "Segmen sudah pada tingkat itu." 
+        "Keluarga menengah" 
+        "28% dari pasar · survei 1,20 (berderau ±7%) · adopsi jangka panjang +0,0%" 
+        #segmen_keluarga_0 "Abaikan" [klik]
+        #segmen_keluarga_1 "Layani" [klik]
+        #segmen_keluarga_2 "Fokus" [klik]
+        "Segmen sudah pada tingkat itu." 
+        "Pekerja muda perkotaan dan belanja daring" 
+        "18% dari pasar · survei 0,90 (berderau ±7%) · adopsi jangka panjang +0,9%" 
+        #segmen_muda_0 "Abaikan" [klik]
+        #segmen_muda_1 "Layani" [klik]
+        #segmen_muda_2 "Fokus" [klik]
+        "Segmen sudah pada tingkat itu." 
+        "Mode dan tren musiman" 
+        "12% dari pasar · survei 0,96 (berderau ±7%) · adopsi jangka panjang +0,2%" 
+        #segmen_mode_0 "Abaikan" [klik]
+        #segmen_mode_1 "Layani" [klik]
+        #segmen_mode_2 "Fokus" [klik]
+        "Segmen sudah pada tingkat itu." 
+        "Seragam institusi dan pemerintah" 
+        "12% dari pasar · survei 1,00 (berderau ±7%) · adopsi jangka panjang +0,0%" 
+        #segmen_institusi_0 "Abaikan" [klik]
+        #segmen_institusi_1 "Layani" [klik]
+        #segmen_institusi_2 "Fokus" [klik]
+        "Segmen sudah pada tingkat itu." 
+      #open_menu_button (ket: Menu utama) [klik]
+      "Oktober 2035" 
+      "Giliran 70 · Era 1" 
+      #chip_ap 
+        "AP 7/7" 
+      #chip_runway 
+        "Runway 1 bln" 
+      #toggle_theme_button (ket: Ganti mode terang atau gelap) [klik]
+        #bottom_nav_markas "Markas" [klik]
+        #bottom_nav_peta "Peta" [klik]
+        #bottom_nav_perusahaan "Usaha" [klik]
+        #bottom_nav_pasar "Pasar" [klik]
+        #bottom_nav_bursa "Bursa" [klik]
+        #bottom_nav_dunia "Dunia" [klik]

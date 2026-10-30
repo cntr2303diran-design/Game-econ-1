@@ -1,0 +1,14 @@
+== jendela 0
+      #peran_back "Kembali" [klik]
+      "Peran dan tantangan" 
+        "Gubernur Bank Sentral" 
+        "Bulan ke-0 dari 24. Suku bunga acuan 6.25%." 
+        "Inflasi 5.0% (target 3%), kesenjangan output 0.0%, pengangguran 5.0%." 
+        "Inflasi tertinggi 0.0%, kesenjangan terdalam 0.0%. Skor 100." 
+        "Suku bunga acuan bulan depan" 
+        #gub_turun "-0,25" [klik]
+        "6.25%" 
+        #gub_naik "+0,25" [klik]
+        #gub_lanjut "Tetapkan dan lanjut 1 bulan" [klik]
+        "Tahan suku bunga dan lanjut 6 bulan" [klik]
+      "Tinggalkan sesi ini" [klik]

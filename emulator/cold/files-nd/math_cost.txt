@@ -1,0 +1,11 @@
+ns per panggilan, 400000 panggilan per putaran, tiga putaran berurutan (dingin, lalu lebih hangat)
+  putaran kosong   5.5  2.3  0.9
+  StrictMath.log   29.2  14.8  14.2
+  StrictMath.exp   24.3  12.7  12.1
+  StrictMath.cos   28.7  18.4  17.9
+  StrictMath.tanh  35.5  23.7  23.5
+  StrictMath.pow   86.8  62.0  56.6
+  Math.log         19.7  7.5  6.8
+  Math.exp         19.0  7.2  6.3
+  Math.pow         36.0  18.4  17.3
+  Math.sqrt        16.1  4.0  6.5

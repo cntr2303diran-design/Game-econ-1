@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.MarketTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:33:03.111Z" hostname="runnervm48cm3" time="0.311">
+  <properties/>
+  <testcase name="orderBook_buysWhenCheap_sellsWhenExpensive_andRespectsBounds" classname="com.example.MarketTest" time="0.001"/>
+  <testcase name="dataDesk_isDeterministic_andNewsIsBounded" classname="com.example.MarketTest" time="0.024"/>
+  <testcase name="orderBook_isDeterministic" classname="com.example.MarketTest" time="0.0"/>
+  <testcase name="priceMeanReverts_toFairValue_andDoesNotExplodeWithMomentum" classname="com.example.MarketTest" time="0.015"/>
+  <testcase name="investorPool_is5000_inFourClasses" classname="com.example.MarketTest" time="0.001"/>
+  <testcase name="engine_publishesData_andStockMarketStaysFiniteAndDeterministic" classname="com.example.MarketTest" time="0.26"/>
+  <testcase name="orderBook_classesBehaveAsLabelled" classname="com.example.MarketTest" time="0.001"/>
+  <testcase name="normalCdf_isAccurate_andSymmetric" classname="com.example.MarketTest" time="0.0"/>
+  <testcase name="dataDesk_releasesAreDelayed_noisy_thenRevisedToTruth" classname="com.example.MarketTest" time="0.008"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

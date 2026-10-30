@@ -1,0 +1,54 @@
+== jendela 0
+      #save_notice 
+        "Simpanan ini dibuat dengan versi mesin 1 (sekarang 2), jadi hasil kejadian bisa berbeda dari saat Anda memainkannya." 
+        "Mengerti" [klik]
+      #covenant_warning_card "Jarak ke covenant 1591% | Uji kuartalan dalam 2 giliran" (ket: Covenant aman | Asal data covenant) [klik]
+      #morning_paper_card "Harian Bisnis | Keyakinan sedang | Harga kapas naik, margin pabrik tertekan | +4 sudut pandang lain · 1 rumor | Buka Koran Pagi" [klik]
+      "Indikator utama" 
+      "Ketuk / tahan angka untuk Asal data" 
+      #uncertain_value_kas "Kas | 1.634 jt RS | −1.375/bulan | Rekening bank · Akhir September 2035 | Keyakinan tinggi" (ket: Asal data Kas) [klik]
+      #uncertain_value_utilisasi_pabrik "Utilisasi pabrik | 88% | normal | Kepala Pabrik · Laporan September 2035 | Keyakinan sedang" (ket: Asal data Utilisasi pabrik) [klik]
+      #uncertain_value_siklus_kas "Siklus kas | 63 hari | DSO 46 · DIO 49 · DPO 32 | Akuntansi CFO · Akhir September 2035 | Keyakinan sedang" (ket: Asal data Siklus kas) [klik]
+      #uncertain_value_inflasi_sundara "Inflasi Sundara | 2,0–4,0% | data Agustus 2035 | Biro Statistik Sundara · terlambat 2 bln | Keyakinan rendah" (ket: Asal data Inflasi Sundara) [klik]
+        "Memo eksekutif" 
+        "Ir. Sutrisno · Kepala Pabrik Kalimas" 
+        "“Anggaran perawatan terserap penuh, tetapi getaran mesin mulai turun.”" 
+        "Dewi Anggraini · Direktur Keuangan (CFO)" 
+        "“Runway 1 bulan. Jarak ke covenant 1591%. Tarif PPh efektif kita 22,0%.”" 
+        "Gilang Permana · Direktur Operasi (COO)" 
+        "“Pemasok kapas Tarsis meminta pembayaran lebih cepat karena El Niño.”" 
+        "Memo mencerminkan kepentingan penulisnya. Cocokkan dengan data sebelum percaya." 
+      "Menunggu keputusan" 
+      "Keputusan besar wajib jurnal" 
+      #decision_item_dec_pemintalan "Proposal pabrik pemintalan | Integrasi hulu benang di Kalimas · 14.391 jt RS; pembiayaan harus Anda cari sendiri (kas atau kredit bank) | 3 AP" [klik]
+        "Harga jual: +0% dari harga pasar" 
+        "Harga naik = margin naik, pangsa turun. Pesaing menyamai potongan harga, tapi tidak ikut kenaikan. 1 AP per perubahan." 
+        "−3%" [klik]
+        "+3%" [klik]
+        "Proyeksi kas dan ketidakpastian" 
+        "Pita 50% dan 90% untuk 6 giliran ke depan · garis merah = kas nol" 
+        "juta RS" 
+        (ket: Grafik proyeksi Proyeksi kas dan ketidakpastian, satuan juta RS. Nilai terakhir 1634,2. Median di ujung proyeksi -6616,6, rentang 50 persen -7351,4 sampai -5881,7, rentang 90 persen -8086,3 sampai -5146,9. Batas bahaya 0,0.) 
+        "← Data Historis (Terealisasi)" 
+        "Proyeksi Rentang 50% & 90% →" 
+        "Kalibrasi dan jurnal" 
+          "Brier 0,06 · 2 dinilai" 
+        "• Underconfidence: Anda benar 100% dari waktu, lebih sering dari keyakinan Anda (75%)." 
+        "• Confirmation bias: Anda belum pernah memeriksa silang berita sejak memimpin perusahaan." 
+        "Jurnal Terakhir: Refinancing: Bank Pembangunan Sundara (Keyakinan 75% · Evaluasi Giliran 46)" 
+      #end_turn_button "Akhiri giliran" [klik]
+      "Lihat laporan bulan lalu" [klik]
+      #open_menu_button (ket: Menu utama) [klik]
+      "Oktober 2035" 
+      "Giliran 70 · Era 1" 
+      #chip_ap 
+        "AP 7/7" 
+      #chip_runway 
+        "Runway 1 bln" 
+      #toggle_theme_button (ket: Ganti mode terang atau gelap) [klik]
+        #bottom_nav_markas "Markas" [klik]
+        #bottom_nav_peta "Peta" [klik]
+        #bottom_nav_perusahaan "Usaha" [klik]
+        #bottom_nav_pasar "Pasar" [klik]
+        #bottom_nav_bursa "Bursa" [klik]
+        #bottom_nav_dunia "Dunia" [klik]

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.ActiveBotTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:29:08.874Z" hostname="runnervm48cm3" time="20.344">
+  <properties/>
+  <testcase name="activeBot_keepsInvariants_andUsesItsHabits" classname="com.example.ActiveBotTest" time="3.6"/>
+  <testcase name="activeBot_outperformsDisciplinedPassiveBot_overFullCampaigns" classname="com.example.ActiveBotTest" time="16.657"/>
+  <testcase name="activeBot_isDeterministic" classname="com.example.ActiveBotTest" time="0.084"/>
+  <system-out><![CDATA[B9 kebiasaan bot: harga diubah 24/24, derivatif dibeli 23/24, asuransi 23/24
+B9 menang kampanye (60 seed): pasif=28 aktif=46
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

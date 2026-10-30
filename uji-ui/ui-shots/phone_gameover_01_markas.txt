@@ -1,0 +1,83 @@
+== jendela 0
+        "Permainan berakhir · Oktober 2034 (giliran 57)" 
+        "Covenant dilanggar tiga kuartal berturut-turut (ICR -2,75x). Bank menyatakan technical default dan menyita Pabrik Kalimas." 
+        "Kelas F · Korban Penyitaan Covenant Bank · skor 48/100" 
+        "Nilai perusahaan riil (30%)" 
+        "25/100" 
+        "Ketahanan (20%)" 
+        "18/100" 
+        "Kualitas keputusan dan kalibrasi (20%)" 
+        "73/100" 
+        "Etika dan reputasi (15%)" 
+        "78/100" 
+        "Dampak sosial (15%)" 
+        "72/100" 
+        "Post-mortem" 
+        "Akhir permainan: Covenant dilanggar tiga kuartal berturut-turut" 
+        "Faktor penyumbang:" 
+        "• Kas tipis: hanya 0.00 bulan pendapatan pada giliran 51." 
+        "• Kovenan dilanggar 3 kali." 
+        "• Rugi di 7 dari 11 bulan terakhir (laba bersih total -3861 jt RS)." 
+        "Titik balik:" 
+        "• Giliran 57: ekuitas turun 4339 jt RS (Permainan berakhir: Korban Penyitaan Covenant Bank: Lihat post-mortem dan evaluasi 5 komponen.)" 
+        "• Giliran 49: ekuitas turun 3089 jt RS (Kerusakan mesin besar: KPI penghematan → perawatan ditunda → keausan → mesin rusak.)" 
+        "Kualitas keputusan:" 
+        "• Skor Brier jurnal 0.06 dari 1 prediksi (0,25 = menebak acak; makin kecil makin baik)." 
+        "• Bias: Bias konfirmasi. Confirmation bias: Anda belum pernah memeriksa silang berita sejak memimpin perusahaan." 
+        "Pelajaran:" 
+        "• Sisakan kas minimum ±1 bulan pendapatan sebelum membayar dividen atau berinvestasi." 
+        "• Pantau jarak kovenan tiap kuartal, bukan setelah terlambat." 
+        "• Rugi berkepanjangan menggerus ekuitas dan kovenan; perbaiki margin lebih awal." 
+        "• Periksa silang berita dengan sumber kedua sebelum mengambil keputusan besar." 
+        "Buka Kronik Dunia untuk melihat rantai keputusan yang membawa ke sini, lalu coba lagi dengan dunia baru." 
+        "Kronik" [klik]
+        #new_game_button "Permainan baru" [klik]
+      #covenant_warning_card "Covenant diperkirakan GAGAL (-494%) | Uji kuartalan dalam 2 giliran · sudah gagal 3× berturut-turut" (ket: Peringatan Covenant | Asal data covenant) [klik]
+      #morning_paper_card "Harian Bisnis | Keyakinan sedang | Perang harga kain di kalangan produsen menengah | +4 sudut pandang lain · 1 rumor | Buka Koran Pagi" [klik]
+      "Indikator utama" 
+      "Ketuk / tahan angka untuk Asal data" 
+      #uncertain_value_kas "Kas | 243 jt RS | +81/bulan | Rekening bank · Akhir September 2034 | Keyakinan tinggi" (ket: Asal data Kas) [klik]
+      #uncertain_value_utilisasi_pabrik "Utilisasi pabrik | 52% | produksi terganggu | Kepala Pabrik · Laporan September 2034 | Keyakinan sedang" (ket: Asal data Utilisasi pabrik) [klik]
+      #uncertain_value_siklus_kas "Siklus kas | 109 hari | DSO 85 · DIO 72 · DPO 48 | Akuntansi CFO · Akhir September 2034 | Keyakinan sedang" (ket: Asal data Siklus kas) [klik]
+      #uncertain_value_inflasi_sundara "Inflasi Sundara | 4,4–6,4% | data Agustus 2034 | Biro Statistik Sundara · terlambat 2 bln | Keyakinan rendah" (ket: Asal data Inflasi Sundara) [klik]
+        "Memo eksekutif" 
+        "Gilang Permana · Direktur Operasi (COO)" 
+        "“Harga kapas dari pemasok baru sedikit lebih tinggi, tetapi kualitasnya jauh lebih stabil.”" 
+        "Dewi Anggraini · Direktur Keuangan (CFO)" 
+        "“Piutang berumur di atas 90 hari kini 5.786 jt RS. Runway 99 bulan; jarak covenant -494%.”" 
+        "Kevin Salim · Direktur Penjualan" 
+        "“Mohon jangan perketat kredit sekarang; momentum penjualan sedang bagus.”" 
+        "Memo mencerminkan kepentingan penulisnya. Cocokkan dengan data sebelum percaya." 
+      "Menunggu keputusan" 
+      "Keputusan besar wajib jurnal" 
+      "Tidak ada keputusan mendesak. Gunakan AP untuk audit, tinjauan kontrak, atau periksa silang berita." 
+        "Harga jual: -15% dari harga pasar" 
+        "Harga naik = margin naik, pangsa turun. Pesaing menyamai potongan harga, tapi tidak ikut kenaikan. 1 AP per perubahan." 
+        "−3%" [klik]
+        "+3%" [klik]
+        "Proyeksi kas dan ketidakpastian" 
+        "Pita 50% dan 90% untuk 6 giliran ke depan · garis merah = kas nol" 
+        "juta RS" 
+        (ket: Grafik proyeksi Proyeksi kas dan ketidakpastian, satuan juta RS. Nilai terakhir 242,6. Median di ujung proyeksi 727,8, rentang 50 persen -7,0 sampai 1462,7, rentang 90 persen -741,9 sampai 2197,5. Batas bahaya 0,0.) 
+        "← Data Historis (Terealisasi)" 
+        "Proyeksi Rentang 50% & 90% →" 
+        "Kalibrasi dan jurnal" 
+          "Brier 0,06 · 1 dinilai" 
+        "• Confirmation bias: Anda belum pernah memeriksa silang berita sejak memimpin perusahaan." 
+        "Jurnal Terakhir: Pengetatan syarat kredit ritel (giliran 39) (Keyakinan 75% · Evaluasi Giliran 45)" 
+      #end_turn_button "Akhiri giliran" [klik]
+      "Lihat laporan bulan lalu" [klik]
+      #open_menu_button (ket: Menu utama) [klik]
+      "Oktober 2034" 
+      "Giliran 58 · Era 1" 
+      #chip_ap 
+        "AP 7/7" 
+      #chip_runway 
+        "Kas stabil" 
+      #toggle_theme_button (ket: Ganti mode terang atau gelap) [klik]
+        #bottom_nav_markas "Markas" [klik]
+        #bottom_nav_peta "Peta" [klik]
+        #bottom_nav_perusahaan "Usaha" [klik]
+        #bottom_nav_pasar "Pasar" [klik]
+        #bottom_nav_bursa "Bursa" [klik]
+        #bottom_nav_dunia "Dunia" [klik]

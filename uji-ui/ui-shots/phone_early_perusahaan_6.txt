@@ -1,0 +1,190 @@
+== jendela 0
+        #perusahaan_subtab_0 "Laporan keuangan" [klik]
+        #perusahaan_subtab_1 "Organisasi" [klik]
+        #perusahaan_subtab_2 "Proyek" [klik]
+        #perusahaan_subtab_3 "Kontrak" [klik]
+        #perusahaan_subtab_4 "Bank" [klik]
+        #perusahaan_subtab_5 "Pelaku" [klik]
+        #perusahaan_subtab_6 "Investasi" [klik]
+        #perusahaan_subtab_7 "Intelijen" [klik]
+        #perusahaan_subtab_8 "Segmen" [klik]
+        #perusahaan_subtab_9 "Operasi" [klik]
+      "Ekspansi dan investasi" 
+      "Anda bebas memilih. Kapasitas pabrik dan permintaan pasar harus tumbuh bersama: lini baru tanpa tambahan permintaan hanya menambah biaya, sedangkan permintaan tanpa kapasitas berarti pesanan tertolak. Dana keluar bertahap dari kas; ajukan kredit di tab Bank bila perlu. AP sekarang: 7." 
+        "Kondisi kapasitas" 
+        "Kapasitas" 
+        "108,0% dari basis" 
+        "Permintaan" 
+        "100,0% dari basis" 
+        "Utilisasi" 
+        "92,6% (ada ruang)" 
+        "Lini tambahan" 
+        "0 dari 3" 
+        "Pekerja produksi" 
+        "349" 
+        "Era sekarang" 
+        "Era 1: Bertahan Hidup" 
+        "Anak usaha, M&A, transfer pricing" 
+        "Terkunci sampai Era 2 (Ekspansi Lintas Batas), Januari 2038. Atau terbuka lebih awal bila semua syarat kinerja terpenuhi: [ok] sudah berjalan sampai Januari 2033 (sekarang Oktober 2035); [belum] pendapatan 12 bulan riil minimal 1,15x basis awal (sekarang 1,07x); [ok] ekuitas konsolidasi riil minimal 1,15x awal (sekarang 1,21x); [ok] laba operasi 12 bulan positif (16.794 jt); [ok] tanpa pelanggaran covenant yang berjalan (0 pelanggaran)." 
+        "Obligasi, IPO, bank grup, lobi" 
+        "Terkunci sampai Era 3 (Konglomerasi dan Finansialisasi), Januari 2049." 
+        "Karbon dan suksesi CEO" 
+        "Terkunci sampai Era 4 (Kekaisaran Global dan Suksesi), Januari 2061." 
+        "Multinasional dan korporasi" 
+        "Anak usaha punya pembukuan lokal dan dikonsolidasikan ke laporan grup. Hasil tindakan tampil di Koran Pagi dan laporan keuangan; tindakan yang syaratnya belum terpenuhi (AP, kas, era) ditolak tanpa biaya." 
+        #corp_SUB|tarsis "Bangun anak usaha Tarsis" [klik]
+        #corp_SUB|kestrel "Bangun anak usaha Kestrel" [klik]
+        #corp_SUB|halvenia "Bangun anak usaha Halvenia" [klik]
+        #corp_SUB|meridia "Bangun anak usaha Meridia" [klik]
+        #corp_REP|tarsis "Repatriasi dividen Tarsis" [klik]
+        #corp_REP|kestrel "Repatriasi dividen Kestrel" [klik]
+        #corp_REP|halvenia "Repatriasi dividen Halvenia" [klik]
+        #corp_REP|meridia "Repatriasi dividen Meridia" [klik]
+        #corp_TPR|WAJAR "Transfer pricing: wajar" [klik]
+        #corp_TPR|OPTIMAL "Transfer pricing: optimal" [klik]
+        #corp_TPR|AGRESIF "Transfer pricing: agresif (berisiko audit)" [klik]
+        #corp_HFX "Forward valas 6 bulan" [klik]
+        #corp_BSB|tarsis|500 "Pinjaman bank lokal anak usaha Tarsis, 500 jt (mata uang lokal)" [klik]
+        #corp_BSB|kestrel|500 "Pinjaman bank lokal anak usaha Kestrel, 500 jt (mata uang lokal)" [klik]
+        #corp_BSB|halvenia|500 "Pinjaman bank lokal anak usaha Halvenia, 500 jt (mata uang lokal)" [klik]
+        #corp_BSB|meridia|500 "Pinjaman bank lokal anak usaha Meridia, 500 jt (mata uang lokal)" [klik]
+        #corp_CHA "Uji tuntas rantai pasok Tier-3 (ungkap simpul tersembunyi)" [klik]
+        #corp_BND|3000|36 "Terbitkan obligasi 3.000 jt RS, 36 bulan" [klik]
+        #corp_IPO|20|false "IPO 20% saham" [klik]
+        #corp_BYB|1500 "Beli kembali saham 1.500 jt RS" [klik]
+        #corp_SPO|3000 "Terbitkan saham lanjutan 3.000 jt RS" [klik]
+        #corp_NCI|tarsis|15 "Jual 15% saham anak usaha Tarsis" [klik]
+        #corp_NCI|kestrel|15 "Jual 15% saham anak usaha Kestrel" [klik]
+        #corp_ACQ|riv_importir "Akuisisi Importir Velmora" [klik]
+        #corp_ACQ|riv_cahaya "Akuisisi Cahaya Weaving" [klik]
+        #corp_ACQ|riv_prima "Akuisisi Prima Garmen" [klik]
+        #corp_LOB|media "Beli media" [klik]
+        #corp_LOB|parliament "Lobi parlemen (tarif turun, berisiko etika)" [klik]
+        #corp_CRB|buy|5 "Beli 5 kredit karbon" [klik]
+        #corp_CRB|sell|3 "Jual 3 kredit karbon" [klik]
+        #corp_SUC|exec_cfo "Tunjuk CFO sebagai penerus CEO" [klik]
+        #corp_SUC|exec_coo "Tunjuk COO sebagai penerus CEO" [klik]
+        #corp_SUC|family "Tunjuk anggota keluarga sebagai penerus" [klik]
+        #corp_CBK "Dirikan bank dan asuransi grup" [klik]
+        "Tambah lini tenun" 
+        "Lini tenun baru menambah kapasitas. Tanpa tambahan permintaan, lini baru menganggur dan hanya menambah biaya." 
+        "Anggaran" 
+        "4.058 jt RS" 
+        "Durasi" 
+        "4 bulan" 
+        "Manfaat" 
+        "Kapasitas +12%, biaya operasi +70 jt RS per bulan" 
+        "Status" 
+        "Belum dimulai" 
+        #invest_line "Mulai (3 AP)" [klik]
+        "Kas tidak cukup untuk bulan pertama (1.014 jt RS). Ajukan kredit di tab Bank dulu." 
+        "Otomasi pabrik" 
+        "Mesin otomatis menurunkan kebutuhan tenaga kerja dan HPP, tetapi memicu keresahan pekerja." 
+        "Anggaran" 
+        "2.705 jt RS" 
+        "Durasi" 
+        "3 bulan" 
+        "Manfaat" 
+        "HPP −1,5% dan tenaga kerja −10%" 
+        "Status" 
+        "Belum dimulai" 
+        #invest_automation "Mulai (2 AP)" [klik]
+        "Kas tidak cukup untuk bulan pertama (902 jt RS). Ajukan kredit di tab Bank dulu." 
+        "R&D dan desain motif" 
+        "Tim desain dan laboratorium warna. Dibebankan sebagai biaya, bukan aset." 
+        "Anggaran" 
+        "2.029 jt RS" 
+        "Durasi" 
+        "6 bulan" 
+        "Manfaat" 
+        "Permintaan +4% permanen" 
+        "Status" 
+        "Belum dimulai" 
+        #invest_rnd "Mulai (2 AP)" [klik]
+        "Kas tidak cukup untuk bulan pertama (338 jt RS). Ajukan kredit di tab Bank dulu." 
+        "Kampanye merek ritel" 
+        "Iklan dan promosi bersama peritel." 
+        "Anggaran" 
+        "1.353 jt RS" 
+        "Durasi" 
+        "4 bulan" 
+        "Manfaat" 
+        "Penjualan +3% selama 12 bulan" 
+        "Status" 
+        "Belum dimulai" 
+        #invest_brand "Mulai (2 AP)" [klik]
+        "Kas tidak cukup untuk bulan pertama (338 jt RS). Ajukan kredit di tab Bank dulu." 
+        "Gudang dan logistik" 
+        "Gudang tambahan dekat pelabuhan." 
+        "Anggaran" 
+        "1.691 jt RS" 
+        "Durasi" 
+        "2 bulan" 
+        "Manfaat" 
+        "Persediaan −8% dan risiko pengiriman tertahan separuh" 
+        "Status" 
+        "Belum dimulai" 
+        #invest_warehouse "Mulai (2 AP)" [klik]
+        "Kas tidak cukup untuk bulan pertama (845 jt RS). Ajukan kredit di tab Bank dulu." 
+        "Armada truk dan kontainer sendiri" 
+        "Armada milik sendiri mengurangi ketergantungan pada ekspeditur dan penundaan pengiriman." 
+        "Anggaran" 
+        "1.578 jt RS" 
+        "Durasi" 
+        "2 bulan" 
+        "Manfaat" 
+        "HPP −0,4%, risiko pengiriman tertahan −20%, perawatan 18 jt RS per bulan" 
+        "Status" 
+        "Belum dimulai" 
+        #invest_fleet "Mulai (1 AP)" [klik]
+        "Kas tidak cukup untuk bulan pertama (789 jt RS). Ajukan kredit di tab Bank dulu." 
+        "Pasar ekspor Aurelia" 
+        "Sertifikasi, pameran dagang, dan agen penjualan luar negeri." 
+        "Anggaran" 
+        "1.691 jt RS" 
+        "Durasi" 
+        "6 bulan" 
+        "Manfaat" 
+        "Permintaan +6% permanen, biaya operasi +40 jt RS per bulan" 
+        "Status" 
+        "Belum dimulai" 
+        #invest_export "Mulai (3 AP)" [klik]
+        "Kas tidak cukup untuk bulan pertama (282 jt RS). Ajukan kredit di tab Bank dulu." 
+        "PLTS Atap & IPAL Hijau (Transisi Era 4)" 
+        "Panel surya kawasan dan daur ulang air limbah untuk sertifikasi ESG penuh dan bebas pajak karbon Halvenia (CBAM)." 
+        "Anggaran" 
+        "2.931 jt RS" 
+        "Durasi" 
+        "4 bulan" 
+        "Manfaat" 
+        "Sertifikasi ESG/IPAL penuh (bebas CBAM Halvenia) & permintaan +3%" 
+        "Status" 
+        "Belum dimulai" 
+        #invest_solar "Mulai (2 AP)" [klik]
+        "Kas tidak cukup untuk bulan pertama (733 jt RS). Ajukan kredit di tab Bank dulu." 
+        "Institut Kepemimpinan & Suksesi (Warisan Era 5)" 
+        "Akademi kaderisasi manajemen dan tata kelola institusi agar konglomerasi tahan melintasi generasi." 
+        "Anggaran" 
+        "2.254 jt RS" 
+        "Durasi" 
+        "4 bulan" 
+        "Manfaat" 
+        "Kepercayaan Dewan +15 poin & loyalitas seluruh eksekutif naik" 
+        "Status" 
+        "Belum dimulai" 
+        #invest_institute "Mulai (2 AP)" [klik]
+        "Kas tidak cukup untuk bulan pertama (564 jt RS). Ajukan kredit di tab Bank dulu." 
+      #open_menu_button (ket: Menu utama) [klik]
+      "Oktober 2035" 
+      "Giliran 70 · Era 1" 
+      #chip_ap 
+        "AP 7/7" 
+      #chip_runway 
+        "Runway 1 bln" 
+      #toggle_theme_button (ket: Ganti mode terang atau gelap) [klik]
+        #bottom_nav_markas "Markas" [klik]
+        #bottom_nav_peta "Peta" [klik]
+        #bottom_nav_perusahaan "Usaha" [klik]
+        #bottom_nav_pasar "Pasar" [klik]
+        #bottom_nav_bursa "Bursa" [klik]
+        #bottom_nav_dunia "Dunia" [klik]

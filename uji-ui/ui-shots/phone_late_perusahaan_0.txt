@@ -1,0 +1,524 @@
+== jendela 0
+        #perusahaan_subtab_0 "Laporan keuangan" [klik]
+        #perusahaan_subtab_1 "Organisasi" [klik]
+        #perusahaan_subtab_2 "Proyek" [klik]
+        #perusahaan_subtab_3 "Kontrak" [klik]
+        #perusahaan_subtab_4 "Bank" [klik]
+        #perusahaan_subtab_5 "Pelaku" [klik]
+        #perusahaan_subtab_6 "Investasi" [klik]
+        #perusahaan_subtab_7 "Intelijen" [klik]
+        #perusahaan_subtab_8 "Segmen" [klik]
+        #perusahaan_subtab_9 "Operasi" [klik]
+        "1. Laporan laba rugi (akrual)" 
+        "Dalam juta Rial Sundara (jt RS) · Juli 2066" 
+        "Pos" 
+        "Bulan ini" 
+        "Bulan lalu" 
+        "Pendapatan (akrual)" 
+        "Termasuk penjualan kredit yang kasnya belum masuk" 
+        "114.911" [klik]
+        "110.507" [klik]
+        "Harga pokok penjualan" 
+        "Rasio 60,9% dari pendapatan" 
+        "(70.003)" [klik]
+        "(67.598)" [klik]
+        "    Bahan baku (kapas, benang)" 
+        "Mengikuti indeks harga kapas 1,44" 
+        "(35.002)" [klik]
+        "(33.799)" [klik]
+        "    Energi dan utilitas pabrik" 
+        "Listrik, uap, bahan bakar" 
+        "(10.501)" [klik]
+        "(10.140)" [klik]
+        "    Tenaga kerja langsung" 
+        "601 pekerja produksi · rata-rata 29,1 jt RS per orang per bulan" 
+        "(17.501)" [klik]
+        "(16.900)" [klik]
+        "    Overhead pabrik" 
+        "Suku cadang habis pakai, gudang, pengiriman masuk" 
+        "(7.000)" [klik]
+        "(6.760)" [klik]
+        "Laba kotor" 
+        "Margin 39,1%" 
+        "44.907" [klik]
+        "42.909" [klik]
+        "Beban operasional" 
+        "Total beban usaha di luar HPP dan perawatan" 
+        "(18.450)" [klik]
+        "(18.125)" [klik]
+        "    Gaji staf dan manajemen" 
+        "90 karyawan · rata-rata 117,8 jt RS per orang per bulan (termasuk kenaikan upah yang disepakati)" 
+        "(10.605)" [klik]
+        "(10.563)" [klik]
+        "    Administrasi dan kantor" 
+        "Sewa kantor, IT, perjalanan, profesional" 
+        "(1.867)" [klik]
+        "(1.858)" [klik]
+        "    Pemasaran dan distribusi" 
+        "Tim penjualan, pengiriman keluar, promosi" 
+        "(2.334)" [klik]
+        "(2.322)" [klik]
+        "    Utilitas kantor dan gudang" 
+        "Listrik, air, komunikasi" 
+        "(1.245)" [klik]
+        "(1.238)" [klik]
+        "    Asuransi dan pajak bumi" 
+        "Polis kebakaran dan pajak properti" 
+        "(778)" [klik]
+        "(774)" [klik]
+        "    Beban lain-lain" 
+        "Perlengkapan, perizinan, iuran asosiasi" 
+        "(778)" [klik]
+        "(774)" [klik]
+        "    Operasi lini dan fasilitas tambahan" 
+        "Tenaga dan utilitas dari ekspansi" 
+        "(539)" [klik]
+        "(537)" [klik]
+        "    Biaya satu kali (audit, hukum, pesangon, provisi, denda)" 
+        "Muncul karena keputusan atau kejadian bulan ini" 
+        "(352)" [klik]
+        "(103)" [klik]
+        "    Pendapatan lain (asuransi, insentif, pemulihan)" 
+        "Mengurangi beban" 
+        "48" [klik]
+        "45" [klik]
+        "Perawatan mesin" 
+        "Bandingkan dengan kebutuhan teknis ±1.998 jt RS" 
+        "(4.366)" [klik]
+        "(4.345)" [klik]
+        "Kredit macet dihapusbukukan" 
+        "Piutang berumur 6 bulan yang gagal ditagih" 
+        "(0)" [klik]
+        "(0)" [klik]
+        "EBITDA" 
+        "Acuan rasio utang bersih/EBITDA" 
+        "22.091" [klik]
+        "20.439" [klik]
+        "Penyusutan" 
+        "Mesin dan bangunan (0,81% per bulan dari nilai buku)" 
+        "(466)" [klik]
+        "(467)" [klik]
+        "EBIT (laba operasi)" 
+        "Acuan covenant ICR" 
+        "21.626" [klik]
+        "19.972" [klik]
+        "Beban bunga" 
+        "Mengikuti suku bunga dan saldo utang" 
+        "(0)" [klik]
+        "(0)" [klik]
+        "Pendapatan bunga deposito" 
+        "Bunga atas kas mengendap" 
+        "1.199" [klik]
+        "1.055" [klik]
+        "Laba sebelum pajak" 
+        "Dasar pajak sebelum kompensasi rugi" 
+        "22.825" [klik]
+        "21.028" [klik]
+        "Pajak penghasilan badan" 
+        "22%, setelah kompensasi rugi fiskal 0 jt RS" 
+        "(5.022)" [klik]
+        "(4.733)" [klik]
+        "Laba bersih" 
+        "Laba di atas kertas; cek arus kas" 
+        "17.804" [klik]
+        "16.295" [klik]
+        "2. Neraca" 
+        "Posisi akhir Juli 2066 · aset = liabilitas + ekuitas" 
+        "Pos" 
+        "Bulan ini" 
+        "Bulan lalu" 
+        "    Kas dan setara kas" 
+        "Runway > 24 bulan" 
+        "283.239" [klik]
+        "274.143" [klik]
+        "    Piutang usaha normal" 
+        "DSO total 47 hari" 
+        "183.803" [klik]
+        "176.089" [klik]
+        "    Piutang berisiko (obral kredit)" 
+        "Rentan macet; lihat umur piutang di Catatan" 
+        "0" [klik]
+        "0" [klik]
+        "    Persediaan" 
+        "DIO 51 hari" 
+        "119.334" [klik]
+        "114.994" [klik]
+        "Total aset lancar" 
+        "Rasio lancar 7,47x" 
+        "586.376" [klik]
+        "565.226" [klik]
+        "    Aset tetap bersih" 
+        "Agunan utama pinjaman; perawatan tertunda 0 bulan" 
+        "57.343" [klik]
+        "57.483" [klik]
+        "    Investasi saham (nilai pasar)" 
+        "Portofolio di Bursa; selisih nilai masuk ekuitas" 
+        "0" [klik]
+        "0" [klik]
+        "Total aset" 
+        "Aset = liabilitas + ekuitas" 
+        "660.117" [klik]
+        "639.107" [klik]
+        "    Utang dagang" 
+        "DPO 33 hari" 
+        "78.464" [klik]
+        "75.258" [klik]
+        "    Utang bank jatuh tempo ≤12 bulan" 
+        "Risiko refinancing" 
+        "0" [klik]
+        "0" [klik]
+        "Total liabilitas lancar" 
+        "Harus dibayar dalam 12 bulan" 
+        "78.464" [klik]
+        "75.258" [klik]
+        "    Utang bank jangka panjang" 
+        "Termasuk utang A$ dinilai dengan kurs hari ini" 
+        "0" [klik]
+        "0" [klik]
+        "Total liabilitas" 
+        "Utang dagang + utang bank" 
+        "78.464" [klik]
+        "75.258" [klik]
+        "Total ekuitas" 
+        "Modal disetor + laba ditahan − rugi kurs" 
+        "581.653" [klik]
+        "563.849" [klik]
+        "3. Laporan arus kas" 
+        "Rekonsiliasi laba bersih terhadap kas bank · Juli 2066" 
+        "Pos" 
+        "Bulan ini" 
+        "Bulan lalu" 
+        "A. ARUS KAS OPERASI" 
+        "" 
+        "" [klik]
+        "" [klik]
+        "    Laba bersih" 
+        "Titik awal rekonsiliasi" 
+        "+17.804" [klik]
+        "+16.295" [klik]
+        "    Penyusutan (non-kas)" 
+        "Ditambahkan kembali" 
+        "+466" [klik]
+        "+467" [klik]
+        "    Perubahan piutang" 
+        "Penjualan kredit menahan kas" 
+        "−7.714" [klik]
+        "−8.090" [klik]
+        "    Perubahan persediaan" 
+        "Stok menahan kas" 
+        "−4.339" [klik]
+        "−4.429" [klik]
+        "    Perubahan utang dagang" 
+        "Pemasok membiayai sebagian modal kerja" 
+        "+3.206" [klik]
+        "+3.607" [klik]
+        "Arus kas operasi" 
+        "Bisa negatif walau laba positif" 
+        "+9.422" [klik]
+        "+7.849" [klik]
+        "B. ARUS KAS INVESTASI" 
+        "" 
+        "" [klik]
+        "" [klik]
+        "    Penggantian mesin (belanja modal rutin)" 
+        "70% dari penyusutan" 
+        "−326" [klik]
+        "−327" [klik]
+        "    Dividen saham diterima" 
+        "Dari emiten yang dimiliki" 
+        "+0" [klik]
+        "+1.149" [klik]
+        "Arus kas investasi" 
+        "Belanja modal dan portofolio" 
+        "−326" [klik]
+        "+822" [klik]
+        "C. ARUS KAS PENDANAAN" 
+        "" 
+        "" [klik]
+        "" [klik]
+        "Arus kas pendanaan" 
+        "Pinjaman, pemegang saham" 
+        "+0" [klik]
+        "+0" [klik]
+        "Perubahan kas bersih" 
+        "Sama dengan perubahan kartu Kas (A + B + C)" 
+        "+9.096" [klik]
+        "+8.671" [klik]
+        "4. Laporan perubahan ekuitas" 
+        "Dari ekuitas awal ke akhir · Juli 2066" 
+        "Pos" 
+        "Bulan ini" 
+        "Bulan lalu" 
+        "Ekuitas awal periode" 
+        "Ekuitas akhir bulan lalu" 
+        "563.849" [klik]
+        "546.406" [klik]
+        "    Laba bersih" 
+        "Dari laporan laba rugi" 
+        "+17.804" [klik]
+        "+16.295" [klik]
+        "Ekuitas akhir periode" 
+        "Sama dengan ekuitas di neraca" 
+        "581.653" [klik]
+        "563.849" [klik]
+        "5. Catatan atas laporan keuangan" 
+        "Umur piutang, utang bank, karyawan, rasio" 
+        "Pos" 
+        "Bulan ini" 
+        "Bulan lalu" 
+        "Umur piutang" 
+        "" 
+        "" [klik]
+        "" [klik]
+        "    Piutang normal (termin ≤ 60 hari)" 
+        "Pelanggan reguler" 
+        "183.803" [klik]
+        "" [klik]
+        "    Piutang berisiko 0–1 bulan" 
+        "Obral kredit baru" 
+        "0" [klik]
+        "" [klik]
+        "    Piutang berisiko 2–3 bulan" 
+        "Mulai perlu ditagih" 
+        "0" [klik]
+        "" [klik]
+        "    Piutang berisiko 4–6 bulan" 
+        "Perkiraan 0 jt RS akan macet (45%)" 
+        "0" [klik]
+        "" [klik]
+        "Utang bank" 
+        "" 
+        "" [klik]
+        "" [klik]
+        "Karyawan dan kapasitas" 
+        "" 
+        "" [klik]
+        "" [klik]
+        "    Pekerja produksi" 
+        "Rata-rata 29,1 jt RS per orang per bulan (di HPP)" 
+        "601" [klik]
+        "" [klik]
+        "    Staf dan manajemen" 
+        "Rata-rata 117,8 jt RS per orang per bulan (di beban operasional)" 
+        "90" [klik]
+        "" [klik]
+        "    Utilisasi kapasitas" 
+        "Permintaan 113,9% dari basis · kapasitas 132,0%" 
+        "86,3%" [klik]
+        "" [klik]
+        "Rasio keuangan" 
+        "" 
+        "" [klik]
+        "" [klik]
+        "    Margin EBIT" 
+        "EBIT / pendapatan" 
+        "18,8%" [klik]
+        "" [klik]
+        "    Perputaran kas (DSO + DIO − DPO)" 
+        "Makin panjang makin banyak kas tertahan" 
+        "65 hari" [klik]
+        "" [klik]
+        "    ICR (EBIT / bunga, 3 bulan)" 
+        "Batas covenant 0,00x" 
+        "tanpa beban bunga" [klik]
+        "" [klik]
+        "    Utang bersih / EBITDA" 
+        "Batas covenant 3,5x" 
+        "-1,17x" [klik]
+        "" [klik]
+        "    Rasio lancar" 
+        "Aset lancar / liabilitas lancar" 
+        "7,47x" [klik]
+        "" [klik]
+        "6. Laporan konsolidasi grup" 
+        "Induk + anak usaha, setelah eliminasi · jt RS" 
+        "Pos" 
+        "Bulan ini" 
+        "Bulan lalu" 
+        "LABA RUGI KONSOLIDASI" 
+        "" 
+        "" [klik]
+        "" [klik]
+        "Pendapatan grup" 
+        "Setelah eliminasi pendapatan antar-entitas 0 jt RS" 
+        "115.855" [klik]
+        "" [klik]
+        "Harga pokok penjualan" 
+        "" 
+        "(70.652)" [klik]
+        "" [klik]
+        "Beban operasional" 
+        "Setelah eliminasi beban antar-entitas" 
+        "(18.592)" [klik]
+        "" [klik]
+        "EBIT grup" 
+        "" 
+        "21.745" [klik]
+        "" [klik]
+        "Beban bunga" 
+        "" 
+        "0" [klik]
+        "" [klik]
+        "Pajak penghasilan" 
+        "Pajak withholding dividen: 0 jt RS" 
+        "(5.045)" [klik]
+        "" [klik]
+        "Laba bersih grup" 
+        "" 
+        "17.900" [klik]
+        "" [klik]
+        "NERACA KONSOLIDASI" 
+        "" 
+        "" [klik]
+        "" [klik]
+        "Kas grup" 
+        "" 
+        "292.479" [klik]
+        "" [klik]
+        "Piutang" 
+        "" 
+        "184.801" [klik]
+        "" [klik]
+        "Persediaan" 
+        "" 
+        "120.020" [klik]
+        "" [klik]
+        "Aset tetap" 
+        "" 
+        "62.661" [klik]
+        "" [klik]
+        "Goodwill" 
+        "" 
+        "0" [klik]
+        "" [klik]
+        "Total aset" 
+        "Investasi pada anak usaha dieliminasi: 10.830 jt RS" 
+        "665.530" [klik]
+        "" [klik]
+        "Total liabilitas" 
+        "" 
+        "79.020" [klik]
+        "" [klik]
+        "Selisih kurs translasi (CTA)" 
+        "Komponen ekuitas dari translasi anak usaha" 
+        "4.660" [klik]
+        "" [klik]
+        "Ekuitas grup" 
+        "Aset = liabilitas + ekuitas" 
+        "586.509" [klik]
+        "" [klik]
+        "ARUS KAS KONSOLIDASI" 
+        "" 
+        "" [klik]
+        "" [klik]
+        "Operasi" 
+        "" 
+        "9.557" [klik]
+        "" [klik]
+        "Investasi" 
+        "Termasuk pembangunan anak usaha, dikurangi kas anak usaha yang diperoleh" 
+        "-348" [klik]
+        "" [klik]
+        "Pendanaan" 
+        "Dividen internal dieliminasi" 
+        "0" [klik]
+        "" [klik]
+        "Pengaruh kurs atas kas anak usaha" 
+        "" 
+        "32" [klik]
+        "" [klik]
+        "Perubahan kas grup" 
+        "Cocok dengan selisih kas grup antar bulan" 
+        "9.241" [klik]
+        "" [klik]
+        "PERUBAHAN EKUITAS KONSOLIDASI" 
+        "" 
+        "" [klik]
+        "" [klik]
+        "Ekuitas awal" 
+        "" 
+        "568.555" [klik]
+        "" [klik]
+        "Laba bersih grup" 
+        "" 
+        "17.900" [klik]
+        "" [klik]
+        "Penambahan modal, dividen, dan komponen langsung lain" 
+        "" 
+        "0" [klik]
+        "" [klik]
+        "Perubahan CTA" 
+        "" 
+        "54" [klik]
+        "" [klik]
+        "Ekuitas akhir" 
+        "" 
+        "586.509" [klik]
+        "" [klik]
+        "7. Anak usaha per entitas" 
+        "Pembukuan mata uang lokal dan terjemahan ke RS" 
+        "Pos" 
+        "Bulan ini" 
+        "Bulan lalu" 
+        "PT Benang Tarsis Agro (Pabrik Hulu Kapas)" 
+        "Aktif 335 bulan · kurs 136,74 RS/TRS" 
+        "" [klik]
+        "" [klik]
+        "    Pendapatan bulan ini" 
+        "Utilisasi 90,3%" 
+        "3 jt TRS" [klik]
+        "386" [klik]
+        "    EBIT" 
+        "" 
+        "1 jt TRS" [klik]
+        "79" [klik]
+        "    Laba bersih" 
+        "Laba kumulatif 24.340 jt RS vs investasi 4.690 jt RS" 
+        "0 jt TRS" [klik]
+        "63" [klik]
+        "    Ekuitas lokal" 
+        "Utang bank lokal 0 jt TRS" 
+        "29 jt TRS" [klik]
+        "3.948" [klik]
+        "    Dividen siap ditarik" 
+        "Pajak withholding berlaku saat repatriasi" 
+        "1 jt TRS" [klik]
+        "129" [klik]
+        "Kestrel Precision Weaving Ltd (Pabrik Komponen & Kain Teknis)" 
+        "Aktif 322 bulan · kurs 4593,45 RS/KST" 
+        "" [klik]
+        "" [klik]
+        "    Pendapatan bulan ini" 
+        "Utilisasi 44,5%" 
+        "0 jt KST" [klik]
+        "559" [klik]
+        "    EBIT" 
+        "" 
+        "0 jt KST" [klik]
+        "40" [klik]
+        "    Laba bersih" 
+        "Laba kumulatif 7.648 jt RS vs investasi 6.140 jt RS" 
+        "0 jt KST" [klik]
+        "33" [klik]
+        "    Ekuitas lokal" 
+        "Utang bank lokal 0 jt KST" 
+        "3 jt KST" [klik]
+        "11.738" [klik]
+        "    Dividen siap ditarik" 
+        "Pajak withholding berlaku saat repatriasi" 
+        "0 jt KST" [klik]
+        "68" [klik]
+      #open_menu_button (ket: Menu utama) [klik]
+      "Agustus 2066" 
+      "Giliran 440 · Era 4" 
+      #chip_ap 
+        "AP 7/7" 
+      #chip_runway 
+        "Kas stabil" 
+      #toggle_theme_button (ket: Ganti mode terang atau gelap) [klik]
+        #bottom_nav_markas "Markas" [klik]
+        #bottom_nav_peta "Peta" [klik]
+        #bottom_nav_perusahaan "Usaha" [klik]
+        #bottom_nav_pasar "Pasar" [klik]
+        #bottom_nav_bursa "Bursa" [klik]
+        #bottom_nav_dunia "Dunia" [klik]

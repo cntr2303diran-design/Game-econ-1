@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.MacroPlusTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-30T03:33:02.846Z" hostname="runnervm48cm3" time="0.263">
+  <properties/>
+  <testcase name="fx_followsTradeBalance_andRatingDowngradeWeakensCurrency" classname="com.example.MacroPlusTest" time="0.011"/>
+  <testcase name="engine_macroLayerIsDeterministic_andSundaraPolicyBiasReachesTheTaylorRule" classname="com.example.MacroPlusTest" time="0.053"/>
+  <testcase name="centralBank_qeTapersAndBoundsStock_guidanceBreachHurtsCredibility" classname="com.example.MacroPlusTest" time="0.007"/>
+  <testcase name="registry_has24GovernmentsAndCentralBanks_withSensibleInitialRatings" classname="com.example.MacroPlusTest" time="0.001"/>
+  <testcase name="yieldCurve_invertsOnlyWhenPolicyIsVeryHigh" classname="com.example.MacroPlusTest" time="0.007"/>
+  <testcase name="outputsStayBoundedOverFullCampaign_underRandomInputs" classname="com.example.MacroPlusTest" time="0.031"/>
+  <testcase name="fiscal_recessionRaisesDeficitAndDebt_boundedAndDeterministic" classname="com.example.MacroPlusTest" time="0.031"/>
+  <testcase name="rating_worseFundamentalsLowerScore_andChangesAreRateLimited" classname="com.example.MacroPlusTest" time="0.021"/>
+  <testcase name="bankRun_needsGenuineStress_isRare_hasCooldown_andHurtsDemandAndCredit" classname="com.example.MacroPlusTest" time="0.099"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
