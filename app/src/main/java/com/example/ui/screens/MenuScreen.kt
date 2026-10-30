@@ -29,7 +29,9 @@ fun MenuScreen(
     onToggleTheme: () -> Unit,
     modifier: Modifier = Modifier,
     onLoadSlot: (Int) -> Unit = {},
-    onOpenPeran: () -> Unit = {}
+    onOpenPeran: () -> Unit = {},
+    /** Kemajuan pemulihan simpanan 0..1; dipakai selama [GameState.isRestoring]. */
+    restoreProgress: Float = 0f
 ) {
     var showSlots by rememberSaveable { mutableStateOf(false) }
     var showHow by rememberSaveable { mutableStateOf(false) }
@@ -63,57 +65,77 @@ fun MenuScreen(
             )
             Spacer(Modifier.height(8.dp))
 
-            if (gameState.hasSavedGame) {
+            if (gameState.isRestoring) {
+                // Simpanan diputar ulang di latar belakang (bisa belasan detik untuk kampanye panjang). Tombol permainan disembunyikan
+                // supaya pemain tidak memulai permainan baru yang menimpa simpanan sebelum selesai dimuat.
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth().border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(8.dp))
+                    modifier = Modifier.fillMaxWidth().border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(8.dp)).testTag("menu_loading")
                 ) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Permainan tersimpan", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("${gameState.activeRole} · ${gameState.dateText}", style = MaterialTheme.typography.titleMedium)
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Memuat permainan tersimpan…", style = MaterialTheme.typography.titleMedium)
+                        LinearProgressIndicator(progress = { restoreProgress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
                         Text(
-                            "Kas ${gameState.markasIndicators.firstOrNull()?.valueText ?: "-"} · Ekuitas ${gameState.companyEquityText}",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = MonoFontFamily)
+                            "${(restoreProgress.coerceIn(0f, 1f) * 100).toInt()}% · memutar ulang riwayat bulan demi bulan",
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = MonoFontFamily),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        if (gameState.gameOverReason != null) {
-                            Text("Permainan berakhir. Mulai permainan baru untuk bermain lagi.", style = MaterialTheme.typography.bodySmall,
-                                color = KapitalSemanticColors.red)
-                        }
                     }
                 }
-                Button(
-                    onClick = onContinue,
-                    shape = RoundedCornerShape(6.dp),
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("menu_continue")
-                ) { Text("Lanjutkan permainan", style = MaterialTheme.typography.titleMedium) }
-            }
-
-            if (gameState.hasSavedGame) {
-                OutlinedButton(
-                    onClick = { confirmNew = true },
-                    shape = RoundedCornerShape(6.dp),
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("menu_new_game")
-                ) { Text("Permainan baru", style = MaterialTheme.typography.titleMedium) }
             } else {
-                Button(
-                    onClick = { pickDifficulty = true },
-                    shape = RoundedCornerShape(6.dp),
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("menu_new_game")
-                ) { Text("Mulai permainan", style = MaterialTheme.typography.titleMedium) }
-            }
-            if (gameState.autosaves.any { it.turn > 0 }) {
+                if (gameState.hasSavedGame) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().border(1.dp, KapitalSemanticColors.border, RoundedCornerShape(8.dp))
+                    ) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Permainan tersimpan", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${gameState.activeRole} · ${gameState.dateText}", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "Kas ${gameState.markasIndicators.firstOrNull()?.valueText ?: "-"} · Ekuitas ${gameState.companyEquityText}",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontFamily = MonoFontFamily)
+                            )
+                            if (gameState.gameOverReason != null) {
+                                Text("Permainan berakhir. Mulai permainan baru untuk bermain lagi.", style = MaterialTheme.typography.bodySmall,
+                                    color = KapitalSemanticColors.red)
+                            }
+                        }
+                    }
+                    Button(
+                        onClick = onContinue,
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("menu_continue")
+                    ) { Text("Lanjutkan permainan", style = MaterialTheme.typography.titleMedium) }
+                }
+
+                if (gameState.hasSavedGame) {
+                    OutlinedButton(
+                        onClick = { confirmNew = true },
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("menu_new_game")
+                    ) { Text("Permainan baru", style = MaterialTheme.typography.titleMedium) }
+                } else {
+                    Button(
+                        onClick = { pickDifficulty = true },
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("menu_new_game")
+                    ) { Text("Mulai permainan", style = MaterialTheme.typography.titleMedium) }
+                }
+                if (gameState.autosaves.any { it.turn > 0 }) {
+                    OutlinedButton(
+                        onClick = { showSlots = true },
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("menu_slots")
+                    ) { Text("Muat autosave", style = MaterialTheme.typography.titleMedium) }
+                }
                 OutlinedButton(
-                    onClick = { showSlots = true },
+                    onClick = onOpenPeran,
                     shape = RoundedCornerShape(6.dp),
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("menu_slots")
-                ) { Text("Muat autosave", style = MaterialTheme.typography.titleMedium) }
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("menu_peran")
+                ) { Text("Peran lain dan tantangan", style = MaterialTheme.typography.titleMedium) }
             }
-            OutlinedButton(
-                onClick = onOpenPeran,
-                shape = RoundedCornerShape(6.dp),
-                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("menu_peran")
-            ) { Text("Peran lain dan tantangan", style = MaterialTheme.typography.titleMedium) }
             OutlinedButton(
                 onClick = { showHow = true },
                 shape = RoundedCornerShape(6.dp),

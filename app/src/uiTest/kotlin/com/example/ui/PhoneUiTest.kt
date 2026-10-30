@@ -181,6 +181,51 @@ class PhoneUiTest : UiTestBase() {
         soft.done()
     }
 
+    @Test
+    fun autosaveSlot_loadsInBackground_thenOpensMarkas() {
+        val soft = Soft()
+        val (slotText, slotTurn) = UiSaves.asSlot(UiSaves.early)
+        launch(null, mapOf(3 to slotText))
+        soft.check("menu menawarkan muat autosave") { rule.onNodeWithTag("menu_slots").assertExists() }
+        UiShots.save(rule, "phone_slot_00_menu")
+        soft.check("buka daftar slot dan pilih slot 3") { rule.tap("menu_slots"); rule.tap("slot_3") }
+        soft.check("sesudah pemulihan selesai aplikasi berpindah sendiri ke Markas") {
+            rule.waitUntil(timeoutMillis = 60_000) { rule.tagExists("end_turn_button") }
+        }
+        soft.check("giliran di Markas sama dengan giliran slot ($slotTurn)") { assertEquals(slotTurn, rule.turnAndEra()?.first) }
+        soft.check("simpanan utama ditulis dari slot yang dimuat") {
+            val f = appFile("kapital_save.txt")
+            assertTrue("simpanan utama ada", f.exists())
+            val lines = f.readText().lines()
+            assertEquals("seed sama dengan slot", slotText.lines().first(), lines.first())
+            assertTrue("memuat cap versi", lines.any { it.startsWith("VER:") })
+        }
+        UiShots.save(rule, "phone_slot_01_markas")
+        soft.done()
+    }
+
+    @Test
+    fun chronicleCounterfactual_runsInBackground_andShowsTheResult() {
+        val soft = Soft()
+        launch(UiSaves.early)
+        continueGame(soft)
+        soft.check("buka Kronik Dunia dari tab Dunia") { rule.tap("bottom_nav_dunia"); rule.tap("kronik_dunia_button"); rule.waitForIdle() }
+        val replay = rule.tagsWithPrefix("kronik_replay_")
+        soft.check("ada keputusan yang bisa disimulasikan ulang (${replay.size})") { assertTrue(replay.isNotEmpty()) }
+        UiShots.save(rule, "phone_kronik_sebelum")
+        if (replay.isNotEmpty()) {
+            soft.check("Bagaimana jika menampilkan hasil") {
+                rule.tap(replay.first())
+                rule.waitUntil(timeoutMillis = 60_000) { rule.tagExists("counterfactual_result") }
+                val t = rule.textOfTag("counterfactual_result")
+                assertTrue("hasil menyebut pengandaian: $t", t.startsWith("Seandainya Anda bermain"))
+            }
+            soft.check("penanda sibuk hilang sesudah hasil tampil") { assertTrue(!rule.tagExists("counterfactual_busy")) }
+            UiShots.save(rule, "phone_kronik_sesudah")
+        }
+        soft.done()
+    }
+
     private fun playRole(role: Role, advanceTag: String) {
         val soft = Soft()
         launch(null)

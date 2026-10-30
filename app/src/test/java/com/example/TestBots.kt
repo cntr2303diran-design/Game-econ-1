@@ -54,6 +54,43 @@ object TestBots {
         for (s in 1..maxSeeds) playUntil(s * 7919L, targetTurn)?.let { if (accept(it)) return it }
         throw AssertionError("tidak ada seed yang bertahan sampai giliran $targetTurn dalam $maxSeeds percobaan")
     }
+
+    /** Rekaman permainan bot aktif: seed dan log aksi (tanpa baris SEED). */
+    class LateRecording(val seed: Long, val log: List<String>)
+
+    /**
+     * Rekaman [ActiveBot] selama [months] bulan pada seed pertama (7919·k) yang bertahan, sudah menjadi emiten, dan punya anak usaha,
+     * supaya uji keadaan akhir permainan memakai perusahaan yang kaya fitur (kredit, anak usaha, saham, bank grup).
+     */
+    fun lateRecording(months: Int = 400): LateRecording {
+        for (k in 1..120) {
+            val seed = 7919L * k
+            val eng = KapitalEngine(seed)
+            val rec = mutableListOf<String>()
+            val t0 = eng.turn
+            var t = 0
+            while (eng.turn < t0 + months && eng.gameOverReason == null) {
+                t++
+                ActiveBot.step(eng, t, rec)
+                if (eng.gameOverReason != null) break
+                if (eng.apply(Action.EndTurn)) rec += Action.EndTurn.encode()
+            }
+            if (eng.gameOverReason == null && eng.isPublicCompany && eng.subsidiaries.isNotEmpty()) return LateRecording(seed, rec)
+        }
+        throw AssertionError("tidak ada seed bot aktif yang menjadi emiten dengan anak usaha dalam $months bulan")
+    }
+
+    /** Awalan [log] sampai tepat sesudah aksi yang membuat giliran mesin mencapai [target]. */
+    fun prefixToTurn(seed: Long, log: List<String>, target: Int): List<String> {
+        val e = KapitalEngine(seed)
+        val out = ArrayList<String>()
+        for (l in log) {
+            Action.decode(l)?.let { e.apply(it) }
+            out += l
+            if (e.turn >= target) break
+        }
+        return out
+    }
 }
 
 /** Sakelar perilaku ActiveBot (dipakai eksperimen keseimbangan untuk mengukur sumbangan tiap kebiasaan). */

@@ -278,9 +278,10 @@ private fun CovenantWarningBanner(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            val safe = tone == SemanticTone.GOOD_GREEN
             Icon(
-                imageVector = Icons.Outlined.WarningAmber,
-                contentDescription = "Peringatan Covenant",
+                imageVector = if (safe) Icons.Outlined.CheckCircle else Icons.Outlined.WarningAmber,
+                contentDescription = if (safe) "Covenant aman" else "Peringatan Covenant",
                 tint = fg,
                 modifier = Modifier.size(22.dp)
             )

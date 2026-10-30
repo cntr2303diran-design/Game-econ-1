@@ -38,11 +38,12 @@ abstract class UiTestBase {
      * permainan yang SEBENARNYA dimuat ViewModel. Pembanding ini memisahkan kegagalan pemuatan simpanan dari kegagalan tampilan;
      * catatan harness ditulis ke _diag.txt.
      */
-    protected fun launch(saveText: String?): GameState {
+    protected fun launch(saveText: String?, slots: Map<Int, String> = emptyMap()): GameState {
         try { scenario?.close() } catch (_: Throwable) { }
         val app = ApplicationProvider.getApplicationContext<Application>()
         val f = File(app.filesDir, "kapital_save.txt")
         if (saveText != null) f.writeText(saveText) else f.delete()
+        for (i in 1..5) { val sf = File(app.filesDir, "kapital_slot_$i.txt"); val t = slots[i]; if (t != null) sf.writeText(t) else sf.delete() }
         val sizeBefore = if (f.exists()) f.length() else -1L
         val t0 = System.nanoTime()
         val sc = ActivityScenario.launch(MainActivity::class.java)
@@ -67,6 +68,9 @@ abstract class UiTestBase {
         )
         return s
     }
+
+    /** Berkas di folder data aplikasi uji (folder yang sama dengan yang dibaca ViewModel lewat pabrik eksplisit). */
+    protected fun appFile(name: String): File = File(ApplicationProvider.getApplicationContext<Application>().filesDir, name)
 
     @After fun closeScenario() { try { scenario?.close() } catch (_: Throwable) { } }
 

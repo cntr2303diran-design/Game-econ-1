@@ -468,6 +468,10 @@ data class GameState(
     val factorySchemeOptions: List<Pair<String, String>> = emptyList(),
     val priceAdjPct: Int = 0,
     val counterfactualText: String? = null,
+    /** True selama "Bagaimana Jika" masih dihitung di latar belakang (memutar ulang seluruh riwayat). */
+    val counterfactualBusy: Boolean = false,
+    /** True selama simpanan masih diputar ulang di latar belakang; menu hanya menampilkan panel pemuatan. */
+    val isRestoring: Boolean = false,
     /** Peringatan saat simpanan dimuat dari versi mesin lain atau sebagian tindakannya tak bisa diputar ulang. */
     val saveNotice: String? = null,
     val ganttTitle: String = "",

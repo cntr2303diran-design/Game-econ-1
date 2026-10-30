@@ -55,4 +55,48 @@ adb logcat -d > "$OUT/release-logcat.txt" 2>&1 || true
 if grep -Eq "^// CRASH|Monkey aborted|// NOT RESPONDING" "$OUT/monkey.txt"; then status "monkey_crash=1"; else status "monkey_crash=0"; fi
 if grep -E "FATAL EXCEPTION" "$OUT/release-logcat.txt" | head -1 | grep -q .; then status "release_fatal=1"; else status "release_fatal=0"; fi
 grep -E "Events injected|Network stats|CRASH|aborted" "$OUT/monkey.txt" | head -5 > "$OUT/monkey-ringkasan.txt" 2>&1 || true
+
+# ---------- 3) muat simpanan akhir permainan dari PROSES DINGIN lewat aplikasi (debug, bisa run-as) ----------
+# Mengukur apa yang dialami pemain: berapa lama aplikasi yang baru dibuka memutar ulang kampanye ±380 bulan di latar belakang.
+# Dua keadaan kompilasi: bawaan pemasangan (hanya diverifikasi; jalan lewat interpreter + JIT, seperti APK yang baru dipasang
+# manual) dan AOT penuh (batas atas kecepatan, seperti aplikasi yang sudah dioptimalkan sistem). Hasil informatif, tidak menggagalkan job.
+adb uninstall "$PKG" > /dev/null 2>&1 || true
+python3 tools/make_late_save.py app/src/androidTest/assets/replay_fixture.txt 380 "$OUT/late_save.txt" > "$OUT/late_save-info.txt" 2>&1
+adb install -r -t "$DEBUG_APK" > "$OUT/install-debug2.txt" 2>&1
+adb push "$OUT/late_save.txt" /data/local/tmp/kapital_late_save.txt > "$OUT/push-late.txt" 2>&1
+LATE_SIZE=$(stat -c %s "$OUT/late_save.txt" 2>/dev/null || echo 0)
+: > "$OUT/cold-load.txt"
+cold_finished=1
+cold_start() {  # $1 = label pengukuran
+  adb shell am force-stop "$PKG" > /dev/null 2>&1
+  adb shell run-as "$PKG" mkdir -p files > /dev/null 2>&1
+  adb shell run-as "$PKG" cp /data/local/tmp/kapital_late_save.txt files/kapital_save.txt > /dev/null 2>&1
+  local have
+  have=$(adb shell run-as "$PKG" stat -c %s files/kapital_save.txt 2>/dev/null | tr -d '\r')
+  if [ "$have" != "$LATE_SIZE" ]; then
+    # cadangan: kirim lewat stdin
+    adb shell "run-as $PKG sh -c 'cat > files/kapital_save.txt'" < "$OUT/late_save.txt" > /dev/null 2>&1
+    have=$(adb shell run-as "$PKG" stat -c %s files/kapital_save.txt 2>/dev/null | tr -d '\r')
+  fi
+  adb logcat -c
+  local t0 t1 line=""
+  t0=$(date +%s)
+  adb shell am start -W -n "$PKG/com.example.MainActivity" > "$OUT/cold-$1-start.txt" 2>&1
+  for _ in $(seq 1 180); do
+    line=$(adb logcat -d -s KAPITAL-LOAD:I 2>/dev/null | grep "restorePending selesai" | head -1)
+    [ -n "$line" ] && break
+    sleep 1
+  done
+  t1=$(date +%s)
+  if [ -z "$line" ]; then cold_finished=0; line="TIDAK SELESAI dalam 180 s"; fi
+  echo "$1 (berkas $have dari $LATE_SIZE byte): ${line} | diamati skrip $((t1 - t0)) s | $(grep -E 'TotalTime|WaitTime' "$OUT/cold-$1-start.txt" | tr '\r\n' '  ')" >> "$OUT/cold-load.txt"
+}
+cold_start jit1
+cold_start jit2
+adb shell cmd package compile -m speed -f "$PKG" > "$OUT/aot-compile.txt" 2>&1
+cold_start aot1
+cold_start aot2
+adb shell am force-stop "$PKG" > /dev/null 2>&1 || true
+adb uninstall "$PKG" > /dev/null 2>&1 || true
+status "cold_load_finished=$cold_finished"
 exit 0

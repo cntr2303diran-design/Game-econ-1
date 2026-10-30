@@ -359,11 +359,6 @@ private fun WorldPolygonCanvasCard(
                         color = onSurfaceColor
                     )
                 )
-                drawText(
-                    textLayoutResult = nameLayout,
-                    topLeft = Offset(cx - nameLayout.size.width / 2f, cy - 18.dp.toPx())
-                )
-
                 val subLabel = when (activeLayer) {
                     MapLayerFilter.ZONA_KONFLIK -> "Konflik ${country.tensionScore}/100"
                     MapLayerFilter.RISIKO_IKLIM -> country.climateRiskLabel.substringBefore(" (")
@@ -379,9 +374,28 @@ private fun WorldPolygonCanvasCard(
                         color = mutedColor
                     )
                 )
+                // Label di tengah negara, digeser ke atas bila menimpa bidak pemain (di emulator, nama Sundara tertutup bidak P dan T).
+                val labelW = maxOf(nameLayout.size.width, subLayout.size.width).toFloat()
+                val labelH = (nameLayout.size.height + subLayout.size.height).toFloat()
+                val clearance = 10.dp.toPx()
+                var labelTop = cy - 18.dp.toPx()
+                repeat(2) {
+                    pieces.forEach { piece ->
+                        val px = piece.normX * w
+                        val py = piece.normY * h
+                        val overlapsX = px + clearance > cx - labelW / 2f && px - clearance < cx + labelW / 2f
+                        val overlapsY = py + clearance > labelTop && py - clearance < labelTop + labelH
+                        if (overlapsX && overlapsY) labelTop = py - clearance - labelH - 2.dp.toPx()
+                    }
+                }
+                labelTop = maxOf(labelTop, 2.dp.toPx())
+                drawText(
+                    textLayoutResult = nameLayout,
+                    topLeft = Offset(cx - nameLayout.size.width / 2f, labelTop)
+                )
                 drawText(
                     textLayoutResult = subLayout,
-                    topLeft = Offset(cx - subLayout.size.width / 2f, cy - 2.dp.toPx())
+                    topLeft = Offset(cx - subLayout.size.width / 2f, labelTop + nameLayout.size.height.toFloat())
                 )
             }
 

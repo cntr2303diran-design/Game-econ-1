@@ -63,6 +63,23 @@ object UiSaves {
         throw AssertionError("tidak ada seed sembrono yang berakhir kalah")
     }
 
+    /**
+     * Mengubah simpanan utama menjadi isi berkas slot autosave: baris META ditambahkan sesudah VER, berisi giliran, tanggal,
+     * kesulitan, dan ekuitas hasil putar ulang sungguhan (sama seperti yang ditulis aplikasi). Mengembalikan teks dan giliran slot.
+     */
+    fun asSlot(text: String): Pair<String, Int> {
+        val lines = text.lines().filter { it.isNotBlank() }
+        val e = KapitalEngine(lines.first().removePrefix("SEED:").toLong())
+        for (l in lines.drop(1)) Action.decode(l)?.let { e.apply(it) }
+        val meta = listOf(e.turn, KapitalEngine.dateText(e.turn), e.difficulty.name, Math.round(e.equity)).joinToString("|")
+        val out = ArrayList<String>()
+        out += lines.first()
+        out += "VER:$ENGINE_VERSION"
+        out += "META:$meta"
+        out += lines.drop(1).filter { !it.startsWith("VER:") }
+        return out.joinToString("\n") to e.turn
+    }
+
     /** Simpanan lama tanpa cap versi: harus memunculkan spanduk peringatan. */
     val legacy: String by lazy { early.lines().filter { !it.startsWith("VER:") }.joinToString("\n") }
 }

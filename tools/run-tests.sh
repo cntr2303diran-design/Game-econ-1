@@ -31,6 +31,8 @@ public class Assert {
   public static void assertFalse(String m, boolean c) { if (c) throw new AssertionError(m); }
   public static void assertNotNull(Object o) { if (o == null) throw new AssertionError("assertNotNull gagal"); }
   public static void assertNotNull(String m, Object o) { if (o == null) throw new AssertionError(m); }
+  public static void assertNull(Object o) { if (o != null) throw new AssertionError("assertNull gagal: " + o); }
+  public static void assertNull(String m, Object o) { if (o != null) throw new AssertionError(m + ": <" + o + ">"); }
   public static void assertEquals(Object a, Object b) { if (!java.util.Objects.equals(a, b)) throw new AssertionError("expected <" + a + "> but was <" + b + ">"); }
   public static void assertEquals(String m, Object a, Object b) { if (!java.util.Objects.equals(a, b)) throw new AssertionError(m + ": expected <" + a + "> but was <" + b + ">"); }
   public static void assertEquals(long a, long b) { if (a != b) throw new AssertionError("expected <" + a + "> but was <" + b + ">"); }
@@ -66,7 +68,7 @@ javac -d "$OUT/jcls" "$OUT/jsrc/org/junit/Assert.java"
 
 # --- Mesin + tes ---
 "$KC" -nowarn -jvm-target 11 -cp "$CO" -d "$OUT/engine.jar" "$M/engine" "$M/data" "$M/model"
-TESTS=("$T/ArgonCorporateTest.kt" "$T/ExampleUnitTest.kt" "$T/StressCalibrationTest.kt" "$T/TestBots.kt")
+TESTS=("$T/ArgonCorporateTest.kt" "$T/ExampleUnitTest.kt" "$T/StressCalibrationTest.kt" "$T/TestBots.kt" "$T/EventProbe.kt")
 for extra in "$T"/*Test.kt; do
   case "$(basename "$extra")" in
     ArgonCorporateTest.kt|ExampleUnitTest.kt|StressCalibrationTest.kt|ExampleRobolectricTest.kt) ;;
@@ -79,7 +81,7 @@ TESTS+=("$ROOT/app/src/shared/kotlin/com/example/ReplayDigest.kt" "$ROOT/app/src
 
 DEFAULT_CLASSES=(ArgonCorporateTest ExampleUnitTest StressCalibrationTest ChainCardsTest EraCrisisTest PublicCompanyTest
   EvaluationTest GroupStatementsUiTest TransferPricingAuditTest RivalLearningTest DifficultyTest EraReviewTest
-  StockTest NciTest SuccessionTest BalanceTest PerformanceTest AgentScaleTest WorldLayerTest MacroPlusTest MarketTest CreditSystemTest LongCyclesTest StageAStressTest WorldViewTest IntelBoardTest AntiExploitTest ProductMarketTest OperationsTest FinanceTest DerivativesTest MinorityTest ForensicsTest LawTest ActorsTest InsightTest SaveSlotsTest ActiveBotTest CardDeckTest RolesTest ChallengeTest EraUnlockTest AuditGuardsTest DeterminismGuardTest EventConsequenceTest ReplayFixtureTest)
+  StockTest NciTest SuccessionTest BalanceTest PerformanceTest AgentScaleTest WorldLayerTest MacroPlusTest MarketTest CreditSystemTest LongCyclesTest StageAStressTest WorldViewTest IntelBoardTest AntiExploitTest ProductMarketTest OperationsTest FinanceTest DerivativesTest MinorityTest ForensicsTest LawTest ActorsTest InsightTest SaveSlotsTest ActiveBotTest CardDeckTest RolesTest ChallengeTest EraUnlockTest AuditGuardsTest DeterminismGuardTest EventConsequenceTest EventConsequenceLateTest AsyncRestoreTest ReplayFixtureTest)
 if [ "$#" -gt 0 ]; then CLASSES=("$@"); else CLASSES=("${DEFAULT_CLASSES[@]}"); fi
 FQ=(); for c in "${CLASSES[@]}"; do FQ+=("com.example.$c"); done
 exec java -cp "$OUT/stub.jar:$OUT/engine.jar:$OUT/tests.jar:$OUT/runner.jar:$STD:$CO" RunnerKt "${FQ[@]}"

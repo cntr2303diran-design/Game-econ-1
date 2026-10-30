@@ -52,6 +52,7 @@ import com.example.ui.theme.KapitalSemanticColors
 import com.example.ui.theme.MonoFontFamily
 import com.example.ui.theme.MyApplicationTheme
 import com.example.viewmodel.KapitalViewModel
+import com.example.viewmodel.KapitalViewModelFactory
 
 const val ROUTE_MENU = "menu"
 const val ROUTE_MARKAS = "markas"
@@ -76,8 +77,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val factory = KapitalViewModelFactory(application)
         setContent {
-            val viewModel: KapitalViewModel = viewModel()
+            val viewModel: KapitalViewModel = viewModel(factory = factory)
             val gameState by viewModel.gameState.collectAsStateWithLifecycle()
             val dark = gameState.isDarkTheme ?: isSystemInDarkTheme()
 
@@ -105,7 +107,7 @@ fun KapitalAppScaffold(
         listOf(
             BottomNavTab(ROUTE_MARKAS, "Markas", Icons.Filled.HomeWork, Icons.Outlined.HomeWork),
             BottomNavTab(ROUTE_PETA, "Peta", Icons.Filled.Map, Icons.Outlined.Map),
-            BottomNavTab(ROUTE_PERUSAHAAN, "Perusahaan", Icons.Filled.Apartment, Icons.Outlined.Apartment),
+            BottomNavTab(ROUTE_PERUSAHAAN, "Usaha", Icons.Filled.Apartment, Icons.Outlined.Apartment),
             BottomNavTab(ROUTE_PASAR, "Pasar", Icons.AutoMirrored.Filled.ShowChart, Icons.AutoMirrored.Outlined.ShowChart),
             BottomNavTab(ROUTE_BURSA, "Bursa", Icons.Filled.AccountBalance, Icons.Outlined.AccountBalance),
             BottomNavTab(ROUTE_DUNIA, "Dunia", Icons.Filled.Public, Icons.Outlined.Public)
@@ -156,6 +158,8 @@ fun KapitalAppScaffold(
                             label = {
                                 Text(
                                     text = tab.label,
+                                    maxLines = 1,
+                                    softWrap = false,
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
                                     )
@@ -184,8 +188,23 @@ fun KapitalAppScaffold(
                 .background(MaterialTheme.colorScheme.background)
         ) {
             composable(ROUTE_MENU) {
+                val restoreProgress by viewModel.restoreProgress.collectAsStateWithLifecycle()
+                val restoredCount by viewModel.restoredCount.collectAsStateWithLifecycle()
+                // Muat autosave berjalan di latar belakang; pindah ke Markas begitu pemulihannya selesai (penghitung pemulihan naik).
+                var slotRequestedAt by remember { mutableStateOf<Int?>(null) }
+                LaunchedEffect(restoredCount, slotRequestedAt, gameState.isRestoring) {
+                    val at = slotRequestedAt
+                    if (at != null && restoredCount != at && !gameState.isRestoring) {
+                        slotRequestedAt = null
+                        navController.navigate(ROUTE_MARKAS) {
+                            popUpTo(ROUTE_MENU) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                }
                 MenuScreen(
                     gameState = gameState,
+                    restoreProgress = restoreProgress,
                     onContinue = {
                         navController.navigate(ROUTE_MARKAS) {
                             popUpTo(ROUTE_MENU) { inclusive = true }
@@ -202,12 +221,8 @@ fun KapitalAppScaffold(
                     onToggleTheme = { viewModel.toggleTheme(isDarkNow) },
                     onOpenPeran = { navController.navigate(ROUTE_PERAN) { launchSingleTop = true } },
                     onLoadSlot = { slot ->
-                        if (viewModel.loadSlot(slot)) {
-                            navController.navigate(ROUTE_MARKAS) {
-                                popUpTo(ROUTE_MENU) { inclusive = true }
-                                launchSingleTop = true
-                            }
-                        }
+                        val before = restoredCount
+                        if (viewModel.loadSlot(slot)) slotRequestedAt = before
                     }
                 )
             }
@@ -370,6 +385,7 @@ fun KapitalAppScaffold(
                 KronikDuniaScreen(
                     chronicles = gameState.worldChronicles,
                     counterfactualText = gameState.counterfactualText,
+                    counterfactualBusy = gameState.counterfactualBusy,
                     onRunCounterfactual = { viewModel.runCounterfactual(it) },
                     onBack = {
                         viewModel.clearCounterfactual()

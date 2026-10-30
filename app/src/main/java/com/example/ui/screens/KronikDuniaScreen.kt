@@ -26,6 +26,7 @@ fun KronikDuniaScreen(
     chronicles: List<ChronicleEntry>,
     counterfactualText: String?,
     onRunCounterfactual: (Int) -> Unit,
+    counterfactualBusy: Boolean = false,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -83,6 +84,29 @@ fun KronikDuniaScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (counterfactualBusy) {
+                Surface(
+                    color = KapitalSemanticColors.blueContainer,
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, KapitalSemanticColors.blue, RoundedCornerShape(6.dp))
+                        .testTag("counterfactual_busy")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = KapitalSemanticColors.blue)
+                        Text(
+                            text = "Memutar ulang seluruh riwayat tanpa tindakan itu…",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
             if (counterfactualResult != null) {
                 Surface(
                     color = KapitalSemanticColors.blueContainer,
@@ -103,7 +127,8 @@ fun KronikDuniaScreen(
                         Text(
                             text = counterfactualResult,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.testTag("counterfactual_result")
                         )
                     }
                 }
@@ -170,8 +195,9 @@ fun KronikDuniaScreen(
                         if (entry.canReplayCounterfactual && idx != null) {
                             OutlinedButton(
                                 onClick = { onRunCounterfactual(idx) },
+                                enabled = !counterfactualBusy,
                                 shape = RoundedCornerShape(6.dp),
-                                modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                                modifier = Modifier.defaultMinSize(minHeight = 48.dp).testTag("kronik_replay_$idx")
                             ) {
                                 Icon(Icons.Outlined.Replay, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))

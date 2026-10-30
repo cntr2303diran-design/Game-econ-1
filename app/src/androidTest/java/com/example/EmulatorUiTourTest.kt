@@ -4,8 +4,12 @@ import android.graphics.Bitmap
 import android.os.SystemClock
 import android.util.Log
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -57,8 +61,16 @@ class EmulatorUiTourTest {
 
     private fun menuVisible(): Boolean = try { rule.tagExists("menu_new_game") } catch (_: AssertionError) { false }
 
-    /** Hasil peluncuran: ms sampai aktivitas kembali (jendela pertama) dan ms sampai menu tampil (simpanan selesai dimuat). */
-    private class Launched(val toActivityMs: Long, val toMenuMs: Long)
+    /**
+     * Hasil peluncuran: ms sampai aktivitas kembali (jendela pertama), sampai panel pemuatan atau menu tampil, sampai menu tampil
+     * (simpanan selesai dimuat), dan [respondMs] = berapa ms dialog "Cara bermain" terbuka saat simpanan MASIH dimuat (-1 bila
+     * pemuatan terlalu cepat untuk sempat diuji). Respons cepat membuktikan thread utama tidak membeku selama pemutaran ulang.
+     */
+    private class Launched(val toActivityMs: Long, val toPanelMs: Long, val toMenuMs: Long, val respondMs: Long) {
+        fun describe() = "aktivitas kembali $toActivityMs ms, panel/menu pertama tampil $toPanelMs ms, " +
+            (if (respondMs >= 0) "layar tetap responsif saat memuat (dialog terbuka dalam $respondMs ms), " else "pemuatan terlalu cepat untuk uji responsivitas, ") +
+            "menu siap $toMenuMs ms"
+    }
 
     private fun launch(saveText: String?): Launched {
         try { scenario?.close() } catch (_: Throwable) { }
@@ -66,9 +78,29 @@ class EmulatorUiTourTest {
         val t0 = SystemClock.elapsedRealtime()
         scenario = ActivityScenario.launch(MainActivity::class.java)
         val toActivity = SystemClock.elapsedRealtime() - t0
-        rule.waitForIdle()
-        rule.waitUntil(timeoutMillis = 180_000) { menuVisible() }
-        return Launched(toActivity, SystemClock.elapsedRealtime() - t0)
+        var toPanel = -1L
+        var respond = -1L
+        rule.waitUntil(timeoutMillis = 180_000) {
+            val loading = rule.tagExists("menu_loading")
+            if (toPanel < 0 && (loading || menuVisible())) toPanel = SystemClock.elapsedRealtime() - t0
+            if (respond < 0 && loading) {
+                // Saat simpanan masih diputar ulang di latar belakang, layar harus tetap melayani sentuhan.
+                val t1 = SystemClock.elapsedRealtime()
+                try {
+                    val inDialog = hasAnyAncestor(isDialog())
+                    rule.tap("menu_how")
+                    rule.onNode(hasText("Cara bermain") and inDialog).assertExists()
+                    respond = SystemClock.elapsedRealtime() - t1
+                    rule.onNode(hasText("Mengerti") and inDialog).performClick()
+                    rule.waitForIdle()
+                } catch (t: Throwable) {
+                    respond = -2L
+                    File(UiShots.dir, "_errors.txt").appendText("uji responsivitas saat memuat gagal: ${t::class.java.simpleName}: ${t.message?.take(200)}\n")
+                }
+            }
+            menuVisible()
+        }
+        return Launched(toActivity, toPanel, SystemClock.elapsedRealtime() - t0, respond)
     }
 
     /**
@@ -133,7 +165,7 @@ class EmulatorUiTourTest {
     fun freshInstall_tour() {
         val soft = Soft()
         val l = launch(null)
-        Log.i("KAPITAL-ART", "ART-UI peluncuran pemasangan baru: aktivitas ${l.toActivityMs} ms, menu ${l.toMenuMs} ms")
+        Log.i("KAPITAL-ART", "ART-UI peluncuran pemasangan baru: ${l.describe()}")
         fullShot("emu_fresh_00_menu")
         soft.check("mulai permainan baru") {
             rule.tap("menu_new_game")
@@ -153,9 +185,14 @@ class EmulatorUiTourTest {
         val soft = Soft()
         val save = lateSave()
         val l = launch(save)
-        val msg = "ART-UI memuat simpanan ${save.lines().size} baris (±380 bulan): aktivitas kembali ${l.toActivityMs} ms, menu tampil ${l.toMenuMs} ms"
+        val msg = "ART-UI memuat simpanan ${save.lines().size} baris (±380 bulan): ${l.describe()}"
         Log.i("KAPITAL-ART", msg)
         File(UiShots.dir, "load_time.txt").writeText(msg + "\n")
+        soft.check("aplikasi tetap responsif selama simpanan panjang dimuat (respon=${l.respondMs} ms)") {
+            // -1 = pemuatan terlalu cepat untuk diuji (tidak gagal); -2 = sempat diuji tetapi dialog tidak terbuka
+            assertTrue("dialog tidak terbuka saat memuat", l.respondMs != -2L)
+            assertTrue("dialog baru terbuka ${l.respondMs} ms sesudah diketuk; thread utama diduga membeku", l.respondMs < 0 || l.respondMs < 4_000)
+        }
         fullShot("emu_late_00_menu")
         soft.check("lanjutkan ke Markas") { rule.tap("menu_continue"); rule.waitForIdle(); rule.onNodeWithTag("end_turn_button").assertExists() }
         soft.check("era akhir (Era 3 atau 4)") { assertTrue("era=${rule.turnAndEra()?.second}", (rule.turnAndEra()?.second ?: 0) >= 3) }

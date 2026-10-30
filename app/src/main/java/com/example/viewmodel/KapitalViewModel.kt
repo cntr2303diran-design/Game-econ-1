@@ -1,13 +1,21 @@
 package com.example.viewmodel
 
 import android.app.Application
+import android.os.Handler
+import android.os.Looper
+import android.os.Process
+import android.os.SystemClock
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import com.example.data.GameRepository
 import com.example.data.SaveStore
 import com.example.data.SlotStore
 import com.example.model.*
 import kotlinx.coroutines.flow.StateFlow
 import java.io.File
+import kotlin.concurrent.thread
 
 /** Menyimpan permainan ke file internal aplikasi (seed + log tindakan). */
 class FileSaveStore(private val file: File) : SaveStore {
@@ -43,14 +51,55 @@ class FileSlotStore(private val dir: File) : SlotStore {
     }
 }
 
+/**
+ * Pabrik eksplisit. Pabrik bawaan androidx (AndroidViewModelFactory.getInstance) menyimpan Application pertama dalam bidang statis,
+ * sehingga di Robolectric setiap uji memakai folder simpanan uji pertama dan berkas simpanan suntikan tidak pernah terbaca.
+ * Dengan pabrik ini ViewModel selalu mendapat Application milik aktivitasnya sendiri.
+ */
+class KapitalViewModelFactory(private val app: Application) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        require(modelClass.isAssignableFrom(KapitalViewModel::class.java)) { "ViewModel tidak dikenal: ${modelClass.name}" }
+        return KapitalViewModel(app) as T
+    }
+}
+
 class KapitalViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = GameRepository(
         FileSaveStore(File(application.filesDir, "kapital_save.txt")),
-        slots = FileSlotStore(application.filesDir)
+        slots = FileSlotStore(application.filesDir),
+        deferRestore = true
     )
 
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    /**
+     * Memutar ulang simpanan di thread latar. Di ART yang belum hangat, kampanye panjang (ratusan bulan) memakan 6 sampai 20 detik;
+     * di thread utama itu membekukan layar saat aplikasi dibuka. Selama berjalan, menu menampilkan panel progres dan perintah ditolak.
+     */
+    private fun startRestoreIfNeeded() {
+        if (!repository.needsRestore) return
+        thread(name = "kapital-restore", isDaemon = true) {
+            val t0 = SystemClock.elapsedRealtime()
+            repository.restorePending()
+            val now = SystemClock.elapsedRealtime()
+            // Dibaca skrip CI (tools/ci-emulator.sh) untuk mengukur muat simpanan dari proses dingin.
+            Log.i("KAPITAL-LOAD", "restorePending selesai dalam ${now - t0} ms; sejak proses mulai ${now - Process.getStartElapsedRealtime()} ms")
+        }
+    }
+
     val gameState: StateFlow<GameState> = repository.gameState
+
+    /** Kemajuan pemulihan simpanan, 0..1. */
+    val restoreProgress: StateFlow<Float> = repository.restoreProgress
+
+    /** Naik satu setiap pemulihan selesai (untuk berpindah layar setelah memuat autosave). */
+    val restoredCount: StateFlow<Int> = repository.restoredCount
+
+    init {
+        startRestoreIfNeeded()
+    }
 
     fun toggleTheme(currentlyDark: Boolean) = repository.toggleTheme(currentlyDark)
     fun setMapLayer(layer: MapLayerFilter) = repository.setMapLayer(layer)
@@ -101,8 +150,21 @@ class KapitalViewModel(application: Application) : AndroidViewModel(application)
     fun newGame(difficulty: com.example.engine.Difficulty? = null) = repository.newGame(difficulty)
     fun newGameFromChallenge(c: com.example.engine.Challenge) = repository.newGameFromChallenge(c)
     fun ceoSubmission(player: String): String? = repository.ceoSubmission(player)
-    fun loadSlot(slot: Int) = repository.loadSlot(slot)
-    fun runCounterfactual(actionIndex: Int) = repository.runCounterfactual(actionIndex)
+    /** Memulai muat autosave di latar belakang; true bila slot sah dan pemulihan dimulai (selesainya ditandai [restoredCount]). */
+    fun loadSlot(slot: Int): Boolean {
+        val ok = repository.beginLoadSlot(slot)
+        if (ok) startRestoreIfNeeded()
+        return ok
+    }
+
+    /** "Bagaimana Jika" menghitung ulang seluruh riwayat, jadi dijalankan di thread latar; hasilnya diserahkan kembali ke thread utama. */
+    fun runCounterfactual(actionIndex: Int) {
+        val job = repository.beginCounterfactual(actionIndex) ?: return
+        thread(name = "kapital-counterfactual", isDaemon = true) {
+            val text = job.run()
+            mainHandler.post { repository.finishCounterfactual(text) }
+        }
+    }
     fun clearCounterfactual() = repository.clearCounterfactual()
     fun rejectDecision(decisionId: String) = repository.rejectDecision(decisionId)
 

@@ -232,6 +232,7 @@ jobs:
             echo '```'; cat emulator-out/status.txt 2>/dev/null; echo '```'
             echo "Ukuran APK (byte):"; echo '```'; cat emulator-out/apk-sizes.txt 2>/dev/null; echo '```'
             echo "Monkey pada APK release:"; echo '```'; cat emulator-out/monkey-ringkasan.txt 2>/dev/null; echo '```'
+            echo "Muat simpanan akhir permainan (±380 bulan) dari proses dingin, kompilasi bawaan (jit) lalu AOT penuh (aot):"; echo '```'; cat emulator-out/cold-load.txt 2>/dev/null; echo '```'
             echo "Keluaran penting uji instrumented:"; echo '```'; cat emulator-out/art-logcat.txt 2>/dev/null; echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           python3 tools/parse_instrument.py emulator-out/instrument.txt >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true

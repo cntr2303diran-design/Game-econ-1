@@ -69,7 +69,8 @@ private data class UiFlags(
     val showMonthlyReport: Boolean = false,
     val inspectedOrigin: DataOriginInfo? = null,
     val selectedCountry: Country? = null,
-    val counterfactualText: String? = null
+    val counterfactualText: String? = null,
+    val counterfactualBusy: Boolean = false
 )
 
 /** Tantangan CEO selalu satu kampanye penuh (480 bulan) atau sampai perusahaan berakhir. */
@@ -79,11 +80,37 @@ class GameRepository(
     private val store: SaveStore? = null,
     seedOverride: Long? = null,
     private val slots: SlotStore? = null,
-    private val newSeed: () -> Long = { System.currentTimeMillis() }
+    private val newSeed: () -> Long = { System.currentTimeMillis() },
+    /**
+     * True: simpanan awal TIDAK diputar ulang di konstruktor, melainkan lewat [restorePending] yang boleh dijalankan di thread latar.
+     * Memutar ulang kampanye panjang di ART yang belum hangat bisa memakan puluhan detik; di thread utama itu membekukan aplikasi.
+     */
+    deferRestore: Boolean = false
 ) {
     private var seed: Long
     private val log = mutableListOf<String>()
     private var loadNotice: String? = null
+
+    /** Hasil memutar ulang sebuah simpanan: mesin baru, baris log yang berhasil diterapkan, dan peringatan pemuatan. */
+    private class Replayed(val engine: KapitalEngine, val log: List<String>, val notice: String?)
+
+    /** Simpanan yang menunggu diputar ulang; [fromSlot] menandai muat autosave (hasilnya harus ditulis ke simpanan utama). */
+    private class PendingRestore(val seed: Long, val lines: List<String>, val fromSlot: Boolean)
+
+    @Volatile private var pending: PendingRestore? = null
+    /** Selama true, semua perintah UI yang mengubah permainan ditolak: mesin sedang diganti oleh pemulihan. */
+    @Volatile private var restoring = false
+    private val _restoreProgress = MutableStateFlow(0f)
+    private val _restoredCount = MutableStateFlow(0)
+
+    /** Kemajuan pemulihan 0..1 (hanya bermakna selama [GameState.isRestoring]). */
+    val restoreProgress: StateFlow<Float> = _restoreProgress.asStateFlow()
+
+    /** Naik satu setiap pemulihan selesai; layar menunggu perubahannya untuk pindah ke Markas setelah memuat autosave. */
+    val restoredCount: StateFlow<Int> = _restoredCount.asStateFlow()
+
+    /** True bila ada simpanan yang masih harus diputar ulang lewat [restorePending]. */
+    val needsRestore: Boolean get() = pending != null
 
     private fun noticeFor(lines: List<String>, dropped: Int): String? {
         val ver = lines.firstOrNull { it.startsWith("VER:") }?.removePrefix("VER:")?.toIntOrNull() ?: 1
@@ -95,25 +122,62 @@ class GameRepository(
     private var engine: KapitalEngine
     private var ui = UiFlags()
 
+    /** Memutar ulang [lines] (baris pertama = SEED) pada mesin baru. Tidak menyentuh keadaan repositori, jadi aman di thread mana pun. */
+    private fun replayLines(seed: Long, lines: List<String>, onProgress: ((Float) -> Unit)? = null): Replayed {
+        val e = KapitalEngine(seed)
+        val applied = ArrayList<String>()
+        val body = lines.drop(1)
+        var dropped = 0
+        body.forEachIndexed { i, l ->
+            if (l.startsWith(Autosave.META) || l.startsWith("VER:")) return@forEachIndexed
+            val a = Action.decode(l) ?: return@forEachIndexed
+            if (e.apply(a)) applied += l else dropped++
+            if (onProgress != null && i % 8 == 0) onProgress(i.toFloat() / maxOf(1, body.size))
+        }
+        return Replayed(e, applied, noticeFor(lines, dropped))
+    }
+
     init {
         val saved = store?.read()
         val lines = saved?.lines()?.filter { it.isNotBlank() }.orEmpty()
         val savedSeed = lines.firstOrNull()?.removePrefix("SEED:")?.toLongOrNull()
         if (seedOverride == null && savedSeed != null) {
             seed = savedSeed
-            engine = KapitalEngine(seed)
-            var dropped = 0
-            for (l in lines.drop(1)) {
-                if (l.startsWith(Autosave.META) || l.startsWith("VER:")) continue
-                val a = Action.decode(l) ?: continue
-                if (engine.apply(a)) log += l else dropped++
+            if (deferRestore) {
+                engine = KapitalEngine(savedSeed) // pengganti sementara; diganti hasil putar ulang oleh restorePending()
+                pending = PendingRestore(savedSeed, lines, fromSlot = false)
+                restoring = true
+            } else {
+                val r = replayLines(savedSeed, lines)
+                engine = r.engine
+                log += r.log
+                loadNotice = r.notice
             }
-            loadNotice = noticeFor(lines, dropped)
         } else {
             seed = seedOverride ?: System.currentTimeMillis()
             engine = KapitalEngine(seed)
             persist()
         }
+    }
+
+    /**
+     * Memutar ulang simpanan yang tertunda (lihat [needsRestore]) lalu memasangnya sekaligus. Boleh dijalankan di thread latar:
+     * mesin yang dipakai UI tidak disentuh sampai pemasangan di akhir, dan selama [restoring] perintah UI ditolak.
+     */
+    fun restorePending() {
+        val p = pending ?: return
+        val r = replayLines(p.seed, p.lines) { _restoreProgress.value = it }
+        loadNotice = r.notice
+        seed = p.seed
+        engine = r.engine
+        log.clear(); log.addAll(r.log)
+        if (p.fromSlot) ui = UiFlags(isDarkTheme = ui.isDarkTheme)
+        pending = null
+        restoring = false
+        _restoreProgress.value = 1f
+        if (p.fromSlot) persist()
+        _restoredCount.update { it + 1 }
+        publish()
     }
 
     private val _gameState = MutableStateFlow(buildState())
@@ -123,6 +187,7 @@ class GameRepository(
     // Perintah dari UI
     // ------------------------------------------------------------------
     private fun perform(action: Action): Boolean {
+        if (restoring) return false
         val ok = engine.apply(action)
         if (ok) {
             log += action.encode()
@@ -151,24 +216,27 @@ class GameRepository(
         }.sortedByDescending { it.turn }
     }
 
-    /** Muat autosave: mainkan ulang log slot dari seed-nya. Ditolak selama permainan Ironman masih berjalan. */
-    fun loadSlot(slot: Int): Boolean {
+    /**
+     * Memulai muat autosave: memvalidasi slot lalu menandai pemulihan tertunda (menu menampilkan panel pemuatan). Pemutaran ulangnya
+     * dijalankan [restorePending], di thread latar pada aplikasi. Ditolak selama permainan Ironman masih berjalan.
+     */
+    fun beginLoadSlot(slot: Int): Boolean {
         val st = slots ?: return false
+        if (restoring) return false
         if (engine.difficulty.ironman && engine.gameOverReason == null) return false
         val lines = st.readSlot(slot)?.lines()?.filter { it.isNotBlank() } ?: return false
         val s = lines.firstOrNull()?.removePrefix("SEED:")?.toLongOrNull() ?: return false
-        val e = KapitalEngine(s)
-        val newLog = mutableListOf<String>()
-        var dropped = 0
-        for (l in lines.drop(1)) {
-            if (l.startsWith(Autosave.META) || l.startsWith("VER:")) continue
-            val a = Action.decode(l) ?: continue
-            if (e.apply(a)) newLog += l else dropped++
-        }
-        loadNotice = noticeFor(lines, dropped)
-        seed = s; engine = e; log.clear(); log.addAll(newLog)
-        ui = UiFlags(isDarkTheme = ui.isDarkTheme)
-        persist(); publish()
+        pending = PendingRestore(s, lines, fromSlot = true)
+        restoring = true
+        _restoreProgress.value = 0f
+        _gameState.update { it.copy(isRestoring = true) }
+        return true
+    }
+
+    /** Muat autosave sekaligus: mainkan ulang log slot dari seed-nya (jalur sinkron untuk uji dan alat). */
+    fun loadSlot(slot: Int): Boolean {
+        if (!beginLoadSlot(slot)) return false
+        restorePending()
         return true
     }
 
@@ -181,6 +249,7 @@ class GameRepository(
     }
 
     private fun setUi(f: (UiFlags) -> UiFlags) {
+        if (restoring) return
         ui = f(ui)
         publish()
     }
@@ -193,7 +262,7 @@ class GameRepository(
     fun clearEventOutcome() = setUi { it.copy(eventOutcome = null) }
     fun dismissMonthlyReport() = setUi { it.copy(showMonthlyReport = false) }
     fun showMonthlyReport() = setUi { it.copy(showMonthlyReport = true) }
-    fun dismissSaveNotice() { loadNotice = null; publish() }
+    fun dismissSaveNotice() { if (restoring) return; loadNotice = null; publish() }
     fun clearCounterfactual() = setUi { it.copy(counterfactualText = null) }
 
     fun setSalesScheme(id: String) {
@@ -302,6 +371,7 @@ class GameRepository(
 
     /** Permainan baru; tanpa argumen, kesulitan diwarisi dari permainan yang sedang/baru berakhir (B8). */
     fun newGame(difficulty: Difficulty? = null) {
+        if (restoring) return
         val d = difficulty ?: engine.difficulty
         loadNotice = null
         seed = newSeed()
@@ -316,6 +386,7 @@ class GameRepository(
 
     /** Tantangan CEO: dunia dengan seed dan kesulitan yang sama dengan pemain lain (permainan sebelumnya diganti). */
     fun newGameFromChallenge(c: Challenge) {
+        if (restoring) return
         loadNotice = null
         seed = c.seed
         log.clear()
@@ -342,35 +413,60 @@ class GameRepository(
         return Submission(player, c, actions, ChallengeVerifier.ceoScore(engine)).encode()
     }
 
-    /**
-     * "Bagaimana Jika": mainkan ulang seluruh riwayat dengan seed yang sama, tetapi tanpa
-     * tindakan nomor [actionIndex]. Dunia (cuaca, pemilu, rumor) identik; hanya pilihan Anda berbeda.
-     */
-    fun runCounterfactual(actionIndex: Int) {
-        if (engine.difficulty.ironman) return
-        val alt = KapitalEngine(seed)
-        log.forEachIndexed { i, line ->
-            if (i == actionIndex) return@forEachIndexed
-            Action.decode(line)?.let { alt.apply(it) }
-        }
-        val skipped = Action.decode(log.getOrNull(actionIndex) ?: "")
-        val label = when (skipped) {
-            is Action.Journal -> "tanpa keputusan \"${skipped.decisionId.removePrefix("dec_")}\""
-            is Action.EventChoice -> "tanpa pilihan Anda pada salah satu kartu kejadian"
-            is Action.RejectProposal -> "tanpa menolak proposal pemintalan (proposal dibiarkan menggantung)"
-            else -> "tanpa tindakan tersebut"
-        }
-        val text = buildString {
-            append("Seandainya Anda bermain $label, ")
-            if (alt.gameOverReason != null && engine.gameOverReason == null) {
-                append("perusahaan sudah berakhir: ${alt.gameOverReason}")
-            } else {
-                append("kas sekarang ${fmt(alt.cash)} jt RS (aktual ${fmt(engine.cash)}, selisih ${signed(alt.cash - engine.cash)}), ")
-                append("ekuitas ${fmt(alt.equity)} jt RS (aktual ${fmt(engine.equity)}).")
-                if (alt.gameOverReason != null) append(" Di cabang itu permainan juga berakhir: ${alt.gameOverReason}")
+    /** Bahan "Bagaimana Jika" yang dibekukan dari keadaan sekarang, supaya penghitungannya aman dijalankan di thread lain. */
+    class CounterfactualJob internal constructor(
+        private val seed: Long,
+        private val lines: List<String>,
+        private val index: Int,
+        private val actualCash: Double,
+        private val actualEquity: Double,
+        private val actualOver: String?
+    ) {
+        /** Mainkan ulang seluruh riwayat dengan seed yang sama tetapi tanpa tindakan nomor [index]; mengembalikan teks hasil. */
+        fun run(): String {
+            val alt = KapitalEngine(seed)
+            lines.forEachIndexed { i, line ->
+                if (i == index) return@forEachIndexed
+                Action.decode(line)?.let { alt.apply(it) }
+            }
+            val skipped = Action.decode(lines.getOrNull(index) ?: "")
+            val label = when (skipped) {
+                is Action.Journal -> "tanpa keputusan \"${skipped.decisionId.removePrefix("dec_")}\""
+                is Action.EventChoice -> "tanpa pilihan Anda pada salah satu kartu kejadian"
+                is Action.RejectProposal -> "tanpa menolak proposal pemintalan (proposal dibiarkan menggantung)"
+                else -> "tanpa tindakan tersebut"
+            }
+            return buildString {
+                append("Seandainya Anda bermain $label, ")
+                if (alt.gameOverReason != null && actualOver == null) {
+                    append("perusahaan sudah berakhir: ${alt.gameOverReason}")
+                } else {
+                    append("kas sekarang ${fmt(alt.cash)} jt RS (aktual ${fmt(actualCash)}, selisih ${signed(alt.cash - actualCash)}), ")
+                    append("ekuitas ${fmt(alt.equity)} jt RS (aktual ${fmt(actualEquity)}).")
+                    if (alt.gameOverReason != null) append(" Di cabang itu permainan juga berakhir: ${alt.gameOverReason}")
+                }
             }
         }
-        setUi { it.copy(counterfactualText = text) }
+    }
+
+    /**
+     * "Bagaimana Jika": membekukan keadaan sekarang dan menandai layar sibuk; null bila tidak boleh (Ironman atau sedang memulihkan).
+     * Penghitungannya ([CounterfactualJob.run]) memutar ulang seluruh riwayat, jadi aplikasi menjalankannya di thread latar lalu
+     * menyerahkan hasilnya ke [finishCounterfactual] di thread utama.
+     */
+    fun beginCounterfactual(actionIndex: Int): CounterfactualJob? {
+        if (restoring || engine.difficulty.ironman) return null
+        val job = CounterfactualJob(seed, log.toList(), actionIndex, engine.cash, engine.equity, engine.gameOverReason)
+        setUi { it.copy(counterfactualBusy = true, counterfactualText = null) }
+        return job
+    }
+
+    fun finishCounterfactual(text: String) = setUi { it.copy(counterfactualText = text, counterfactualBusy = false) }
+
+    /** Sinkron: hitung sekarang juga (uji dan alat). */
+    fun runCounterfactual(actionIndex: Int) {
+        val job = beginCounterfactual(actionIndex) ?: return
+        finishCounterfactual(job.run())
     }
 
     // ------------------------------------------------------------------
@@ -941,7 +1037,8 @@ class GameRepository(
         notesRows += nrow("Rasio keuangan", "", "", true)
         notesRows += nrow("    Margin EBIT", "${fmt1(iv(inc, "ebit") / max(1.0, iv(inc, "revenue")) * 100)}%", "EBIT / pendapatan")
         notesRows += nrow("    Perputaran kas (DSO + DIO − DPO)", "${(e.dso() + e.dio() - e.dpo()).toInt()} hari", "Makin panjang makin banyak kas tertahan")
-        notesRows += nrow("    ICR (EBIT / bunga, 3 bulan)", "${fmt2(e.ebitHist.takeLast(3).sum() / max(1.0, e.interestHist.takeLast(3).sum()))}x", "Batas covenant ${fmt2(e.covenantThreshold())}x")
+        val interest3 = e.interestHist.takeLast(3).sum()
+        notesRows += nrow("    ICR (EBIT / bunga, 3 bulan)", if (interest3 < 1.0) "tanpa beban bunga" else "${fmt2(e.ebitHist.takeLast(3).sum() / interest3)}x", "Batas covenant ${fmt2(e.covenantThreshold())}x")
         notesRows += nrow("    Utang bersih / EBITDA", "${fmt2((e.totalDebt() - e.cash) / max(1.0, (e.ebitHist.takeLast(3).sum() + 3 * iv(inc, "dep")) * 4.0))}x", "Batas covenant 3,5x")
         notesRows += nrow("    Rasio lancar", "${fmt2(curA / max(1.0, curL))}x", "Aset lancar / liabilitas lancar")
         val ni = iv(inc, "ni")
@@ -1262,6 +1359,8 @@ class GameRepository(
             factorySchemeOptions = FactoryScheme.entries.map { it.name to it.label },
             priceAdjPct = e.priceAdjPct,
             counterfactualText = ui.counterfactualText,
+            counterfactualBusy = ui.counterfactualBusy,
+            isRestoring = restoring,
             saveNotice = loadNotice,
             ganttTitle = ganttTitle,
             ganttTotalMonths = totalMonths,

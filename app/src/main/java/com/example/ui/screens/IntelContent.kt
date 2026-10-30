@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalLayoutApi::class)
+
 package com.example.ui.screens
 
 import androidx.compose.foundation.Canvas
@@ -197,7 +199,7 @@ fun IntelTabContent(
         Text("Perkiraan selalu berderau; anggaran lebih besar memperkecil galat tetapi tidak pernah menghilangkannya.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (intel.kinds.isNotEmpty()) {
             val k = intel.kinds[kindIdx.coerceIn(0, intel.kinds.size - 1)]
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 intel.kinds.forEachIndexed { i, kk ->
                     FilterChip(selected = i == kindIdx, onClick = { kindIdx = i; subjectIdx = 0 }, label = { Text(kk.second, style = MaterialTheme.typography.labelMedium) },
                         modifier = Modifier.testTag("intel_kind_$i"))
@@ -297,7 +299,7 @@ fun OperasiTabContent(
         Text(view.costText, style = MaterialTheme.typography.bodyMedium)
         Text("Pesaing bisa membajak karyawan berloyalitas rendah atau bergaji di bawah pasar. Jabatan kosong menghilangkan efeknya; perekrutan baru berisiko karena skill asli baru terlihat setelah 3 bulan.",
             style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             view.hireCosts.forEachIndexed { i, label ->
                 FilterChip(selected = hireTier == i + 1, onClick = { hireTier = i + 1 }, label = { Text(label, style = MaterialTheme.typography.labelSmall) }, modifier = Modifier.testTag("operasi_tier_${i + 1}"))
             }
@@ -322,14 +324,14 @@ fun OperasiTabContent(
     }
     IntelCard {
         Text(view.rdText, style = MaterialTheme.typography.titleMedium)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             (0..3).forEach { lv ->
                 FilterChip(selected = view.rdLevel == lv, onClick = { if (ap >= 1) onSetRd(lv) }, enabled = view.rdLevel == lv || ap >= 1,
                     label = { Text(if (lv == 0) "Mati" else "Tingkat $lv") }, modifier = Modifier.testTag("operasi_rd_$lv"))
             }
         }
         Text(view.logisticsText, style = MaterialTheme.typography.titleMedium)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             (0..2).forEach { lv ->
                 FilterChip(selected = view.logisticsLevel == lv, onClick = { if (ap >= 1) onSetLogistics(lv) }, enabled = view.logisticsLevel == lv || ap >= 1,
                     label = { Text(if (lv == 0) "Dasar" else "Tingkat $lv") }, modifier = Modifier.testTag("operasi_log_$lv"))
@@ -340,7 +342,7 @@ fun OperasiTabContent(
     IntelCard {
         Text("Keuangan lanjut", style = MaterialTheme.typography.titleMedium)
         Text(view.insuranceText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             (0..2).forEach { lv ->
                 FilterChip(selected = view.insuranceLevel == lv, onClick = { if (ap >= 1) onSetInsurance(lv) }, enabled = view.insuranceLevel == lv || ap >= 1,
                     label = { Text(if (lv == 0) "Tanpa" else "Tingkat $lv") }, modifier = Modifier.testTag("keu_ins_$lv"))
@@ -350,7 +352,7 @@ fun OperasiTabContent(
         OutlinedButton(onClick = { onSetTradeFinance(!view.tradeFinance) }, enabled = ap >= 1, shape = RoundedCornerShape(6.dp),
             modifier = Modifier.heightIn(min = 48.dp).testTag("keu_lc")) { Text(if (view.tradeFinance) "Matikan L/C" else "Aktifkan L/C") }
         Text(view.leaseText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf(5, 10, 20).forEachIndexed { i, pct ->
                 OutlinedButton(onClick = { onSaleLeaseback(pct) }, enabled = view.leaseBlocks.getOrNull(i) == null, shape = RoundedCornerShape(6.dp),
                     modifier = Modifier.heightIn(min = 48.dp).testTag("keu_slb_$pct")) { Text("Jual-sewa $pct%") }
@@ -363,14 +365,14 @@ fun OperasiTabContent(
         Text(view.mScoreText, style = MaterialTheme.typography.bodyMedium,
             color = if (view.mScoreFlag) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
         Text(view.auditText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             (0..2).forEach { lv ->
                 FilterChip(selected = view.auditorLevel == lv, onClick = { if (ap >= 1) onSetAuditor(lv) }, enabled = view.auditorLevel == lv || ap >= 1,
                     label = { Text(listOf("Tanpa", "Regional", "Internasional")[lv]) }, modifier = Modifier.testTag("aud_$lv"))
             }
         }
         Text(view.dressText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf(10, 25, 50).forEachIndexed { i, pct ->
                 OutlinedButton(onClick = { onWindowDress(pct) }, enabled = view.dressBlocks.getOrNull(i) == null, shape = RoundedCornerShape(6.dp),
                     modifier = Modifier.heightIn(min = 48.dp).testTag("wdr_$pct")) { Text("Percantik $pct%") }
@@ -378,7 +380,7 @@ fun OperasiTabContent(
         }
         view.dressBlocks.filterNotNull().firstOrNull()?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         Text(view.spvText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf(2000, 5000, 10000).forEachIndexed { i, amt ->
                 OutlinedButton(onClick = { onOpenSpv(amt) }, enabled = view.spvBlocks.getOrNull(i) == null, shape = RoundedCornerShape(6.dp),
                     modifier = Modifier.heightIn(min = 48.dp).testTag("spv_$amt")) { Text("SPV $amt") }
@@ -400,7 +402,7 @@ fun OperasiTabContent(
             if (d.activeText != null) {
                 Text("Aktif: ${d.activeText}", style = MaterialTheme.typography.bodySmall)
             } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf(25, 50, 100).forEachIndexed { i, pct ->
                         OutlinedButton(onClick = { onBuyDerivative(d.code, pct) }, enabled = d.blocks.getOrNull(i) == null, shape = RoundedCornerShape(6.dp),
                             modifier = Modifier.heightIn(min = 48.dp).testTag("drv_${d.code}_$pct")) { Text("$pct% · premi ${"%.0f".format(d.premiums.getOrElse(i) { 0.0 })}") }

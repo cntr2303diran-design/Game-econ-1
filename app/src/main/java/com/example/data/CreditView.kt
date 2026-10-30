@@ -21,7 +21,7 @@ internal object CreditView {
             "EBIT 12 bulan" to "${f(m.ebit12)} jt RS",
             "EBITDA 12 bulan" to "${f(m.ebitda12)} jt RS",
             "Beban bunga 12 bulan" to "${f(m.interest12)} jt RS",
-            "ICR (EBIT / bunga)" to "${f2(icr)}x",
+            "ICR (EBIT / bunga)" to (if (m.interest12 < 1.0) "tanpa beban bunga" else "${f2(icr)}x"),
             "Utang bersih / EBITDA" to "${f2(lev)}x",
             "Rasio lancar" to "${f2(cr)}x",
             "Kas dalam bulan biaya" to "${f1(m.cash / maxOf(1.0, m.monthlyCashCost))} bulan",
@@ -35,7 +35,7 @@ internal object CreditView {
             "Piutang lancar (haircut 30%)" to "${f(0.70 * e.normalAR)} jt RS",
             "Persediaan (haircut 50%)" to "${f(0.50 * e.inventory)} jt RS",
             "Portofolio saham (haircut 50%)" to "${f(0.50 * e.portfolioValue())} jt RS",
-            "Dikurangi utang yang sudah berjalan" to "-${f(e.totalDebt())} jt RS",
+            "Dikurangi utang yang sudah berjalan" to (if (e.totalDebt() < 0.5) "0 jt RS" else "-${f(e.totalDebt())} jt RS"),
             "Agunan bebas yang bisa dijaminkan" to "${f(m.freeCollateral)} jt RS"
         )
         val busy = e.credit.active()

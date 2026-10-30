@@ -221,9 +221,11 @@ class Bourse {
                 // Konsensus analis berisik: rata-rata laba tiga bulan sebelumnya +- noise
                 val consensus = (prevYear?.ni ?: q.ni) * (1.0 + gauss(r) * 0.08)
                 val surprise = if (abs(consensus) > 1.0) (q.ni - consensus) / abs(consensus) else 0.0
+                // Konsensus yang nyaris nol membuat selisih relatif meledak (laba tipis -> rugi besar = "17341%"); teks dibatasi, nilai asli dipakai apa adanya.
+                fun gap(v: Double) = if (v > 1.0) "lebih dari 100%" else fmtPct(v)
                 c.surpriseNote = when {
-                    surprise > 0.10 -> "melampaui konsensus analis ${fmtPct(surprise)}"
-                    surprise < -0.10 -> "di bawah konsensus analis ${fmtPct(-surprise)}"
+                    surprise > 0.10 -> "melampaui konsensus analis ${gap(surprise)}"
+                    surprise < -0.10 -> "di bawah konsensus analis ${gap(-surprise)}"
                     else -> "sesuai konsensus"
                 }
                 c.info += (surprise * 0.5).coerceIn(-0.12, 0.12)

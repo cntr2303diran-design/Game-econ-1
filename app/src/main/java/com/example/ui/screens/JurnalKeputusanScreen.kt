@@ -151,7 +151,7 @@ fun JurnalKeputusanScreen(
                 ) {
                     Column(modifier = Modifier.padding(8.dp)) {
                         Text(
-                            text = "Pilih satu (tinjau kontraknya dulu di Perusahaan › Kontrak)",
+                            text = "Pilih satu (tinjau kontraknya dulu di Usaha › Kontrak)",
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.padding(8.dp)
