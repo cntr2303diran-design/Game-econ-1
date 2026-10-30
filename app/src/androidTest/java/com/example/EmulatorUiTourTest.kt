@@ -15,6 +15,7 @@ import com.example.engine.Difficulty
 import com.example.ui.Soft
 import com.example.ui.UiShots
 import com.example.ui.crawl
+import com.example.ui.tagExists
 import com.example.ui.tagsWithPrefix
 import com.example.ui.tap
 import com.example.ui.textOfTag
@@ -54,18 +55,31 @@ class EmulatorUiTourTest {
         for (i in 1..5) File(ctx.filesDir, "kapital_slot_$i.txt").delete()
     }
 
-    private fun launch(saveText: String?): Long {
+    private fun menuVisible(): Boolean = try { rule.tagExists("menu_new_game") } catch (_: AssertionError) { false }
+
+    /** Hasil peluncuran: ms sampai aktivitas kembali (jendela pertama) dan ms sampai menu tampil (simpanan selesai dimuat). */
+    private class Launched(val toActivityMs: Long, val toMenuMs: Long)
+
+    private fun launch(saveText: String?): Launched {
         try { scenario?.close() } catch (_: Throwable) { }
         if (saveText != null) File(ctx.filesDir, "kapital_save.txt").writeText(saveText)
         val t0 = SystemClock.elapsedRealtime()
         scenario = ActivityScenario.launch(MainActivity::class.java)
+        val toActivity = SystemClock.elapsedRealtime() - t0
         rule.waitForIdle()
-        return SystemClock.elapsedRealtime() - t0
+        rule.waitUntil(timeoutMillis = 180_000) { menuVisible() }
+        return Launched(toActivity, SystemClock.elapsedRealtime() - t0)
     }
 
-    /** Tangkapan layar utuh dari tampilan perangkat (UiAutomation), termasuk bilah status dan dialog. */
+    /**
+     * Tangkapan layar utuh dari tampilan perangkat (UiAutomation), termasuk bilah status dan dialog. Jeda singkat menunggu animasi
+     * peralihan layar selesai digambar: waitForIdle hanya menjamin jam uji Compose sudah maju, bukan bingkai terakhir sudah tampil
+     * (tangkapan pertama putaran lalu menunjukkan layar sebelumnya dan bingkai setengah pudar).
+     */
     private fun fullShot(name: String) {
         try {
+            inst.waitForIdleSync()
+            SystemClock.sleep(600)
             val bmp = inst.uiAutomation.takeScreenshot() ?: return
             FileOutputStream(File(UiShots.dir, "$name.png")).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
         } catch (t: Throwable) {
@@ -118,8 +132,8 @@ class EmulatorUiTourTest {
     @Test
     fun freshInstall_tour() {
         val soft = Soft()
-        val ms = launch(null)
-        Log.i("KAPITAL-ART", "ART-UI peluncuran pemasangan baru sampai menu: $ms ms")
+        val l = launch(null)
+        Log.i("KAPITAL-ART", "ART-UI peluncuran pemasangan baru: aktivitas ${l.toActivityMs} ms, menu ${l.toMenuMs} ms")
         fullShot("emu_fresh_00_menu")
         soft.check("mulai permainan baru") {
             rule.tap("menu_new_game")
@@ -138,8 +152,8 @@ class EmulatorUiTourTest {
     fun lateGame_loadTime_tour_andMonkey() {
         val soft = Soft()
         val save = lateSave()
-        val ms = launch(save)
-        val msg = "ART-UI memuat simpanan ${save.lines().size} baris (±380 bulan) lalu menggambar menu: $ms ms"
+        val l = launch(save)
+        val msg = "ART-UI memuat simpanan ${save.lines().size} baris (±380 bulan): aktivitas kembali ${l.toActivityMs} ms, menu tampil ${l.toMenuMs} ms"
         Log.i("KAPITAL-ART", msg)
         File(UiShots.dir, "load_time.txt").writeText(msg + "\n")
         fullShot("emu_late_00_menu")

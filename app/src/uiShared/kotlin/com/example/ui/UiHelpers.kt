@@ -1,12 +1,11 @@
 package com.example.ui
 
-import android.graphics.Bitmap
-import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsConfiguration
+import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
@@ -17,31 +16,58 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import java.io.File
-import java.io.FileOutputStream
 import kotlin.random.Random
 
 /**
- * Bantuan uji UI (Robolectric, JVM). Tangkapan layar ditulis ke app/build/ui-shots (direktori kerja uji unit AGP = folder modul)
- * dan diunggah CI sebagai artifact. Kegagalan menangkap gambar tidak menggagalkan uji fungsional, tetapi dicatat di _errors.txt
- * supaya tidak diam-diam.
+ * Bantuan uji UI. Di Robolectric, tangkapan gambar lewat captureToImage tidak bisa dipakai pada Compose versi ini (menunggu callback
+ * render yang tak pernah datang di JVM; kehabisan waktu 2 detik tiap kali), jadi uji JVM menulis "tangkapan teks": semua teks, tag, dan
+ * keterangan konten yang tampil, per jendela (termasuk dialog), ke app/build/ui-shots. Gambar sungguhan diambil job emulator
+ * (UiAutomation). Berkas _diag.txt memuat catatan harness (keadaan ViewModel, berkas simpanan) supaya kegagalan bisa dipilah.
  */
 object UiShots {
     /** Uji instrumented mengisi ini dengan folder penyimpanan aplikasi; uji Robolectric memakai build/ui-shots (folder kerja = modul). */
     @Volatile var baseDir: File? = null
     val dir: File get() = (baseDir ?: File(System.getProperty("kapital.shots") ?: "build/ui-shots")).also { it.mkdirs() }
 
+    /** Catatan harness satu baris ke _diag.txt (tak pernah menggagalkan uji). */
+    @Synchronized fun note(line: String) {
+        try { File(dir, "_diag.txt").appendText(line + "\n") } catch (_: Throwable) { }
+    }
+
+    /** Simpan "tangkapan teks" layar saat ini sebagai [name].txt. */
     fun save(rule: ComposeTestRule, name: String) {
         try {
             rule.waitForIdle()
-            val n = rule.onAllNodes(isRoot()).fetchSemanticsNodes().size
-            for (i in 0 until n) {
-                val bmp = rule.onAllNodes(isRoot())[i].captureToImage().asAndroidBitmap()
-                val f = File(dir, if (i == 0) "$name.png" else "${name}_jendela$i.png")
-                FileOutputStream(f).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
-            }
+            File(dir, "$name.txt").writeText(describeScreen(rule))
         } catch (t: Throwable) {
             File(dir, "_errors.txt").appendText("$name: ${t::class.java.simpleName}: ${t.message?.take(300)}\n")
         }
+    }
+
+    /** Pohon semantik yang terlihat: satu baris per simpul bertag/berteks/berketerangan, dikelompokkan per jendela. */
+    fun describeScreen(rule: ComposeTestRule): String {
+        val sb = StringBuilder()
+        val roots = rule.onAllNodes(isRoot()).fetchSemanticsNodes()
+        roots.forEachIndexed { i, root ->
+            sb.append("== jendela ").append(i).append('\n')
+            fun walk(n: SemanticsNode, depth: Int) {
+                val cfg = n.config
+                val tag = cfg.valueOrNull(SemanticsProperties.TestTag)
+                val text = cfg.valueOrNull(SemanticsProperties.Text)?.joinToString(" | ") { it.text }
+                val desc = cfg.valueOrNull(SemanticsProperties.ContentDescription)?.joinToString(" | ")
+                if (tag != null || text != null || desc != null) {
+                    sb.append("  ".repeat(minOf(depth, 8)))
+                    if (tag != null) sb.append('#').append(tag).append(' ')
+                    if (text != null) sb.append('"').append(text).append("\" ")
+                    if (desc != null) sb.append("(ket: ").append(desc).append(") ")
+                    if (cfg.contains(SemanticsActions.OnClick)) sb.append("[klik]")
+                    sb.append('\n')
+                }
+                for (c in n.children) walk(c, depth + 1)
+            }
+            walk(root, 0)
+        }
+        return if (sb.length > 24_000) sb.substring(0, 24_000) + "\n...(dipotong)\n" else sb.toString()
     }
 }
 

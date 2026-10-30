@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -26,7 +27,8 @@ class PhoneUiTest : UiTestBase() {
     @Test
     fun freshInstall_menuToFirstTurn_andBack() {
         val soft = Soft()
-        launch(null)
+        val st0 = launch(null)
+        soft.check("ViewModel: pemasangan baru tanpa permainan tersimpan") { assertTrue("$st0", !st0.hasSavedGame) }
         soft.check("menu: mulai, peran, cara bermain ada") {
             rule.onNodeWithTag("menu_new_game").assertExists()
             rule.onNodeWithTag("menu_peran").assertExists()
@@ -35,10 +37,12 @@ class PhoneUiTest : UiTestBase() {
         UiShots.save(rule, "phone_fresh_00_menu")
         soft.check("dialog cara bermain terbuka dan tertutup") {
             rule.tap("menu_how")
-            rule.onNodeWithText("Cara bermain", substring = false).assertExists()
+            val inDialog = hasAnyAncestor(isDialog())
+            rule.onNode(hasText("Cara bermain") and inDialog).assertExists()
             UiShots.save(rule, "phone_fresh_01_cara_bermain")
-            rule.onNodeWithText("Mengerti").performClick()
+            rule.onNode(hasText("Mengerti") and inDialog).performClick()
             rule.waitForIdle()
+            rule.onNode(hasText("Cara bermain") and inDialog).assertDoesNotExist()
         }
         soft.check("pilih kesulitan: semua tingkat tersedia, mulai Manajer") {
             rule.tap("menu_new_game")
@@ -74,7 +78,8 @@ class PhoneUiTest : UiTestBase() {
     @Test
     fun corporateButtons_inEra1_explainWhyTheyAreRefused() {
         val soft = Soft()
-        launch(UiSaves.early)
+        val st = launch(UiSaves.early)
+        soft.check("ViewModel memuat simpanan awal (tersimpan, Era 1)") { assertTrue("$st", st.hasSavedGame && st.eraNumber == 1) }
         continueGame(soft)
         soft.check("permainan awal berada di Era 1") { assertEquals(1, rule.turnAndEra()?.second) }
         soft.check("buka tab Investasi") {
@@ -107,7 +112,8 @@ class PhoneUiTest : UiTestBase() {
     @Test
     fun lateGame_everyCorporateButtonAnswers() {
         val soft = Soft()
-        launch(UiSaves.late)
+        val st = launch(UiSaves.late)
+        soft.check("ViewModel memuat simpanan akhir permainan (Era 3 atau 4)") { assertTrue("giliran=${st.turn} era=${st.eraNumber}", st.eraNumber >= 3) }
         continueGame(soft)
         soft.check("buka tab Investasi") {
             rule.tap("bottom_nav_perusahaan"); rule.tap("perusahaan_subtab_6"); rule.waitForIdle()
@@ -131,7 +137,8 @@ class PhoneUiTest : UiTestBase() {
     @Test
     fun legacySave_showsNoticeBanner_andItCanBeDismissed() {
         val soft = Soft()
-        launch(UiSaves.legacy)
+        val st = launch(UiSaves.legacy)
+        soft.check("ViewModel memuat simpanan lama dan menyiapkan peringatan") { assertTrue("$st", st.hasSavedGame && st.saveNotice != null) }
         continueGame(soft)
         val inBanner = hasAnyAncestor(hasTestTag("save_notice"))
         soft.check("spanduk peringatan tampil") { rule.onNodeWithTag("save_notice").assertExists() }
@@ -148,7 +155,8 @@ class PhoneUiTest : UiTestBase() {
     @Test
     fun currentSave_hasNoNoticeBanner() {
         val soft = Soft()
-        launch(UiSaves.early)
+        val st = launch(UiSaves.early)
+        soft.check("ViewModel memuat simpanan tanpa peringatan") { assertTrue("$st", st.hasSavedGame && st.saveNotice == null) }
         continueGame(soft)
         soft.check("simpanan bercap versi saat ini tanpa spanduk") { rule.onNodeWithTag("save_notice").assertDoesNotExist() }
         soft.done()
@@ -157,7 +165,8 @@ class PhoneUiTest : UiTestBase() {
     @Test
     fun lostGame_showsGameOverPanel_andNewGameWorks() {
         val soft = Soft()
-        launch(UiSaves.lost)
+        val st = launch(UiSaves.lost)
+        soft.check("ViewModel memuat simpanan yang berakhir kalah") { assertTrue("$st", st.hasSavedGame && st.gameOverReason != null) }
         soft.check("menu menandai permainan berakhir") { rule.onNodeWithText("Permainan berakhir", substring = true).assertExists() }
         UiShots.save(rule, "phone_gameover_00_menu")
         continueGame(soft)

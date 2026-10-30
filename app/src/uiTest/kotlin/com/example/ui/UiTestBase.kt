@@ -1,27 +1,20 @@
 package com.example.ui
 
 import android.app.Application
-import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.assertTextContains
-import androidx.compose.ui.test.hasAnyAncestor
-import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextReplacement
+import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import com.example.MainActivity
-import com.example.engine.Difficulty
-import com.example.engine.Role
+import com.example.model.GameState
+import com.example.viewmodel.KapitalViewModel
 import org.junit.After
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TestName
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
@@ -34,16 +27,45 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 abstract class UiTestBase {
     @get:Rule val rule = createEmptyComposeRule()
+    @get:Rule val testName = TestName()
     private var scenario: ActivityScenario<MainActivity>? = null
     abstract val shot: String
 
-    protected fun launch(saveText: String?) {
+    private fun menuVisible(): Boolean = try { rule.tagExists("menu_new_game") } catch (_: AssertionError) { false }
+
+    /**
+     * Menyuntikkan berkas simpanan (atau menghapusnya), meluncurkan aplikasi, menunggu menu tampil, dan mengembalikan keadaan
+     * permainan yang SEBENARNYA dimuat ViewModel. Pembanding ini memisahkan kegagalan pemuatan simpanan dari kegagalan tampilan;
+     * catatan harness ditulis ke _diag.txt.
+     */
+    protected fun launch(saveText: String?): GameState {
         try { scenario?.close() } catch (_: Throwable) { }
         val app = ApplicationProvider.getApplicationContext<Application>()
         val f = File(app.filesDir, "kapital_save.txt")
         if (saveText != null) f.writeText(saveText) else f.delete()
-        scenario = ActivityScenario.launch(MainActivity::class.java)
+        val sizeBefore = if (f.exists()) f.length() else -1L
+        val t0 = System.nanoTime()
+        val sc = ActivityScenario.launch(MainActivity::class.java)
+        scenario = sc
         rule.waitForIdle()
+        rule.waitUntil(timeoutMillis = 120_000) { menuVisible() }
+        val ms = (System.nanoTime() - t0) / 1_000_000
+        var st: GameState? = null
+        var actDir = "?"
+        var sameApp = false
+        sc.onActivity { a ->
+            actDir = a.filesDir.absolutePath
+            sameApp = a.application === app
+            st = ViewModelProvider(a)[KapitalViewModel::class.java].gameState.value
+        }
+        val s = st ?: throw AssertionError("ViewModel tidak terjangkau dari aktivitas")
+        UiShots.note(
+            "[${testName.methodName}] simpanan=${saveText?.lines()?.size ?: "tanpa"} baris; berkas sebelum=$sizeBefore setelah=${if (f.exists()) f.length() else -1L}; " +
+                "folder uji=${app.filesDir.absolutePath} folder aktivitas=$actDir sama=${actDir == app.filesDir.absolutePath} aplikasiSama=$sameApp; " +
+                "VM: giliran=${s.turn} era=${s.eraNumber} tersimpan=${s.hasSavedGame} berakhir=${s.gameOverReason != null} spanduk=${s.saveNotice != null}; " +
+                "UI: lanjutkan=${rule.tagExists("menu_continue")}; ${ms} ms"
+        )
+        return s
     }
 
     @After fun closeScenario() { try { scenario?.close() } catch (_: Throwable) { } }
@@ -95,7 +117,8 @@ abstract class UiTestBase {
     @Test
     fun savedGame_everyTabAndSubtabRenders() {
         val soft = Soft()
-        launch(UiSaves.early)
+        val st = launch(UiSaves.early)
+        soft.check("ViewModel memuat simpanan awal (tersimpan, Era 1)") { assertTrue("$st", st.hasSavedGame && st.eraNumber == 1) }
         UiShots.save(rule, "${shot}_early_00_menu")
         continueGame(soft)
         soft.check("bilah atas menampilkan giliran dan era") { assertTrue("turnAndEra null", rule.turnAndEra() != null) }
@@ -108,7 +131,9 @@ abstract class UiTestBase {
     @Test
     fun lateGame_everyTabAndSubtabRenders() {
         val soft = Soft()
-        launch(UiSaves.late)
+        val st = launch(UiSaves.late)
+        soft.check("ViewModel memuat simpanan akhir permainan (Era 3 atau 4)") { assertTrue("giliran=${st.turn} era=${st.eraNumber}", st.eraNumber >= 3) }
+        UiShots.save(rule, "${shot}_late_00_menu")
         continueGame(soft)
         soft.check("bilah atas menampilkan era akhir") {
             val te = rule.turnAndEra()
